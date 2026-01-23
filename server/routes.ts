@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { ephemeralStore } from "./services/store";
+import { sendVaultEmail, getRemainingEmailQuota } from "./services/email";
+import { codeLimiter, uploadLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "./replit_integrations/object_storage";
@@ -12,148 +14,214 @@ export async function registerRoutes(
 ): Promise<Server> {
   const objectStorage = new ObjectStorageService();
 
-  // Register base object storage routes (for generic uploads if needed, but we use custom flow)
+  // Register base object storage routes
   registerObjectStorageRoutes(app);
 
-  // --- Vault Operations ---
+  // =============================================================================
+  // VAULT OPERATIONS
+  // =============================================================================
 
+  // Create a new vault
   app.post(api.vaults.create.path, async (req, res) => {
     try {
       const input = api.vaults.create.input.parse(req.body);
-      const vault = await storage.createVault(input);
-      
+      const vault = await ephemeralStore.createVault(input);
+
       const response = {
         id: vault.id,
-        shortCode: vault.shortCode!,
+        shortCode: vault.shortCode,
         expiresAt: vault.expiresAt.toISOString(),
-        directLink: `/v/${vault.id}`, // Frontend route
+        directLink: `/v/${vault.id}`,
       };
-      
+
       res.status(201).json(response);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
           message: err.errors[0].message,
-          field: err.errors[0].path.join('.'),
+          field: err.errors[0].path.join("."),
         });
       }
       throw err;
     }
   });
 
+  // Get vault info
   app.get(api.vaults.get.path, async (req, res) => {
-    const vault = await storage.getVault(req.params.id);
-    
-    if (!vault || vault.isDeleted) {
-        return res.status(404).json({ message: "Vault not found" });
+    // Security headers for download routes
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Clear-Site-Data": '"cache"',
+    });
+
+    const vault = await ephemeralStore.getVault(req.params.id);
+
+    if (!vault) {
+      return res.status(404).json({ message: "Vault not found or expired" });
     }
 
-    // Check expiry
+    // Check if expired or depleted
     if (new Date() > vault.expiresAt || vault.downloadCount >= vault.maxDownloads) {
-        // Lazy cleanup
-        // await storage.cleanupExpiredVaults(); // Could be async background
-        return res.status(410).json({ message: "Vault expired" });
+      await ephemeralStore.deleteVault(vault.id);
+      return res.status(410).json({ message: "Vault expired or download limit reached" });
     }
 
-    const files = await storage.getFiles(vault.id);
-    
-    // Return encrypted metadata + file structure
     res.json({
-        ...vault,
-        files: files.map(f => ({
-            fileId: f.fileId,
-            chunkCount: f.chunkCount,
-            totalSize: f.totalSize
-        }))
+      id: vault.id,
+      shortCode: vault.shortCode,
+      encryptedMetadata: vault.encryptedMetadata,
+      expiresAt: vault.expiresAt.toISOString(),
+      maxDownloads: vault.maxDownloads,
+      downloadCount: vault.downloadCount,
+      files: vault.files.map((f) => ({
+        fileId: f.fileId,
+        chunkCount: f.chunkCount,
+        totalSize: f.totalSize,
+      })),
     });
   });
 
-  app.get(api.vaults.resolveCode.path, async (req, res) => {
-      const vault = await storage.getVaultByShortCode(req.params.code.toUpperCase());
-      if (!vault || vault.isDeleted) {
-          return res.status(404).json({ message: "Vault not found" });
-      }
-       if (new Date() > vault.expiresAt || vault.downloadCount >= vault.maxDownloads) {
-        return res.status(404).json({ message: "Vault expired" });
+  // Resolve short code to vault ID (with strict rate limiting)
+  app.get(api.vaults.resolveCode.path, codeLimiter, async (req, res) => {
+    const vault = await ephemeralStore.getVaultByShortCode(req.params.code.toUpperCase());
+
+    if (!vault) {
+      return res.status(404).json({ message: "Invalid code or vault expired" });
     }
-      res.json({ id: vault.id });
+
+    if (new Date() > vault.expiresAt || vault.downloadCount >= vault.maxDownloads) {
+      return res.status(410).json({ message: "Vault expired" });
+    }
+
+    res.json({ id: vault.id });
   });
 
+  // Mark download (increment counter)
   app.post(api.vaults.download.path, async (req, res) => {
-      const vault = await storage.getVault(req.params.id);
-      if (!vault || vault.isDeleted) return res.status(404).json({ message: "Vault not found" });
+    const vault = await ephemeralStore.getVault(req.params.id);
 
-      if (vault.downloadCount >= vault.maxDownloads) {
-          return res.status(403).json({ message: "Download limit exceeded" });
-      }
+    if (!vault) {
+      return res.status(404).json({ message: "Vault not found" });
+    }
 
-      await storage.incrementDownloadCount(vault.id);
-      res.json({ success: true });
+    if (vault.downloadCount >= vault.maxDownloads) {
+      return res.status(403).json({ message: "Download limit exceeded" });
+    }
+
+    await ephemeralStore.incrementDownloadCount(vault.id);
+    res.json({ success: true, remainingDownloads: vault.maxDownloads - vault.downloadCount - 1 });
   });
 
-  // --- Chunk Operations ---
+  // =============================================================================
+  // EMAIL OPERATIONS (Phase 2.3)
+  // =============================================================================
 
-  app.post(api.chunks.getUploadUrl.path, async (req, res) => {
-      const { id, fileId, chunkIndex } = req.params;
-      const { size } = req.body;
+  app.post("/api/v1/vault/:id/email", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { to, senderName } = req.body;
 
-      // Verify vault exists and is valid
-      const vault = await storage.getVault(id);
-      if (!vault) return res.status(404).json({ message: "Vault not found" });
+      if (!to || typeof to !== "string") {
+        return res.status(400).json({ message: "Email address required" });
+      }
 
-      // Create chunk record
-      await storage.createChunk(fileId, parseInt(chunkIndex), size);
+      const vault = await ephemeralStore.getVault(id);
+      if (!vault) {
+        return res.status(404).json({ message: "Vault not found" });
+      }
 
-      // Generate Presigned URL
-      // Path: /private/vaults/{vaultId}/{fileId}/{chunkIndex}
-      const uploadUrl = await objectStorage.getObjectEntityUploadURL();
-      // The integration generates a random UUID path. We accept that.
-      // We need to return the mapping so the client knows where it went?
-      // Actually, the integration `getObjectEntityUploadURL` returns a URL. 
-      // AND `normalizeObjectEntityPath` can extract the path.
-      
-      const storagePath = objectStorage.normalizeObjectEntityPath(uploadUrl);
-      
-      res.json({
-          uploadUrl,
-          storagePath
+      // Check quota
+      const remaining = getRemainingEmailQuota(id);
+      if (remaining <= 0) {
+        return res.status(429).json({ message: "Email limit reached for this vault" });
+      }
+
+      const result = await sendVaultEmail({
+        to,
+        vaultId: vault.id,
+        shortCode: vault.shortCode,
+        expiresAt: vault.expiresAt,
+        senderName,
       });
-  });
 
-  app.put(api.chunks.markUploaded.path, async (req, res) => {
-      const { id, fileId, chunkIndex } = req.params;
-      const { storagePath } = req.body;
-
-      await storage.updateChunkStatus(fileId, parseInt(chunkIndex), storagePath);
-      res.json({ success: true });
-  });
-
-  app.get(api.chunks.getDownloadUrl.path, async (req, res) => {
-      const { id, fileId, chunkIndex } = req.params;
-      
-      const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
-      if (!chunk || !chunk.isUploaded || !chunk.storagePath) {
-          return res.status(404).json({ message: "Chunk not found or not ready" });
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
       }
 
-      // Generate Signed GET URL
-      // The integration `downloadObject` streams the file. 
-      // But we want a presigned URL for the client to fetch directly if possible?
-      // The integration helper `objectStorageClient` is exported.
-      // But `objectAcl.ts` / `objectStorage.ts` helpers don't expose "getSignedUrl" for GET easily.
-      // `signObjectURL` is internal to `objectStorage.ts`.
-      
-      // Alternative: Serve via proxy endpoint `GET /objects/:path`.
-      // We already have `GET /objects/*` registered in `registerObjectStorageRoutes`.
-      // The path is `chunk.storagePath`.
-      // So we construct the URL to *our* proxy.
-      
-      // NOTE: `chunk.storagePath` looks like `/objects/{uuid}`.
-      // Our proxy is `app.get("/objects/:objectPath(*)")`.
-      
-      const downloadUrl = chunk.storagePath; // e.g. /objects/uuid
-      
-      res.json({ downloadUrl });
+      res.json({
+        success: true,
+        remainingEmails: remaining - 1,
+        previewUrl: result.previewUrl, // Only in dev mode
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to send email" });
+    }
+  });
+
+  // =============================================================================
+  // CHUNK OPERATIONS
+  // =============================================================================
+
+  // Get presigned upload URL for a chunk
+  app.post(api.chunks.getUploadUrl.path, uploadLimiter, async (req, res) => {
+    const { id, fileId, chunkIndex } = req.params;
+    const { size } = req.body;
+
+    const vault = await ephemeralStore.getVault(id);
+    if (!vault) {
+      return res.status(404).json({ message: "Vault not found" });
+    }
+
+    // Generate presigned URL
+    const uploadUrl = await objectStorage.getObjectEntityUploadURL();
+    const storagePath = objectStorage.normalizeObjectEntityPath(uploadUrl);
+
+    res.json({
+      uploadUrl,
+      storagePath,
+    });
+  });
+
+  // Mark chunk as uploaded
+  app.put(api.chunks.markUploaded.path, async (req, res) => {
+    const { id, fileId, chunkIndex } = req.params;
+    const { storagePath } = req.body;
+
+    await ephemeralStore.updateChunkPath(id, fileId, parseInt(chunkIndex), storagePath);
+    res.json({ success: true });
+  });
+
+  // Get download URL for a chunk
+  app.get(api.chunks.getDownloadUrl.path, async (req, res) => {
+    // Security headers
+    res.set({
+      "Cache-Control": "no-store",
+      "Clear-Site-Data": '"cache", "storage"',
+    });
+
+    const { id, fileId, chunkIndex } = req.params;
+
+    const storagePath = await ephemeralStore.getChunkPath(id, fileId, parseInt(chunkIndex));
+    if (!storagePath) {
+      return res.status(404).json({ message: "Chunk not found" });
+    }
+
+    // Return the proxy path
+    res.json({ downloadUrl: storagePath });
+  });
+
+  // =============================================================================
+  // HEALTH CHECK
+  // =============================================================================
+
+  app.get("/api/health", (_req, res) => {
+    const stats = ephemeralStore.getStats();
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      vaults: stats.vaultCount,
+      chunks: stats.totalChunks,
+    });
   });
 
   return httpServer;

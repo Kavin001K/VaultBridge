@@ -1,86 +1,332 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 240 10% 4%;
-  --foreground: 0 0% 98%;
+/* =============================================================================
+   DESIGN SYSTEM: "Zinc Dark" with Emerald Accents
+   Premium Cyber-Security Product Aesthetic
+============================================================================= */
 
-  --card: 240 10% 6%;
+:root {
+  /* Zinc Dark Theme */
+  --background: 240 6% 6%;
+  /* zinc-950 */
+  --foreground: 0 0% 98%;
+  /* zinc-50 */
+
+  --card: 240 5% 8%;
+  /* Slightly lighter than bg */
   --card-foreground: 0 0% 98%;
 
-  --popover: 240 10% 6%;
+  --popover: 240 5% 10%;
   --popover-foreground: 0 0% 98%;
 
-  --primary: 142 70% 50%;
+  /* Emerald Primary (Security/Success) */
+  --primary: 142 71% 45%;
+  /* emerald-500 */
   --primary-foreground: 144 100% 5%;
 
-  --secondary: 240 5% 15%;
-  --secondary-foreground: 0 0% 98%;
-
-  --muted: 240 5% 15%;
-  --muted-foreground: 240 5% 65%;
-
-  --accent: 142 70% 50%;
-  --accent-foreground: 144 100% 5%;
-
-  --destructive: 0 62% 30%;
+  /* Rose Destructive (Expiry/Warning) */
+  --destructive: 346 77% 50%;
+  /* rose-500 */
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 5% 20%;
-  --input: 240 5% 20%;
-  --ring: 142 70% 50%;
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
 
-  --radius: 0.5rem;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 55%;
 
-  --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --accent: 142 71% 45%;
+  --accent-foreground: 144 100% 5%;
+
+  --border: 240 4% 18%;
+  --input: 240 4% 18%;
+  --ring: 142 71% 45%;
+
+  --radius: 0.75rem;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
+
+/* =============================================================================
+   BASE STYLES
+============================================================================= */
 
 @layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply antialiased;
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased font-sans;
-    background-image: 
-      linear-gradient(rgba(18, 18, 18, 0.9), rgba(18, 18, 18, 0.9)),
-      linear-gradient(0deg, transparent 24%, rgba(0, 255, 157, 0.03) 25%, rgba(0, 255, 157, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 157, 0.03) 75%, rgba(0, 255, 157, 0.03) 76%, transparent 77%, transparent),
-      linear-gradient(90deg, transparent 24%, rgba(0, 255, 157, 0.03) 25%, rgba(0, 255, 157, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 157, 0.03) 75%, rgba(0, 255, 157, 0.03) 76%, transparent 77%, transparent);
-    background-size: 100% 100%, 50px 50px, 50px 50px;
+    @apply bg-background text-foreground font-sans;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.08), transparent),
+      linear-gradient(180deg, hsl(240, 6%, 6%) 0%, hsl(240, 6%, 4%) 100%);
+    min-height: 100vh;
+  }
+
+  ::selection {
+    @apply bg-primary/30 text-foreground;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full hover:bg-muted-foreground/30;
   }
 }
 
+/* =============================================================================
+   COMPONENT STYLES
+============================================================================= */
+
 @layer components {
-  .cyber-card {
-    @apply bg-card border border-border/50 rounded-xl shadow-lg relative overflow-hidden;
-  }
-  
-  .cyber-card::before {
-    content: "";
-    @apply absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300;
+
+  /* Glass Card Effect */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+      0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
 
-  .cyber-card:hover::before {
+  /* Glowing Border Effect */
+  .glow-border {
+    @apply relative overflow-hidden;
+  }
+
+  .glow-border::before {
+    content: "";
+    @apply absolute -inset-[1px] rounded-2xl opacity-0 transition-opacity duration-500;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, transparent 50%, hsl(var(--primary)) 100%);
+  }
+
+  .glow-border:hover::before {
     @apply opacity-100;
   }
 
-  .cyber-input {
-    @apply bg-secondary/50 border-input text-foreground font-mono focus:ring-primary/30 focus:border-primary/50 transition-all duration-200;
+  /* Drop Zone Glow */
+  .dropzone-glow {
+    @apply relative transition-all duration-300;
   }
 
-  .cyber-button {
-    @apply font-mono uppercase tracking-wider font-bold transition-all duration-200 hover:shadow-[0_0_15px_rgba(34,197,94,0.3)];
+  .dropzone-glow.active {
+    @apply border-primary bg-primary/5;
+    box-shadow:
+      0 0 30px rgba(16, 185, 129, 0.2),
+      0 0 60px rgba(16, 185, 129, 0.1),
+      inset 0 0 30px rgba(16, 185, 129, 0.05);
   }
 
+  /* Cyber Button */
+  .cyber-btn {
+    @apply relative font-mono font-bold uppercase tracking-wider;
+    @apply px-8 py-4 rounded-xl;
+    @apply bg-primary text-primary-foreground;
+    @apply transition-all duration-300;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .cyber-btn:hover {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+  }
+
+  .cyber-btn:disabled:hover {
+    box-shadow: none;
+  }
+
+  .cyber-btn::before {
+    content: "";
+    @apply absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
+  }
+
+  .cyber-btn:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Code Input Style */
+  .code-input {
+    @apply font-mono text-center text-3xl tracking-[0.5em] uppercase;
+    @apply bg-zinc-900/80 border-2 border-zinc-700 rounded-xl;
+    @apply focus:border-primary focus:ring-4 focus:ring-primary/20;
+    @apply placeholder:text-zinc-600 placeholder:tracking-[0.3em];
+    @apply transition-all duration-300;
+  }
+
+  /* Terminal/Matrix Text Effect */
+  .matrix-text {
+    @apply font-mono text-primary;
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+  }
+
+  /* Ticket/Card Dashed Border */
+  .ticket-border {
+    @apply relative;
+  }
+
+  .ticket-border::before,
+  .ticket-border::after {
+    content: "";
+    @apply absolute left-0 right-0 h-[1px];
+    background: repeating-linear-gradient(90deg,
+        hsl(var(--border)) 0px,
+        hsl(var(--border)) 8px,
+        transparent 8px,
+        transparent 16px);
+  }
+
+  .ticket-border::before {
+    @apply top-0;
+  }
+
+  .ticket-border::after {
+    @apply bottom-0;
+  }
+
+  /* Progress Steps */
+  .progress-step {
+    @apply flex items-center gap-3 py-2 px-3 rounded-lg transition-all duration-300;
+  }
+
+  .progress-step.active {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .progress-step.completed {
+    @apply text-primary opacity-60;
+  }
+
+  .progress-step.pending {
+    @apply text-muted-foreground opacity-40;
+  }
+
+  /* Countdown Timer */
+  .countdown-digit {
+    @apply inline-flex items-center justify-center;
+    @apply w-12 h-14 bg-zinc-900 border border-zinc-700 rounded-lg;
+    @apply font-mono text-2xl font-bold text-primary;
+  }
+
+  /* Scanline Effect (Subtle) */
   .scanline {
-    @apply absolute inset-0 pointer-events-none z-50 mix-blend-overlay opacity-[0.03];
-    background: linear-gradient(to bottom, transparent 50%, black 51%);
+    @apply fixed inset-0 pointer-events-none z-[100] mix-blend-overlay opacity-[0.02];
+    background: linear-gradient(to bottom,
+        transparent 0%,
+        transparent 50%,
+        rgba(0, 0, 0, 0.3) 50%,
+        transparent 100%);
     background-size: 100% 4px;
-    animation: scanline 10s linear infinite;
+    animation: scanline 8s linear infinite;
+  }
+
+  /* Grid Background */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 }
 
+/* =============================================================================
+   ANIMATIONS
+============================================================================= */
+
 @keyframes scanline {
-  0% { background-position: 0 0; }
-  100% { background-position: 0 100%; }
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.5);
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes matrix-rain {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+============================================================================= */
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)) 0%, #a3e635 100%);
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--border))) 1;
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+  }
 }

@@ -1,15 +1,21 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UploadCloud, File, X, AlertCircle } from "lucide-react";
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
-export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
+export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  // Notify parent of drag state changes
+  useEffect(() => {
+    onDragStateChange?.(isDragging);
+  }, [isDragging, onDragStateChange]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -57,8 +63,8 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
           border-2 border-dashed rounded-xl p-10
           transition-all duration-300 ease-in-out
           flex flex-col items-center justify-center text-center
-          ${isDragging 
-            ? "border-primary bg-primary/5 shadow-[0_0_30px_rgba(34,197,94,0.1)]" 
+          ${isDragging
+            ? "border-primary bg-primary/5 shadow-[0_0_30px_rgba(34,197,94,0.1)]"
             : "border-border hover:border-primary/50 hover:bg-secondary/30"}
           ${disabled ? "opacity-50 cursor-not-allowed" : ""}
         `}
@@ -70,11 +76,11 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
           onChange={handleFileInput}
           disabled={disabled}
         />
-        
+
         <div className="w-16 h-16 mb-4 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
           <UploadCloud className={`w-8 h-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
         </div>
-        
+
         <h3 className="text-lg font-semibold mb-1">
           {isDragging ? "Drop it securely" : "Drag & drop files here"}
         </h3>
@@ -88,7 +94,7 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
 
       <AnimatePresence>
         {selectedFiles.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -98,7 +104,7 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
               <span>Selected Files ({selectedFiles.length})</span>
               <span>{(totalSize / (1024 * 1024)).toFixed(2)} MB Total</span>
             </div>
-            
+
             {selectedFiles.map((file, idx) => (
               <motion.div
                 key={`${file.name}-${idx}`}
@@ -116,9 +122,9 @@ export function FileDropzone({ onFilesSelected, disabled }: FileDropzoneProps) {
                     <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
                   </div>
                 </div>
-                
+
                 {!disabled && (
-                  <button 
+                  <button
                     onClick={() => removeFile(idx)}
                     className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors"
                   >
