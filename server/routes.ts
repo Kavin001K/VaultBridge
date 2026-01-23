@@ -113,6 +113,46 @@ export async function registerRoutes(
   });
 
   // =============================================================================
+  // SPLIT-CODE ZERO-KNOWLEDGE LOOKUP (Air-Gapped Transfer)
+  // =============================================================================
+
+  // Lookup vault by 3-digit lookupId - returns vault data without requiring PIN
+  // The server NEVER sees the PIN and NEVER sees the raw file key
+  app.get(api.vaults.codeLookup.path, codeLimiter, async (req, res) => {
+    const vault = await ephemeralStore.getVaultByLookupId(req.params.lookupId);
+
+    if (!vault) {
+      return res.status(404).json({ message: "Invalid code or vault expired" });
+    }
+
+    // Check if expired or depleted
+    if (new Date() > vault.expiresAt || vault.downloadCount >= vault.maxDownloads) {
+      await ephemeralStore.deleteVault(vault.id);
+      return res.status(410).json({ message: "Vault expired or download limit reached" });
+    }
+
+    // Crucial: We return the wrappedKey, but NOT the PIN
+    // The client will use the PIN (entered locally) to unwrap the key
+    if (!vault.wrappedKey) {
+      return res.status(400).json({ message: "This vault does not support split-code access" });
+    }
+
+    res.json({
+      id: vault.id,
+      wrappedKey: vault.wrappedKey,
+      encryptedMetadata: vault.encryptedMetadata,
+      expiresAt: vault.expiresAt.toISOString(),
+      maxDownloads: vault.maxDownloads,
+      downloadCount: vault.downloadCount,
+      files: vault.files.map((f) => ({
+        fileId: f.fileId,
+        chunkCount: f.chunkCount,
+        totalSize: f.totalSize,
+      })),
+    });
+  });
+
+  // =============================================================================
   // EMAIL OPERATIONS (Phase 2.3)
   // =============================================================================
 

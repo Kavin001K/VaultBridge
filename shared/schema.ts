@@ -6,7 +6,9 @@ import { z } from "zod";
 
 export const vaults = pgTable("vaults", {
   id: uuid("id").primaryKey().defaultRandom(),
-  shortCode: text("short_code").unique(), // 6-char alphanumeric
+  shortCode: text("short_code").unique(), // 6-char alphanumeric (legacy)
+  lookupId: text("lookup_id").unique(), // 3-digit numeric ID for split-code lookup
+  wrappedKey: text("wrapped_key"), // File key encrypted by PIN (for split-code vaults)
   encryptedMetadata: text("encrypted_metadata").notNull(), // Encrypted JSON blob containing filenames, types, sizes
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
@@ -58,6 +60,8 @@ export const createVaultRequestSchema = z.object({
   expiresIn: z.number().min(1).max(168), // Hours, max 1 week
   maxDownloads: z.number().min(1).max(100),
   encryptedMetadata: z.string(), // Encrypted JSON of filenames, etc.
+  lookupId: z.string().length(3).optional(), // 3-digit numeric ID for split-code lookup
+  wrappedKey: z.string().optional(), // File key encrypted by PIN (for split-code vaults)
   files: z.array(z.object({
     fileId: z.string(),
     chunks: z.number(),

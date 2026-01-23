@@ -1,28 +1,114 @@
 import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, AlertTriangle, Copy, Check, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VaultCard } from "@/components/vault-card";
 import { useGetVault } from "@/hooks/use-vaults";
+import { useToast } from "@/hooks/use-toast";
+
+// Component to display the split code prominently
+function SplitCodeDisplay({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+
+  const lookupId = code.slice(0, 3);
+  const pin = code.slice(3, 6);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    toast({
+      title: "Code Copied!",
+      description: "The access code has been copied to clipboard.",
+    });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.4 }}
+      className="glass-card p-8 mb-8"
+    >
+      {/* Code Display */}
+      <div className="text-center mb-6">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Key className="w-6 h-6 text-primary" />
+          <span className="text-sm font-mono uppercase tracking-wider text-muted-foreground">
+            Access Code
+          </span>
+        </div>
+
+        <div className="flex items-center justify-center gap-4">
+          <div className="bg-primary/10 border-2 border-primary/30 rounded-xl py-4 px-6">
+            <span className="text-5xl font-mono font-bold tracking-[0.3em] text-primary">
+              {lookupId}
+            </span>
+          </div>
+          <span className="text-4xl font-bold text-muted-foreground">—</span>
+          <div className="bg-zinc-800 border-2 border-zinc-600 rounded-xl py-4 px-6">
+            <span className="text-5xl font-mono font-bold tracking-[0.3em] text-white">
+              {pin}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            className="gap-2"
+          >
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copied ? "Copied!" : "Copy Code"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Security Warning */}
+      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-400">Write this down. It works only once.</p>
+            <p className="text-xs text-amber-300/80 mt-1">
+              This code is your only way to access these files. The recipient needs both parts
+              to decrypt the files. After download limit or expiration, it cannot be recovered.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* How It Works */}
+      <div className="mt-6 pt-6 border-t border-border/50">
+        <p className="text-xs text-muted-foreground text-center">
+          <span className="text-primary font-semibold">{lookupId}</span> = Public ID (finds the file on server) •
+          <span className="text-white font-semibold ml-1">{pin}</span> = Private PIN (decrypts the key locally)
+        </p>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Success() {
   const [, params] = useRoute("/success/:id");
-  const [fullLink, setFullLink] = useState("");
-  const [keyPart, setKeyPart] = useState("");
+  const [splitCode, setSplitCode] = useState("");
+  const { toast } = useToast();
 
   const vaultId = params?.id || "";
   const { data: vault } = useGetVault(vaultId);
 
   useEffect(() => {
-    // Reconstruct the full share link from current URL
-    const hash = window.location.hash; // #key=...
-    const baseUrl = window.location.origin;
-    const shareUrl = `${baseUrl}/v/${params?.id}${hash}`;
-
-    setFullLink(shareUrl);
-    setKeyPart(hash.replace("#key=", ""));
-  }, [params?.id]);
+    // Extract the split code from URL hash
+    const hash = window.location.hash;
+    const codeMatch = hash.match(/#code=(\d{6})/);
+    if (codeMatch) {
+      setSplitCode(codeMatch[1]);
+    }
+  }, []);
 
   const handleSendEmail = async (email: string) => {
     const res = await fetch(`/api/v1/vault/${vaultId}/email`, {
@@ -107,24 +193,26 @@ export default function Success() {
             <span className="text-primary">VAULT</span> CREATED
           </h1>
           <p className="text-lg text-muted-foreground max-w-md mx-auto">
-            Your files are encrypted and ready to share. Copy the link or scan
-            the QR code.
+            Your files are encrypted and ready to share. Share the access code below.
           </p>
         </motion.div>
 
-        {/* Vault Card */}
+        {/* Split Code Display */}
+        {splitCode && <SplitCodeDisplay code={splitCode} />}
+
+        {/* Vault Card (optional metadata) */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.5 }}
         >
           {vault && (
             <VaultCard
               vaultId={vault.id}
-              shortCode={vault.shortCode || "------"}
-              fullLink={fullLink}
+              shortCode={splitCode ? `${splitCode.slice(0, 3)}-${splitCode.slice(3, 6)}` : vault.shortCode || "------"}
+              fullLink={`${window.location.origin}/access`}
               filesCount={vault.files?.length || 0}
-              totalSize={vault.files?.reduce((acc, f) => acc + f.totalSize, 0) || 0}
+              totalSize={vault.files?.reduce((acc: number, f: { totalSize: number }) => acc + f.totalSize, 0) || 0}
               expiresAt={vault.expiresAt}
               downloads={vault.downloadCount}
               maxDownloads={vault.maxDownloads}
@@ -137,13 +225,13 @@ export default function Success() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.6 }}
           className="mt-8 text-center"
         >
           <p className="text-sm text-muted-foreground">
-            🔐 The encryption key is stored only in the URL fragment (after #).
+            🔐 Zero-Knowledge Transfer: The PIN never touches our servers.
             <br />
-            It is never sent to our servers.
+            Only the recipient with the full 6-digit code can decrypt the files.
           </p>
         </motion.div>
       </main>

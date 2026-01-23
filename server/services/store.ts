@@ -10,6 +10,8 @@ import { randomUUID } from "crypto";
 export interface VaultMetadata {
     id: string;
     shortCode: string;
+    lookupId?: string; // 3-digit numeric ID for split-code lookup
+    wrappedKey?: string; // File key encrypted by PIN (for split-code vaults)
     encryptedMetadata: string;
     createdAt: Date;
     expiresAt: Date;
@@ -27,6 +29,8 @@ export interface CreateVaultInput {
     expiresIn: number; // Hours
     maxDownloads: number;
     encryptedMetadata: string;
+    lookupId?: string; // 3-digit numeric ID for split-code lookup
+    wrappedKey?: string; // File key encrypted by PIN (for split-code vaults)
     files: {
         fileId: string;
         chunks: number;
@@ -37,6 +41,7 @@ export interface CreateVaultInput {
 class EphemeralStore {
     private vaults: Map<string, VaultMetadata> = new Map();
     private codeIndex: Map<string, string> = new Map(); // shortCode -> vaultId
+    private lookupIdIndex: Map<string, string> = new Map(); // lookupId -> vaultId
     private cleanupInterval: NodeJS.Timeout | null = null;
 
     constructor() {
@@ -74,6 +79,8 @@ class EphemeralStore {
         const vault: VaultMetadata = {
             id,
             shortCode,
+            lookupId: input.lookupId,
+            wrappedKey: input.wrappedKey,
             encryptedMetadata: input.encryptedMetadata,
             createdAt: now,
             expiresAt,
@@ -89,6 +96,11 @@ class EphemeralStore {
 
         this.vaults.set(id, vault);
         this.codeIndex.set(shortCode, id);
+
+        // Index by lookupId if provided (for split-code vaults)
+        if (input.lookupId) {
+            this.lookupIdIndex.set(input.lookupId, id);
+        }
 
         // Schedule auto-delete
         setTimeout(() => this.deleteVault(id), input.expiresIn * 60 * 60 * 1000);
@@ -117,6 +129,15 @@ class EphemeralStore {
      */
     async getVaultByShortCode(code: string): Promise<VaultMetadata | null> {
         const vaultId = this.codeIndex.get(code.toUpperCase());
+        if (!vaultId) return null;
+        return this.getVault(vaultId);
+    }
+
+    /**
+     * Get vault by lookup ID (3-digit numeric code for split-code vaults)
+     */
+    async getVaultByLookupId(lookupId: string): Promise<VaultMetadata | null> {
+        const vaultId = this.lookupIdIndex.get(lookupId);
         if (!vaultId) return null;
         return this.getVault(vaultId);
     }
@@ -181,6 +202,11 @@ class EphemeralStore {
 
         this.vaults.delete(id);
         this.codeIndex.delete(vault.shortCode);
+
+        // Also remove from lookupId index if present
+        if (vault.lookupId) {
+            this.lookupIdIndex.delete(vault.lookupId);
+        }
 
         console.log(`[store] Vault ${id} deleted. ${storagePaths.length} chunks marked for cleanup.`);
         return storagePaths;

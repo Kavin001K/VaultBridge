@@ -11,11 +11,11 @@ export function useGetVault(id: string) {
     queryFn: async () => {
       const url = buildUrl(api.vaults.get.path, { id });
       const res = await fetch(url);
-      
+
       if (res.status === 404) return null;
       if (res.status === 410) throw new Error("This vault has expired or been deleted.");
       if (!res.ok) throw new Error("Failed to fetch vault");
-      
+
       return api.vaults.get.responses[200].parse(await res.json());
     },
     enabled: !!id,
@@ -47,7 +47,7 @@ export function useCreateVault() {
     mutationFn: async (data: CreateVaultRequest) => {
       // Validate input at runtime
       const validated = api.vaults.create.input.parse(data);
-      
+
       const res = await fetch(api.vaults.create.path, {
         method: api.vaults.create.method,
         headers: { "Content-Type": "application/json" },
@@ -77,23 +77,23 @@ export function useCreateVault() {
 // Get Chunk Upload URL
 export function useGetChunkUploadUrl() {
   return useMutation({
-    mutationFn: async ({ 
-      vaultId, 
-      fileId, 
-      chunkIndex, 
-      size 
-    }: { 
-      vaultId: string, 
-      fileId: string, 
-      chunkIndex: number, 
-      size: number 
+    mutationFn: async ({
+      vaultId,
+      fileId,
+      chunkIndex,
+      size
+    }: {
+      vaultId: string,
+      fileId: string,
+      chunkIndex: number,
+      size: number
     }) => {
-      const url = buildUrl(api.chunks.getUploadUrl.path, { 
-        id: vaultId, 
-        fileId, 
-        chunkIndex 
+      const url = buildUrl(api.chunks.getUploadUrl.path, {
+        id: vaultId,
+        fileId,
+        chunkIndex
       });
-      
+
       const res = await fetch(url, {
         method: api.chunks.getUploadUrl.method,
         headers: { "Content-Type": "application/json" },
@@ -109,23 +109,23 @@ export function useGetChunkUploadUrl() {
 // Mark Chunk as Uploaded
 export function useMarkChunkUploaded() {
   return useMutation({
-    mutationFn: async ({ 
-      vaultId, 
-      fileId, 
-      chunkIndex, 
-      storagePath 
-    }: { 
-      vaultId: string, 
-      fileId: string, 
-      chunkIndex: number, 
-      storagePath: string 
+    mutationFn: async ({
+      vaultId,
+      fileId,
+      chunkIndex,
+      storagePath
+    }: {
+      vaultId: string,
+      fileId: string,
+      chunkIndex: number,
+      storagePath: string
     }) => {
-      const url = buildUrl(api.chunks.markUploaded.path, { 
-        id: vaultId, 
-        fileId, 
-        chunkIndex 
+      const url = buildUrl(api.chunks.markUploaded.path, {
+        id: vaultId,
+        fileId,
+        chunkIndex
       });
-      
+
       const res = await fetch(url, {
         method: api.chunks.markUploaded.method,
         headers: { "Content-Type": "application/json" },
@@ -141,21 +141,21 @@ export function useMarkChunkUploaded() {
 // Get Download URL for Chunk
 export function useGetChunkDownloadUrl() {
   return useMutation({
-    mutationFn: async ({ 
-      vaultId, 
-      fileId, 
-      chunkIndex 
-    }: { 
-      vaultId: string, 
-      fileId: string, 
-      chunkIndex: number 
+    mutationFn: async ({
+      vaultId,
+      fileId,
+      chunkIndex
+    }: {
+      vaultId: string,
+      fileId: string,
+      chunkIndex: number
     }) => {
-      const url = buildUrl(api.chunks.getDownloadUrl.path, { 
-        id: vaultId, 
-        fileId, 
-        chunkIndex 
+      const url = buildUrl(api.chunks.getDownloadUrl.path, {
+        id: vaultId,
+        fileId,
+        chunkIndex
       });
-      
+
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to get download URL");
       return api.chunks.getDownloadUrl.responses[200].parse(await res.json());
@@ -171,6 +171,22 @@ export function useTrackDownload() {
       const res = await fetch(url, { method: 'POST' });
       if (!res.ok) throw new Error("Failed to track download");
       return await res.json();
+    }
+  });
+}
+
+// Split-code lookup: Get vault by 3-digit lookupId (zero-knowledge access)
+export function useCodeLookup() {
+  return useMutation({
+    mutationFn: async (lookupId: string) => {
+      const url = buildUrl(api.vaults.codeLookup.path, { lookupId });
+      const res = await fetch(url);
+
+      if (res.status === 404) throw new Error("Invalid code or vault expired");
+      if (res.status === 410) throw new Error("Vault expired or download limit reached");
+      if (!res.ok) throw new Error("Failed to lookup vault");
+
+      return api.vaults.codeLookup.responses[200].parse(await res.json());
     }
   });
 }

@@ -48,12 +48,34 @@ export const api = {
       },
     },
     download: {
-        method: 'POST' as const, // POST because we might increment download count
-        path: '/api/vaults/:id/download',
-        responses: {
-            200: z.object({ success: true }),
-            403: z.object({ message: z.string() }) // Limit exceeded
-        }
+      method: 'POST' as const, // POST because we might increment download count
+      path: '/api/vaults/:id/download',
+      responses: {
+        200: z.object({ success: true }),
+        403: z.object({ message: z.string() }) // Limit exceeded
+      }
+    },
+    // Split-code lookup: Find vault by 3-digit lookupId
+    codeLookup: {
+      method: 'GET' as const,
+      path: '/api/vault/code/:lookupId',
+      responses: {
+        200: z.object({
+          id: z.string(),
+          wrappedKey: z.string(),
+          encryptedMetadata: z.string(),
+          expiresAt: z.string(),
+          maxDownloads: z.number(),
+          downloadCount: z.number(),
+          files: z.array(z.object({
+            fileId: z.string(),
+            chunkCount: z.number(),
+            totalSize: z.number(),
+          })),
+        }),
+        404: errorSchemas.notFound,
+        410: z.object({ message: z.string() }), // Gone (expired/deleted)
+      }
     }
   },
   chunks: {
