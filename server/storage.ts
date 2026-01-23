@@ -15,6 +15,7 @@ export interface IStorage {
     createVault(data: CreateVaultRequest): Promise<Vault>;
     getVault(id: string): Promise<Vault | undefined>;
     getVaultByShortCode(code: string): Promise<Vault | undefined>;
+    getVaultByLookupId(lookupId: string): Promise<Vault | undefined>;
     createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number): Promise<FileRecord>;
     getFiles(vaultId: string): Promise<FileRecord[]>;
     createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord>;
@@ -39,6 +40,8 @@ export class DatabaseStorage implements IStorage {
 
         const [vault] = await db.insert(vaults).values({
             shortCode,
+            lookupId: data.lookupId,   // Store the 3-digit lookup ID
+            wrappedKey: data.wrappedKey, // Store the PIN-encrypted key
             encryptedMetadata: data.encryptedMetadata,
             expiresAt,
             maxDownloads: data.maxDownloads,
@@ -46,22 +49,13 @@ export class DatabaseStorage implements IStorage {
 
         // Create file records
         for (const f of data.files) {
-            const [fileRecord] = await db.insert(files).values({
+            await db.insert(files).values({
                 vaultId: vault.id,
                 fileId: f.fileId,
                 chunkCount: f.chunks,
                 totalSize: f.size,
-            }).returning();
-
-            // Create chunk placeholders
-            for (let i = 0; i < f.chunks; i++) {
-                 // Calculate chunk size (simplified, assuming even chunks except last)
-                 // Actually, the client sends specific chunk sizes?
-                 // For now, the route will update the chunk size/status.
-                 // We pre-create chunks or create them on demand?
-                 // Route `getUploadUrl` is called per chunk. Let's create them there or here.
-                 // Better to create them on demand in `createChunk` when getting URL.
-            }
+            });
+            // Note: Chunk records are created on-demand via createChunk
         }
 
         return vault;
@@ -77,14 +71,19 @@ export class DatabaseStorage implements IStorage {
         return vault;
     }
 
+    async getVaultByLookupId(lookupId: string): Promise<Vault | undefined> {
+        const [vault] = await db.select().from(vaults).where(eq(vaults.lookupId, lookupId));
+        return vault;
+    }
+
     async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number): Promise<FileRecord> {
-         const [file] = await db.insert(files).values({
+        const [file] = await db.insert(files).values({
             vaultId,
             fileId,
             chunkCount,
             totalSize
-         }).returning();
-         return file;
+        }).returning();
+        return file;
     }
 
     async getFiles(vaultId: string): Promise<FileRecord[]> {
@@ -116,13 +115,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     async getChunk(fileId: string, chunkIndex: number): Promise<ChunkRecord | undefined> {
-         // Join to get internal file ID
-         const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
-         if (!file) return undefined;
+        // Join to get internal file ID
+        const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
+        if (!file) return undefined;
 
-         const [chunk] = await db.select().from(chunks)
+        const [chunk] = await db.select().from(chunks)
             .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
-         return chunk;
+        return chunk;
     }
 
     async incrementDownloadCount(vaultId: string): Promise<void> {

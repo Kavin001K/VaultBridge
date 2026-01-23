@@ -16,51 +16,51 @@ const MAX_EMAILS_PER_VAULT = 3;
 let transporter: nodemailer.Transporter | null = null;
 
 async function getTransporter(): Promise<nodemailer.Transporter> {
-    if (transporter) return transporter;
+  if (transporter) return transporter;
 
-    // Check for production SMTP config
-    if (process.env.SMTP_HOST) {
-        transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT || "587"),
-            secure: process.env.SMTP_SECURE === "true",
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-        });
-        return transporter;
-    }
-
-    // Development: Use Ethereal (fake SMTP)
-    const testAccount = await nodemailer.createTestAccount();
+  // Check for production SMTP config
+  if (process.env.SMTP_HOST) {
     transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: {
-            user: testAccount.user,
-            pass: testAccount.pass,
-        },
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
     });
-
-    log(`Email dev mode: View sent emails at https://ethereal.email`, "email");
     return transporter;
+  }
+
+  // Development: Use Ethereal (fake SMTP)
+  const testAccount = await nodemailer.createTestAccount();
+  transporter = nodemailer.createTransport({
+    host: "smtp.ethereal.email",
+    port: 587,
+    secure: false,
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass,
+    },
+  });
+
+  log(`Email dev mode: View sent emails at https://ethereal.email`, "email");
+  return transporter;
 }
 
 export interface SendVaultEmailInput {
-    to: string;
-    vaultId: string;
-    shortCode: string;
-    expiresAt: Date;
-    senderName?: string;
+  to: string;
+  vaultId: string;
+  shortCode: string;
+  expiresAt: Date;
+  senderName?: string;
 }
 
 export interface SendEmailResult {
-    success: boolean;
-    messageId?: string;
-    previewUrl?: string;
-    error?: string;
+  success: boolean;
+  messageId?: string;
+  previewUrl?: string;
+  error?: string;
 }
 
 /**
@@ -68,33 +68,33 @@ export interface SendEmailResult {
  * IMPORTANT: Never sends file attachments - only the link!
  */
 export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEmailResult> {
-    try {
-        // Rate limit check
-        const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
-        if (sentCount >= MAX_EMAILS_PER_VAULT) {
-            return {
-                success: false,
-                error: `Maximum ${MAX_EMAILS_PER_VAULT} emails per vault reached.`,
-            };
-        }
+  try {
+    // Rate limit check
+    const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
+    if (sentCount >= MAX_EMAILS_PER_VAULT) {
+      return {
+        success: false,
+        error: `Maximum ${MAX_EMAILS_PER_VAULT} emails per vault reached.`,
+      };
+    }
 
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(input.to)) {
-            return { success: false, error: "Invalid email address." };
-        }
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(input.to)) {
+      return { success: false, error: "Invalid email address." };
+    }
 
-        const transport = await getTransporter();
-        const baseUrl = process.env.APP_URL || "http://localhost:5001";
-        const accessLink = `${baseUrl}/v/${input.vaultId}`;
-        const codeLink = `${baseUrl}/code/${input.shortCode}`;
+    const transport = await getTransporter();
+    const baseUrl = process.env.APP_URL || "http://localhost:5001";
+    const accessLink = `${baseUrl}/v/${input.vaultId}`;
+    const codeLink = `${baseUrl}/code/${input.shortCode}`;
 
-        const expiryFormatted = input.expiresAt.toLocaleString("en-US", {
-            dateStyle: "medium",
-            timeStyle: "short",
-        });
+    const expiryFormatted = input.expiresAt.toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
 
-        const html = `
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -195,11 +195,11 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
 </html>
     `;
 
-        const info = await transport.sendMail({
-            from: process.env.SMTP_FROM || '"VaultBridge" <noreply@vaultbridge.local>',
-            to: input.to,
-            subject: `${input.senderName || "Someone"} shared encrypted files with you`,
-            text: `
+    const info = await transport.sendMail({
+      from: process.env.SMTP_FROM || '"VaultBridge" <noreply@vaultbridge.local>',
+      to: input.to,
+      subject: `${input.senderName || "Someone"} shared encrypted files with you`,
+      text: `
 VaultBridge - Encrypted File Transfer
 
 ${input.senderName || "Someone"} shared encrypted files with you.
@@ -211,38 +211,95 @@ This link expires: ${expiryFormatted}
 
 Files are end-to-end encrypted. This email contains NO attachments for your security.
       `,
-            html,
-        });
+      html,
+    });
 
-        // Track email sent
-        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+    // Track email sent
+    emailsSentPerVault.set(input.vaultId, sentCount + 1);
 
-        // Get preview URL for development
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) {
-            log(`Email preview: ${previewUrl}`, "email");
-        }
-
-        log(`Email sent to ${input.to} for vault ${input.shortCode}`, "email");
-
-        return {
-            success: true,
-            messageId: info.messageId,
-            previewUrl: previewUrl || undefined,
-        };
-    } catch (error) {
-        log(`Failed to send email: ${error}`, "email");
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to send email",
-        };
+    // Get preview URL for development
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    if (previewUrl) {
+      log(`Email preview: ${previewUrl}`, "email");
     }
+
+    log(`Email sent to ${input.to} for vault ${input.shortCode}`, "email");
+
+    return {
+      success: true,
+      messageId: info.messageId,
+      previewUrl: previewUrl || undefined,
+    };
+  } catch (error) {
+    log(`Failed to send email: ${error}`, "email");
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to send email",
+    };
+  }
+}
+
+import { Resend } from "resend";
+
+// Resend Configuration (using provided key)
+const resend = new Resend("re_Cmka1787_2LURzpiKv1pMVXU3GwziPHny");
+
+export interface SendDirectEmailInput {
+  to: string;
+  subject: string;
+  text: string;
+  filename: string;
+  fileBuffer: Buffer;
+}
+
+/**
+ * Send a file directly via email attachment (Transient Mode)
+ * The file exists only in memory and is relayed to Resend.
+ */
+export async function sendDirectAttachment(input: SendDirectEmailInput): Promise<boolean> {
+  try {
+    const { to, subject, text, filename, fileBuffer } = input;
+
+    const data = await resend.emails.send({
+      from: "VaultBridge <onboarding@resend.dev>", // Default Resend sender for testing
+      to: [to],
+      subject: subject,
+      html: `
+            <div style="font-family: sans-serif; color: #333;">
+                <h2>File Received via VaultBridge</h2>
+                <p>${text}</p>
+                <hr />
+                <p style="font-size: 12px; color: #666;">
+                    <strong>Security Notice:</strong> This file was sent directly from the sender's browser. 
+                    VaultBridge did not store this file. It was relayed through secure memory.
+                </p>
+            </div>
+            `,
+      attachments: [
+        {
+          filename: filename,
+          content: fileBuffer,
+        },
+      ],
+    });
+
+    if (data.error) {
+      log(`Resend Error: ${data.error.message}`, "email");
+      return false;
+    }
+
+    log(`Direct email sent to ${to} with attachment ${filename}`, "email");
+    return true;
+  } catch (error) {
+    log(`Failed to send direct email: ${error}`, "email");
+    return false;
+  }
 }
 
 /**
  * Get remaining email quota for a vault
  */
 export function getRemainingEmailQuota(vaultId: string): number {
-    const sent = emailsSentPerVault.get(vaultId) || 0;
-    return Math.max(0, MAX_EMAILS_PER_VAULT - sent);
+  const sent = emailsSentPerVault.get(vaultId) || 0;
+  return Math.max(0, MAX_EMAILS_PER_VAULT - sent);
 }
