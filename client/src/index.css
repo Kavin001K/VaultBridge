@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+
+  --card: 240 10% 6%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 10% 6%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 142 70% 50%;
+  --primary-foreground: 144 100% 5%;
+
+  --secondary: 240 5% 15%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 240 5% 15%;
+  --muted-foreground: 240 5% 65%;
+
+  --accent: 142 70% 50%;
+  --accent-foreground: 144 100% 5%;
+
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 240 5% 20%;
+  --input: 240 5% 20%;
+  --ring: 142 70% 50%;
+
+  --radius: 0.5rem;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased font-sans;
+    background-image: 
+      linear-gradient(rgba(18, 18, 18, 0.9), rgba(18, 18, 18, 0.9)),
+      linear-gradient(0deg, transparent 24%, rgba(0, 255, 157, 0.03) 25%, rgba(0, 255, 157, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 157, 0.03) 75%, rgba(0, 255, 157, 0.03) 76%, transparent 77%, transparent),
+      linear-gradient(90deg, transparent 24%, rgba(0, 255, 157, 0.03) 25%, rgba(0, 255, 157, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 157, 0.03) 75%, rgba(0, 255, 157, 0.03) 76%, transparent 77%, transparent);
+    background-size: 100% 100%, 50px 50px, 50px 50px;
+  }
+}
+
+@layer components {
+  .cyber-card {
+    @apply bg-card border border-border/50 rounded-xl shadow-lg relative overflow-hidden;
+  }
+  
+  .cyber-card::before {
+    content: "";
+    @apply absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300;
+  }
+
+  .cyber-card:hover::before {
+    @apply opacity-100;
+  }
+
+  .cyber-input {
+    @apply bg-secondary/50 border-input text-foreground font-mono focus:ring-primary/30 focus:border-primary/50 transition-all duration-200;
+  }
+
+  .cyber-button {
+    @apply font-mono uppercase tracking-wider font-bold transition-all duration-200 hover:shadow-[0_0_15px_rgba(34,197,94,0.3)];
+  }
+
+  .scanline {
+    @apply absolute inset-0 pointer-events-none z-50 mix-blend-overlay opacity-[0.03];
+    background: linear-gradient(to bottom, transparent 50%, black 51%);
+    background-size: 100% 4px;
+    animation: scanline 10s linear infinite;
+  }
+}
+
+@keyframes scanline {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100%; }
+}

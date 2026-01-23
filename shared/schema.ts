@@ -1,0 +1,76 @@
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// === TABLE DEFINITIONS ===
+
+export const vaults = pgTable("vaults", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  shortCode: text("short_code").unique(), // 6-char alphanumeric
+  encryptedMetadata: text("encrypted_metadata").notNull(), // Encrypted JSON blob containing filenames, types, sizes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  maxDownloads: integer("max_downloads").default(1).notNull(),
+  downloadCount: integer("download_count").default(0).notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+});
+
+export const files = pgTable("files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vaultId: uuid("vault_id").references(() => vaults.id).notNull(),
+  fileId: text("file_id").notNull(), // Client-generated UUID for the file
+  chunkCount: integer("chunk_count").notNull(),
+  totalSize: integer("total_size").notNull(), // Bytes
+});
+
+export const chunks = pgTable("chunks", {
+  id: serial("id").primaryKey(),
+  fileId: uuid("file_id").references(() => files.id).notNull(),
+  chunkIndex: integer("chunk_index").notNull(),
+  storagePath: text("storage_path"), // Path in Object Storage
+  size: integer("size").notNull(),
+  isUploaded: boolean("is_uploaded").default(false).notNull(),
+});
+
+// === SCHEMAS ===
+
+export const insertVaultSchema = createInsertSchema(vaults).omit({
+  id: true,
+  shortCode: true,
+  createdAt: true,
+  downloadCount: true,
+  isDeleted: true,
+});
+
+export const insertFileSchema = createInsertSchema(files).omit({
+  id: true,
+  vaultId: true,
+});
+
+// === TYPES ===
+
+export type Vault = typeof vaults.$inferSelect;
+export type FileRecord = typeof files.$inferSelect;
+export type ChunkRecord = typeof chunks.$inferSelect;
+
+// Client-facing types for creation
+export const createVaultRequestSchema = z.object({
+  expiresIn: z.number().min(1).max(168), // Hours, max 1 week
+  maxDownloads: z.number().min(1).max(100),
+  encryptedMetadata: z.string(), // Encrypted JSON of filenames, etc.
+  files: z.array(z.object({
+    fileId: z.string(),
+    chunks: z.number(),
+    size: z.number(),
+  })),
+});
+
+export type CreateVaultRequest = z.infer<typeof createVaultRequestSchema>;
+
+export type VaultResponse = Vault & {
+  files: {
+    fileId: string;
+    chunkCount: number;
+    totalSize: number;
+  }[];
+};

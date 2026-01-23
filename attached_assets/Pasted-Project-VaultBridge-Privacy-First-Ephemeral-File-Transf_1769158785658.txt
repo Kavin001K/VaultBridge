@@ -1,0 +1,258 @@
+Project: VaultBridge – Privacy-First Ephemeral File Transfer Platform
+ROLE & EXPECTATION
+You are a senior full-stack engineer + security architect tasked with building a production-grade, privacy-first file transfer platform called VaultBridge.
+You must:
+Build frontend + backend
+Follow zero-knowledge security principles
+Assume users are on public/shared computers
+Deliver clean, documented, production-ready code
+Make no assumptions beyond what is written here
+Never add features that violate privacy, ephemerality, or statelessness
+You should not ask clarifying questions unless something is technically impossible.
+CORE PRODUCT DEFINITION
+VaultBridge is a temporary encrypted bridge to move files from one device to another without accounts, logins, or permanent storage.
+The system must:
+Encrypt files client-side only
+Store only encrypted data
+Auto-delete everything after expiry or download
+Never store decryption keys
+Leave zero traces on public computers
+This is NOT:
+A cloud drive
+A chat app
+A backup system
+A long-term storage platform
+NON-NEGOTIABLE PRINCIPLES
+Zero Knowledge
+The server must NEVER see plaintext files
+The server must NEVER receive encryption keys
+Ephemeral Storage
+All data must auto-delete
+No backups
+No recovery
+Public Computer Safe
+No localStorage
+No sessionStorage
+No cookies (except strictly necessary)
+No browser cache
+Auto-cleanup after use
+Stateless Backend
+No SQL or NoSQL databases
+Only Redis (TTL) + Object Storage
+Privacy First
+No tracking
+No analytics
+No fingerprinting
+Minimal logs, no PII
+REQUIRED TECH STACK (DO NOT DEVIATE)
+Frontend
+React 18
+TypeScript
+Vite
+Tailwind CSS
+Headless UI
+Web Crypto API
+Streams API
+qrcode.react
+Backend
+Node.js 20+
+Express.js
+TypeScript
+Zod (validation)
+Helmet
+CORS
+express-rate-limit
+Storage
+Redis (metadata + TTL)
+S3-compatible object storage (encrypted chunks)
+NO DATABASE
+HIGH-LEVEL ARCHITECTURE
+Browser
+  ├─ Encrypt files (AES-256-GCM)
+  ├─ Upload encrypted chunks
+  └─ Decrypt on download
+
+Backend API
+  ├─ Create vault
+  ├─ Validate access
+  ├─ Stream encrypted chunks
+  └─ Cleanup expired vaults
+
+Storage
+  ├─ Redis → vault metadata (TTL)
+  └─ Object storage → encrypted file chunks
+CRYPTOGRAPHY SPECIFICATION (CRITICAL)
+Encryption
+Algorithm: AES-GCM
+Key size: 256-bit
+IV: Unique per chunk
+Chunk size: 5–10 MB
+Encryption location: Browser only
+Key Handling
+Generate key in browser
+Store key only:
+In memory
+In URL fragment (#key=)
+NEVER:
+Send key to server
+Log key
+Store key
+FUNCTIONAL REQUIREMENTS
+1. Upload Flow (Frontend)
+Implement the following flow exactly:
+User opens homepage
+User selects files (drag & drop or picker)
+Validate:
+Max total size: 5GB
+Configurable file count
+Browser generates encryption key
+Files are chunked
+Each chunk encrypted client-side
+Encrypted chunks uploaded sequentially
+Show progress:
+Encryption progress
+Upload progress
+Backend creates a vault
+User receives:
+Short code
+Direct link
+QR code
+Optional email delivery
+2. Download Flow (Frontend)
+User enters short code OR opens direct link
+Vault metadata fetched
+Validate:
+Not expired
+Download limit not exceeded
+Encrypted chunks streamed
+Browser decrypts chunks
+File reassembled
+File saved locally
+Vault cleaned up if required
+Browser auto-clears state
+User redirected to neutral page
+3. Vault Rules
+A vault:
+Has a UUID v7 ID
+Has expiry time
+Has max download count
+Auto-deletes on:
+Expiry
+Download limit reached
+DATA MODELS
+Vault
+{
+  id: string,
+  createdAt: number,
+  expiresAt: number,
+  maxDownloads: number,
+  downloadCount: number,
+  files: [
+    {
+      fileId: string,
+      originalName: string,
+      size: number,
+      mimeType: string,
+      chunks: number
+    }
+  ],
+  access: {
+    shortCode: string,
+    emailSent: boolean
+  }
+}
+BACKEND API (IMPLEMENT EXACTLY)
+Create Vault
+POST /api/v1/vault
+Upload Chunk
+PUT /api/v1/vault/:id/chunk/:index
+Resolve Short Code
+GET /api/v1/code/:code
+Download Files
+GET /api/v1/vault/:id/files
+SHORT CODE SYSTEM
+6-character alphanumeric
+Exclude ambiguous characters (0/O, 1/I/l)
+Case-insensitive
+Rate-limited
+Stored in Redis with TTL
+EMAIL DELIVERY
+Plain text only
+No tracking
+No attachments
+Email contains:
+Download link
+Expiry notice
+Use privacy-focused provider
+PUBLIC COMPUTER PROTECTION (MANDATORY)
+Frontend must enforce:
+Cache-Control: no-store
+Clear-Site-Data on completion
+No localStorage
+No sessionStorage
+No IndexedDB
+Auto-redirect after download
+Clear in-memory keys on unload
+SECURITY REQUIREMENTS
+Headers
+CSP
+X-Frame-Options
+Referrer-Policy
+Permissions-Policy
+Rate Limits
+Upload: 20/min
+Code attempts: 10/min
+Download streams: 5 concurrent
+Email triggers: 3 per vault
+Logging
+Structured JSON logs
+Never log:
+File names
+Keys
+Emails
+IPs in plaintext
+CLEANUP & EXPIRY
+Redis TTL handles metadata
+Object storage lifecycle deletes files
+Background cleanup job every 10 minutes
+No manual recovery
+PROJECT STRUCTURE
+frontend/
+  src/
+    components/
+    hooks/
+    lib/crypto
+    pages/
+backend/
+  src/
+    routes/
+    services/
+    middlewares/
+    workers/
+TESTING REQUIREMENTS
+Unit tests for:
+Encryption
+Vault lifecycle
+Integration tests:
+Upload → download → delete
+Security tests:
+Rate limiting
+Brute force attempts
+WHAT YOU MUST NOT BUILD
+User accounts
+Login systems
+Permanent storage
+Analytics dashboards
+Tracking scripts
+Server-side decryption
+Long-term logs
+DELIVERY EXPECTATION
+At completion:
+Code must be readable and documented
+System must be deployable immediately
+Vaults must self-destruct reliably
+Server must never see plaintext
+Public computers must retain zero traces
+FINAL RULE
+If any design decision conflicts with privacy, ephemerality, or zero knowledge,
+privacy wins every time.
