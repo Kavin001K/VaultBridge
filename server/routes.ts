@@ -61,7 +61,7 @@ export async function registerRoutes(
       "Clear-Site-Data": '"cache"',
     });
 
-    const vault = await storage.getVault(req.params.id);
+    const vault = await storage.getVault(req.params.id as string);
 
     if (!vault) {
       return res.status(404).json({ message: "Vault not found or expired" });
@@ -92,7 +92,7 @@ export async function registerRoutes(
 
   // Resolve short code to vault ID (with strict rate limiting)
   app.get(api.vaults.resolveCode.path, codeLimiter, async (req, res) => {
-    const vault = await storage.getVaultByShortCode(req.params.code.toUpperCase());
+    const vault = await storage.getVaultByShortCode((req.params.code as string).toUpperCase());
 
     if (!vault) {
       return res.status(404).json({ message: "Invalid code or vault expired" });
@@ -107,7 +107,7 @@ export async function registerRoutes(
 
   // Mark download (increment counter)
   app.post(api.vaults.download.path, async (req, res) => {
-    const vault = await storage.getVault(req.params.id);
+    const vault = await storage.getVault(req.params.id as string);
 
     if (!vault) {
       return res.status(404).json({ message: "Vault not found" });
@@ -117,8 +117,17 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Download limit exceeded" });
     }
 
-    await storage.incrementDownloadCount(vault.id);
-    res.json({ success: true, remainingDownloads: vault.maxDownloads - vault.downloadCount - 1 });
+    const newCount = await storage.incrementDownloadCount(vault.id);
+
+    // BURNING LOGIC: If limit reached, delete immediately
+    if (newCount >= vault.maxDownloads) {
+      console.log(`[Vault ${vault.id}] Burn-on-read triggered. Deleting...`);
+      await storage.deleteVault(vault.id);
+      // We still return success but with 0 remaining
+      res.json({ success: true, remainingDownloads: 0 });
+    } else {
+      res.json({ success: true, remainingDownloads: vault.maxDownloads - newCount });
+    }
   });
 
   // =============================================================================
@@ -128,7 +137,7 @@ export async function registerRoutes(
   // Lookup vault by 3-digit lookupId - returns vault data without requiring PIN
   // The server NEVER sees the PIN and NEVER sees the raw file key
   app.get(api.vaults.codeLookup.path, codeLimiter, async (req, res) => {
-    const vault = await storage.getVaultByLookupId(req.params.lookupId);
+    const vault = await storage.getVaultByLookupId(req.params.lookupId as string);
 
     if (!vault) {
       return res.status(404).json({ message: "Invalid code or vault expired" });
@@ -235,7 +244,7 @@ export async function registerRoutes(
       const result = await sendVaultEmail({
         to,
         vaultId: vault.id,
-        shortCode: vault.shortCode,
+        shortCode: vault.shortCode || "UNKNOWN",
         expiresAt: vault.expiresAt,
         senderName,
       });
@@ -261,7 +270,9 @@ export async function registerRoutes(
 
   // Get presigned upload URL for a chunk
   app.post(api.chunks.getUploadUrl.path, uploadLimiter, async (req, res) => {
-    const { id, fileId, chunkIndex } = req.params;
+    const id = req.params.id as string;
+    const fileId = req.params.fileId as string;
+    const chunkIndex = req.params.chunkIndex as string;
     const { size } = req.body;
 
     const vault = await storage.getVault(id);
@@ -288,16 +299,16 @@ export async function registerRoutes(
     }
   });
 
-  // Mark chunk as uploaded
   app.put(api.chunks.markUploaded.path, async (req, res) => {
-    const { id, fileId, chunkIndex } = req.params;
+    const id = req.params.id as string;
+    const fileId = req.params.fileId as string;
+    const chunkIndex = req.params.chunkIndex as string;
     const { storagePath } = req.body;
 
     await storage.updateChunkStatus(fileId, parseInt(chunkIndex), storagePath);
     res.json({ success: true });
   });
 
-  // Get download URL for a chunk
   app.get(api.chunks.getDownloadUrl.path, async (req, res) => {
     // Security headers
     res.set({
@@ -305,7 +316,9 @@ export async function registerRoutes(
       "Clear-Site-Data": '"cache", "storage"',
     });
 
-    const { id, fileId, chunkIndex } = req.params;
+    const id = req.params.id as string;
+    const fileId = req.params.fileId as string;
+    const chunkIndex = req.params.chunkIndex as string;
 
     const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
     if (!chunk || !chunk.storagePath) {

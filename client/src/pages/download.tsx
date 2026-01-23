@@ -27,7 +27,7 @@ export default function DownloadPage() {
   const [files, setFiles] = useState<DecryptedFile[]>([]);
   const [isDecrypting, setIsDecrypting] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Download State
   const [activeDownload, setActiveDownload] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -36,6 +36,33 @@ export default function DownloadPage() {
   const getDownloadUrl = useGetChunkDownloadUrl();
   const trackDownload = useTrackDownload();
   const { toast } = useToast();
+
+  // Worker Management
+  const workerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    workerRef.current = new Worker(new URL('../encryption.worker.ts', import.meta.url), { type: 'module' });
+    return () => workerRef.current?.terminate();
+  }, []);
+
+  const decryptWithWorker = (data: ArrayBuffer, iv: Uint8Array, key: CryptoKey) => {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      if (!workerRef.current) return reject("Worker not ready");
+      const id = Math.random();
+
+      const handler = (e: MessageEvent) => {
+        if (e.data.id === id) {
+          workerRef.current?.removeEventListener('message', handler);
+          if (e.data.type === 'error') reject(e.data.error);
+          else resolve(e.data.decryptedData);
+        }
+      };
+
+      workerRef.current.addEventListener('message', handler);
+      // Transfer 'data' (encrypted chunk) to worker
+      workerRef.current.postMessage({ type: 'decrypt', data, iv, key, id }, [data]);
+    });
+  };
 
   useEffect(() => {
     // 1. Extract Key from URL Hash
@@ -51,13 +78,13 @@ export default function DownloadPage() {
     // 2. Import Key & Decrypt Metadata when vault data arrives
     const initVault = async () => {
       if (!vault) return;
-      
+
       try {
         const key = await importKey(keyStr);
         setDecryptionKey(key);
 
         const metadata = await decryptMetadata(vault.encryptedMetadata, key);
-        
+
         // Merge metadata with backend info (chunk counts)
         const mergedFiles = metadata.map((meta: any) => {
           const backendFile = vault.files.find((f: any) => f.fileId === meta.fileId);
@@ -81,7 +108,7 @@ export default function DownloadPage() {
 
   const handleDownload = async (file: DecryptedFile) => {
     if (!decryptionKey || !vaultId) return;
-    
+
     setActiveDownload(file.fileId);
     setDownloadProgress(0);
 
@@ -100,14 +127,14 @@ export default function DownloadPage() {
         // 2. Fetch Encrypted Chunk
         const res = await fetch(downloadUrl);
         const buffer = await res.arrayBuffer();
-        
+
         // 3. Separate IV and Data
         // Format: [IV (12 bytes)] + [Encrypted Data]
         const iv = new Uint8Array(buffer.slice(0, 12));
         const encryptedData = buffer.slice(12);
 
-        // 4. Decrypt
-        const decryptedBuffer = await decryptData(encryptedData, iv, decryptionKey);
+        // 4. Decrypt with Worker
+        const decryptedBuffer = await decryptWithWorker(encryptedData, iv, decryptionKey);
         chunks.push(new Uint8Array(decryptedBuffer));
 
         // Update Progress
@@ -116,9 +143,9 @@ export default function DownloadPage() {
       }
 
       // 5. Reassemble File
-      const blob = new Blob(chunks, { type: file.type });
+      const blob = new Blob(chunks as any, { type: file.type });
       const url = window.URL.createObjectURL(blob);
-      
+
       // 6. Trigger Browser Download
       const a = document.createElement('a');
       a.href = url;
@@ -130,7 +157,7 @@ export default function DownloadPage() {
 
       // 7. Track analytics
       trackDownload.mutate(vaultId);
-      
+
       toast({ title: "Download Complete", description: `Saved ${file.name}` });
 
     } catch (err) {
@@ -174,7 +201,7 @@ export default function DownloadPage() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        
+
         {/* Header */}
         <header className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.href = '/'}>
@@ -189,8 +216,8 @@ export default function DownloadPage() {
 
         {/* Vault Info */}
         {vault && (
-          <VaultCard 
-            id={vault.id}
+          <VaultCard
+            vaultId={vault.id}
             filesCount={files.length}
             totalSize={files.reduce((acc, f) => acc + f.size, 0)}
             expiresAt={vault.expiresAt}
@@ -204,15 +231,15 @@ export default function DownloadPage() {
           <h3 className="text-lg font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
             Encrypted Contents
           </h3>
-          
+
           {isDecrypting ? (
-             <div className="p-8 text-center text-muted-foreground animate-pulse">
-               <Unlock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-               Decrypting metadata...
-             </div>
+            <div className="p-8 text-center text-muted-foreground animate-pulse">
+              <Unlock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              Decrypting metadata...
+            </div>
           ) : (
             files.map((file) => (
-              <motion.div 
+              <motion.div
                 key={file.fileId}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -231,22 +258,22 @@ export default function DownloadPage() {
                 </div>
 
                 <div className="flex items-center gap-4 w-full md:w-auto">
-                   {activeDownload === file.fileId ? (
-                     <div className="w-full md:w-48 space-y-2">
-                       <div className="flex justify-between text-xs text-muted-foreground">
-                         <span>Decrypting...</span>
-                         <span>{Math.round(downloadProgress)}%</span>
-                       </div>
-                       <Progress value={downloadProgress} className="h-2" />
-                     </div>
-                   ) : (
-                    <Button 
+                  {activeDownload === file.fileId ? (
+                    <div className="w-full md:w-48 space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Decrypting...</span>
+                        <span>{Math.round(downloadProgress)}%</span>
+                      </div>
+                      <Progress value={downloadProgress} className="h-2" />
+                    </div>
+                  ) : (
+                    <Button
                       onClick={() => handleDownload(file)}
                       className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-mono"
                     >
                       <DownloadIcon className="w-4 h-4 mr-2" /> Download
                     </Button>
-                   )}
+                  )}
                 </div>
               </motion.div>
             ))

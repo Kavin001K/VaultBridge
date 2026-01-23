@@ -21,8 +21,9 @@ export interface IStorage {
     createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord>;
     updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string): Promise<void>;
     getChunk(fileId: string, chunkIndex: number): Promise<ChunkRecord | undefined>;
-    incrementDownloadCount(vaultId: string): Promise<void>;
+    incrementDownloadCount(vaultId: string): Promise<number>;
     cleanupExpiredVaults(): Promise<void>;
+    deleteVault(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -124,16 +125,21 @@ export class DatabaseStorage implements IStorage {
         return chunk;
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<void> {
-        await db.update(vaults)
+    async incrementDownloadCount(vaultId: string): Promise<number> {
+        const [updated] = await db.update(vaults)
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
-            .where(eq(vaults.id, vaultId));
+            .where(eq(vaults.id, vaultId))
+            .returning({ count: vaults.downloadCount });
+        return updated?.count || 0;
     }
 
     async cleanupExpiredVaults(): Promise<void> {
-        await db.update(vaults)
-            .set({ isDeleted: true })
+        await db.delete(vaults)
             .where(sql`${vaults.expiresAt} < NOW() OR ${vaults.downloadCount} >= ${vaults.maxDownloads}`);
+    }
+
+    async deleteVault(id: string): Promise<void> {
+        await db.delete(vaults).where(eq(vaults.id, id));
     }
 }
 

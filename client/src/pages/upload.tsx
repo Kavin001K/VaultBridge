@@ -308,9 +308,11 @@ export default function UploadPage() {
                                 <div className="flex justify-between items-center">
                                     <label className="text-sm text-muted-foreground flex items-center gap-2">
                                         <Zap className="w-4 h-4" />
-                                        Max Downloads
+                                        Downloads
                                     </label>
-                                    <span className="text-sm font-mono text-primary font-bold">{maxDownloads[0]}</span>
+                                    <span className="text-sm font-mono text-primary font-bold">
+                                        {maxDownloads[0] === 1 ? "BURN ON READ" : `${maxDownloads[0]}x`}
+                                    </span>
                                 </div>
                                 <Slider
                                     value={maxDownloads}
@@ -318,7 +320,17 @@ export default function UploadPage() {
                                     min={1}
                                     max={100}
                                     step={1}
+                                    disabled={maxDownloads[0] === 1}
+                                    className={maxDownloads[0] === 1 ? "opacity-50" : ""}
                                 />
+                                <Button
+                                    variant={maxDownloads[0] === 1 ? "destructive" : "outline"}
+                                    size="sm"
+                                    className="w-full text-xs h-7"
+                                    onClick={() => setMaxDownloads(maxDownloads[0] === 1 ? [5] : [1])}
+                                >
+                                    {maxDownloads[0] === 1 ? "🔥 Burn-on-read Active" : "Enable Burn-on-read"}
+                                </Button>
                             </div>
                         </div>
 

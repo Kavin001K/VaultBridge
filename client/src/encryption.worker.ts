@@ -1,6 +1,3 @@
-/// <reference lib="webworker" />
-declare const self: DedicatedWorkerGlobalScope;
-
 // Web Worker for handling expensive encryption/decryption tasks off the main thread
 
 type WorkerMessage =
@@ -23,7 +20,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             const encrypted = await crypto.subtle.encrypt(
                 { name: "AES-GCM", iv },
                 key,
-                data
+                data as any
             );
 
             // Transfer buffers to avoid cloning overhead
@@ -34,7 +31,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 encryptedData: encrypted
             };
 
-            self.postMessage(response, [encrypted, iv.buffer]);
+            (self as any).postMessage(response, [encrypted, iv.buffer]);
 
         } else if (type === 'decrypt') {
             const { data, iv, key } = e.data;
@@ -42,7 +39,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             const decrypted = await crypto.subtle.decrypt(
                 { name: "AES-GCM", iv },
                 key,
-                data
+                data as any
             );
 
             const response: WorkerResponse = {
@@ -51,10 +48,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 decryptedData: decrypted
             };
 
-            self.postMessage(response, [decrypted]);
+            (self as any).postMessage(response, [decrypted]);
         }
     } catch (err: any) {
-        self.postMessage({
+        (self as any).postMessage({
             type: 'error',
             id,
             error: err.message || 'Unknown crypto error'
