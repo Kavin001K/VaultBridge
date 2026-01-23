@@ -5,15 +5,15 @@ import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./
 import { codeLimiter, uploadLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
-import { ObjectStorageService, ObjectNotFoundError } from "./replit_integrations/object_storage";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { supabaseStorage } from "./services/supabase_storage";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage"; // Leaving for now if needed by other components, but effectively unused
 import multer from "multer";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const objectStorage = new ObjectStorageService();
+  // const objectStorage = new ObjectStorageService(); // Removed in favor of Supabase
 
   // Configure Multer for transient "hot potato" memory storage
   const upload = multer({
@@ -254,6 +254,7 @@ export async function registerRoutes(
     }
   });
 
+
   // =============================================================================
   // CHUNK OPERATIONS
   // =============================================================================
@@ -271,14 +272,20 @@ export async function registerRoutes(
     // Ensure the chunk record exists (idempotent)
     await storage.createChunk(fileId, parseInt(chunkIndex), size);
 
-    // Generate presigned URL
-    const uploadUrl = await objectStorage.getObjectEntityUploadURL();
-    const storagePath = objectStorage.normalizeObjectEntityPath(uploadUrl);
+    // Generate Supabase Signed URL
+    // Path: vaultId/fileId/chunkIndex.enc
+    const storagePath = supabaseStorage.getStoragePath(id, fileId, parseInt(chunkIndex));
 
-    res.json({
-      uploadUrl,
-      storagePath,
-    });
+    try {
+      const uploadUrl = await supabaseStorage.getUploadUrl(storagePath);
+      res.json({
+        uploadUrl,
+        storagePath,
+      });
+    } catch (err) {
+      console.error("Upload URL Gen Failed:", err);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
   });
 
   // Mark chunk as uploaded
@@ -305,10 +312,14 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Chunk not found" });
     }
 
-    // Return the proxy path (using the storage path as the fake URL for now, mimicking ephemeral store behavior)
-    // Actually, objectStorage.getObjectEntityUploadURL creates a local file URL in dev?
-    // Ephemeral store returned the exact path. Database returns chunk.storagePath.
-    res.json({ downloadUrl: chunk.storagePath });
+    try {
+      // Get signed download URL from Supabase
+      const downloadUrl = await supabaseStorage.getDownloadUrl(chunk.storagePath);
+      res.json({ downloadUrl });
+    } catch (err) {
+      console.error("Download URL Gen Failed:", err);
+      res.status(404).json({ message: "File not found in storage" });
+    }
   });
 
   // =============================================================================

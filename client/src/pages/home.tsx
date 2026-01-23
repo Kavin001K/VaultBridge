@@ -144,8 +144,8 @@ export default function Home() {
             <button
               onClick={() => setActiveTab("vault")}
               className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "vault"
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -156,8 +156,8 @@ export default function Home() {
             <button
               onClick={() => setActiveTab("email")}
               className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "email"
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -300,10 +300,13 @@ export default function Home() {
                         }}>Remove</Button>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <Paperclip className="w-8 h-8 text-muted-foreground mx-auto" />
+                      <div className="space-y-3">
+                        <Paperclip className="w-8 h-8 text-indigo-400 mx-auto" />
                         <p className="text-sm font-medium">Click to attach a file</p>
-                        <p className="text-xs text-muted-foreground">Max 10MB • Held only in RAM</p>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-mono uppercase tracking-wider text-indigo-400">Max 10MB</span>
+                          <span className="px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Transient Memory</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -345,12 +348,12 @@ export default function Home() {
                     {isSending ? (
                       <>
                         <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                        Relaying File...
+                        Relaying Securely...
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4 mr-2" />
-                        Send Direct Email
+                        Send via Secure Relay
                       </>
                     )}
                   </Button>

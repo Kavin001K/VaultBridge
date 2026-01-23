@@ -92,6 +92,25 @@ export default function UploadPage() {
             const totalChunks = filesPayload.reduce((acc, f) => acc + f.chunks, 0);
             let processedChunks = 0;
 
+            // Initialize Worker
+            const worker = new Worker(new URL('../encryption.worker.ts', import.meta.url), { type: 'module' });
+
+            // Helper to promisify worker interaction
+            const encryptWithWorker = (data: ArrayBuffer, key: CryptoKey) => {
+                return new Promise<{ iv: Uint8Array, encryptedData: ArrayBuffer }>((resolve, reject) => {
+                    const id = Math.random();
+                    const handler = (e: MessageEvent) => {
+                        if (e.data.id === id) {
+                            worker.removeEventListener('message', handler);
+                            if (e.data.type === 'error') reject(e.data.error);
+                            else resolve({ iv: e.data.iv, encryptedData: e.data.encryptedData });
+                        }
+                    };
+                    worker.addEventListener('message', handler);
+                    worker.postMessage({ type: 'encrypt', data, key, id }, [data]);
+                });
+            };
+
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const fileId = fileMetadata[i].fileId;
@@ -106,7 +125,9 @@ export default function UploadPage() {
                     const chunkBlob = file.slice(start, end);
                     const chunkBuffer = await chunkBlob.arrayBuffer();
 
-                    const { iv, encryptedData } = await encryptData(chunkBuffer, key);
+                    // Offload encryption to Web Worker
+                    const { iv, encryptedData } = await encryptWithWorker(chunkBuffer, key);
+
                     const combinedBuffer = new Uint8Array(iv.byteLength + encryptedData.byteLength);
                     combinedBuffer.set(iv, 0);
                     combinedBuffer.set(new Uint8Array(encryptedData), iv.byteLength);
@@ -134,6 +155,8 @@ export default function UploadPage() {
                     setProgress(30 + (processedChunks / totalChunks) * 65);
                 }
             }
+
+            worker.terminate();
 
             setCurrentStep("done");
             setProgress(100);
@@ -237,11 +260,29 @@ export default function UploadPage() {
                         )}
                     </AnimatePresence>
 
-                    <FileDropzone
-                        onFilesSelected={setFiles}
-                        disabled={stage !== "idle"}
-                        onDragStateChange={setIsDragActive}
-                    />
+                    <div className="space-y-4">
+                        <FileDropzone
+                            onFilesSelected={(newFiles) => {
+                                const oversized = newFiles.some(f => f.size > 500 * 1024 * 1024);
+                                if (oversized) {
+                                    toast({
+                                        variant: "destructive",
+                                        title: "File too large",
+                                        description: "Max file size is 500MB for Vault mode.",
+                                    });
+                                    return;
+                                }
+                                setFiles(newFiles);
+                            }}
+                            disabled={stage !== "idle"}
+                            onDragStateChange={setIsDragActive}
+                        />
+                        <div className="flex justify-center">
+                            <span className="px-2 py-1 rounded-md bg-primary/10 border border-primary/20 text-[10px] font-mono uppercase tracking-wider text-primary">
+                                Max 500MB • AES-256-GCM
+                            </span>
+                        </div>
+                    </div>
 
                     {/* Settings */}
                     <div className="mt-8 space-y-6">
@@ -286,8 +327,22 @@ export default function UploadPage() {
                             disabled={files.length === 0 || stage !== "idle"}
                             className="w-full h-14 cyber-btn text-base"
                         >
-                            <Shield className="w-5 h-5 mr-2" />
-                            Encrypt & Upload
+                            {stage === "encrypting" ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-3" />
+                                    Encrypting...
+                                </>
+                            ) : stage === "uploading" ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-3" />
+                                    Uploading...
+                                </>
+                            ) : (
+                                <>
+                                    <Shield className="w-5 h-5 mr-3" />
+                                    Secure & Upload
+                                </>
+                            )}
                         </Button>
                     </div>
                 </motion.div>
