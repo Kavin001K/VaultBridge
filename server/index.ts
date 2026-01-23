@@ -30,7 +30,7 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'", "ws:", "wss:"], // WebSocket for HMR
+        connectSrc: ["'self'", "ws:", "wss:", "https://kigljmhbgzbbhrtgtxmk.supabase.co"], // WebSocket for HMR + Supabase
       },
     },
     crossOriginEmbedderPolicy: false, // Required for some features

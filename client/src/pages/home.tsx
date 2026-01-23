@@ -106,11 +106,11 @@ export default function Home() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3"
           >
-            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 animate-pulse-glow">
-              <Lock className="w-6 h-6 text-primary" />
+            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden">
+              <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold font-mono tracking-tight">
+              <h1 className="text-xl font-bold font-mono tracking-tight">
                 VAULT<span className="text-primary">BRIDGE</span>
               </h1>
               <p className="text-xs text-muted-foreground uppercase tracking-[0.2em]">

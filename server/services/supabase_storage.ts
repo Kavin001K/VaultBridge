@@ -9,7 +9,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
     throw new Error("Missing Supabase credentials in environment variables (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)");
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const BUCKET_NAME = "vaults";
 
 export class SupabaseStorageService {

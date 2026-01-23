@@ -205,8 +205,8 @@ export default function DownloadPage() {
         {/* Header */}
         <header className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.href = '/'}>
-            <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50">
-              <ShieldCheck className="w-6 h-6 text-primary" />
+            <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
+              <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
             </div>
             <div>
               <h1 className="text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
@@ -218,6 +218,8 @@ export default function DownloadPage() {
         {vault && (
           <VaultCard
             vaultId={vault.id}
+            shortCode={vault.shortCode}
+            fullLink={window.location.href.split('#')[0]}
             filesCount={files.length}
             totalSize={files.reduce((acc, f) => acc + f.size, 0)}
             expiresAt={vault.expiresAt}
