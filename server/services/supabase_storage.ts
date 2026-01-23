@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
 // Supabase Configuration
-// In production, move these to process.env.SUPABASE_URL and process.env.SUPABASE_KEY
-const SUPABASE_URL = "https://kigljmhbgzbbhrtgtxmk.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZ2xqbWhiZ3piYmhydGd0eG1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxOTAxNzAsImV4cCI6MjA4NDc2NjE3MH0.12vTRdR8k_s0C5HuvpU8H-Jvd0U5g2lyaAa1qCgMYpQ";
+// Prioritize Service Role Key for backend operations to bypass RLS
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error("Missing Supabase credentials in environment variables (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)");
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const BUCKET_NAME = "vaults";
