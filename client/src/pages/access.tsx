@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     Lock, KeyRound, ArrowLeft, Shield, AlertTriangle, Download, Loader2
 } from "lucide-react";
@@ -263,36 +263,103 @@ export default function AccessPage() {
                     className="glass-card p-8 w-full"
                 >
                     {stage === "input" && (
-                        <div className="space-y-6">
-                            {/* Code Input */}
-                            <div className="space-y-3">
-                                <label className="text-sm text-muted-foreground uppercase tracking-wider font-mono">
-                                    Access Code
+                        <div className="space-y-8">
+                            {/* 6-Digit PIN Input */}
+                            <div className="space-y-4">
+                                <label className="text-sm text-center block text-muted-foreground uppercase tracking-widest font-mono">
+                                    Enter 6-Digit Code
                                 </label>
-                                <Input
-                                    type="text"
-                                    value={formatCodeDisplay(accessCode)}
-                                    onChange={handleCodeChange}
-                                    onKeyPress={handleKeyPress}
-                                    placeholder="123-456"
-                                    className="code-input h-20 text-center text-4xl tracking-[0.3em]"
-                                    maxLength={7}
-                                    autoFocus
-                                />
+
+                                <div className="flex justify-center gap-2 md:gap-3 relative">
+                                    {/* Invisible input for handling focus/typing */}
+                                    <Input
+                                        type="tel"
+                                        value={accessCode}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                            setAccessCode(val);
+                                            if (val.length === 6) {
+                                                // Optional: Auto-submit or focus button
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && accessCode.length === 6) {
+                                                handleCodeSubmit();
+                                            }
+                                        }}
+                                        className="absolute inset-0 opacity-0 cursor-pointer z-10 h-16 w-full"
+                                        autoFocus
+                                        autoComplete="off"
+                                    />
+
+                                    {/* Visual Boxes */}
+                                    {Array.from({ length: 6 }).map((_, i) => {
+                                        const num = accessCode[i] || "";
+                                        const isFocused = accessCode.length === i;
+                                        const isFilled = !!num;
+
+                                        return (
+                                            <motion.div
+                                                key={i}
+                                                initial={false}
+                                                animate={{
+                                                    scale: isFocused ? 1.1 : 1,
+                                                    borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                                                    backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
+                                                }}
+                                                className={`
+                                                    w-12 h-16 md:w-14 md:h-20 
+                                                    border-2 rounded-xl flex items-center justify-center 
+                                                    text-2xl md:text-3xl font-mono font-bold
+                                                    transition-colors duration-200
+                                                    ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
+                                                `}
+                                            >
+                                                <AnimatePresence mode="popLayout">
+                                                    {num ? (
+                                                        <motion.span
+                                                            key={num}
+                                                            initial={{ y: 20, opacity: 0 }}
+                                                            animate={{ y: 0, opacity: 1 }}
+                                                            exit={{ y: -20, opacity: 0 }}
+                                                            className="text-primary"
+                                                        >
+                                                            {num}
+                                                        </motion.span>
+                                                    ) : (
+                                                        isFocused && (
+                                                            <motion.div
+                                                                layoutId="cursor"
+                                                                className="w-2 h-2 bg-primary/50 rounded-full animate-pulse"
+                                                            />
+                                                        )
+                                                    )}
+                                                </AnimatePresence>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+
                                 <p className="text-xs text-muted-foreground text-center">
-                                    Enter the 6-digit code you received
+                                    Check your email or secure message for the code
                                 </p>
                             </div>
 
                             {/* Submit Button */}
                             <Button
                                 onClick={handleCodeSubmit}
-                                disabled={accessCode.replace(/\D/g, '').length !== 6}
-                                variant="secondary"
-                                className="w-full h-14 font-mono uppercase tracking-wider font-bold text-base"
+                                disabled={accessCode.length !== 6}
+                                size="lg"
+                                className={`
+                                    w-full h-14 font-mono font-bold uppercase tracking-wider text-base
+                                    transition-all duration-300
+                                    ${accessCode.length === 6
+                                        ? "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_50px_rgba(16,185,129,0.6)] hover:scale-[1.02]"
+                                        : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}
+                                `}
                             >
-                                <Lock className="w-5 h-5 mr-2" />
-                                Unlock Vault
+                                <Lock className={`w-5 h-5 mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
+                                {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
                             </Button>
                         </div>
                     )}
