@@ -271,7 +271,7 @@ export async function registerRoutes(
   app.post(api.vaults.email.path, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const { to, senderName } = req.body;
+      const { to, senderName, fullCode } = req.body;
 
       if (!to || typeof to !== "string") {
         return res.status(400).json({ message: "Email address required" });
@@ -288,10 +288,19 @@ export async function registerRoutes(
         return res.status(429).json({ message: "Email limit reached for this vault" });
       }
 
+      // VERIFICATION LAYER:
+      // Ensure the client-provided code matches the vault's stored lookup ID.
+      // This prevents sending a random/incorrect code that won't unlock the files.
+      if (fullCode && vault.lookupId && !fullCode.startsWith(vault.lookupId)) {
+        console.error(`[Email Verification Failed] Vault ${id}: fullCode '${fullCode}' does not match lookupId '${vault.lookupId}'`);
+        return res.status(400).json({ message: "Invalid access code provided. Verification failed." });
+      }
+
       const result = await sendVaultEmail({
         to,
         vaultId: vault.id,
         shortCode: vault.shortCode || "UNKNOWN",
+        fullCode, // Pass the full code if provided by client
         expiresAt: vault.expiresAt,
         senderName,
       });

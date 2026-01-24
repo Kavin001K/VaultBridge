@@ -56,6 +56,7 @@ export interface SendVaultEmailInput {
   to: string;
   vaultId: string;
   shortCode: string;
+  fullCode?: string; // Client provided full 6-digit code
   expiresAt: Date;
   senderName?: string;
 }
@@ -90,7 +91,10 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
 
     const transport = await getTransporter();
     const baseUrl = process.env.APP_URL || "http://localhost:5001";
-    const accessLink = `${baseUrl}/v/${input.vaultId}`;
+    const accessLink = `${baseUrl}/access`;
+
+    // Use full code if available (client provided), otherwise partial (server knowledge)
+    const displayCode = input.fullCode || input.shortCode;
 
     const expiryFormatted = input.expiresAt.toLocaleString("en-US", {
       dateStyle: "medium",
@@ -184,11 +188,11 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
     
     <div class="code-box">
       <p style="margin: 0 0 8px 0; font-size: 12px; color: #71717a; text-transform: uppercase; letter-spacing: 2px;">Access Code</p>
-      <div class="code">${input.shortCode}</div>
+      <div class="code">${displayCode}</div>
     </div>
     
     <p style="text-align: center;">
-      <a href="${baseUrl}/access" class="btn">🔓 Access Files</a>
+      <a href="${accessLink}" class="btn">🔓 Access Files</a>
     </p>
     
     <div class="warning">
@@ -219,8 +223,8 @@ VaultBridge - Encrypted File Transfer
 
 ${input.senderName || "Someone"} shared encrypted files with you.
 
-Access Code: ${input.shortCode}
-Direct Link: ${baseUrl}/access
+Access Code: ${displayCode}
+Direct Link: ${accessLink}
 
 This link expires: ${expiryFormatted}
 
