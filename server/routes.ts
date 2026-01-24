@@ -6,23 +6,17 @@ import { codeLimiter, uploadLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage"; // Leaving for now if needed by other components, but effectively unused
 import multer from "multer";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // const objectStorage = new ObjectStorageService(); // Removed in favor of Supabase
-
   // Configure Multer for transient "hot potato" memory storage
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   });
-
-  // Register base object storage routes
-  registerObjectStorageRoutes(app);
 
   // =============================================================================
   // VAULT OPERATIONS

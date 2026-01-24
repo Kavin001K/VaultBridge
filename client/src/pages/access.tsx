@@ -41,13 +41,13 @@ export default function AccessPage() {
     };
 
     const handleCodeSubmit = async () => {
-        // Validate 6-digit numeric code
-        const cleanCode = accessCode.replace(/\D/g, '');
+        // Validate 6-char alphanumeric code
+        const cleanCode = accessCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
         if (cleanCode.length !== 6) {
             toast({
                 variant: "destructive",
                 title: "Invalid Code",
-                description: "Please enter a 6-digit numeric code."
+                description: "Please enter a 6-character code."
             });
             return;
         }
@@ -208,7 +208,7 @@ export default function AccessPage() {
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-zinc-500/5 rounded-full blur-[100px] pointer-events-none" />
 
             {/* Header */}
-            <header className="relative z-10 px-6 py-8">
+            <header className="relative z-10 px-4 md:px-6 py-6 md:py-8">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <Link href="/">
                         <motion.div
@@ -216,11 +216,11 @@ export default function AccessPage() {
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                         >
-                            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30">
-                                <Lock className="w-5 h-5 text-primary" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30">
+                                <Lock className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold font-mono tracking-tight">
+                                <h1 className="text-lg md:text-xl font-bold font-mono tracking-tight">
                                     VAULT<span className="text-primary">BRIDGE</span>
                                 </h1>
                             </div>
@@ -228,7 +228,7 @@ export default function AccessPage() {
                     </Link>
 
                     <Link href="/">
-                        <Button variant="ghost" className="gap-2">
+                        <Button variant="ghost" size="sm" className="gap-2">
                             <ArrowLeft className="w-4 h-4" />
                             Back
                         </Button>
@@ -237,20 +237,20 @@ export default function AccessPage() {
             </header>
 
             {/* Main Content */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-lg mx-auto px-6 py-8">
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-lg mx-auto px-4 md:px-6 py-8">
                 {/* Page Title */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-10"
+                    className="text-center mb-8 md:mb-10"
                 >
                     <div className="flex items-center justify-center gap-3 mb-4">
                         <div className="p-3 rounded-xl bg-zinc-800 border border-zinc-700">
-                            <KeyRound className="w-8 h-8 text-zinc-400" />
+                            <KeyRound className="w-6 h-6 md:w-8 md:h-8 text-zinc-400" />
                         </div>
                     </div>
-                    <h2 className="text-3xl font-bold mb-2">Access Vault</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-2xl md:text-3xl font-bold mb-2">Access Vault</h2>
+                    <p className="text-sm md:text-base text-muted-foreground">
                         Enter your 6-digit access code to unlock the vault
                     </p>
                 </motion.div>
@@ -260,23 +260,24 @@ export default function AccessPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="glass-card p-8 w-full"
+                    className="glass-card p-6 md:p-8 w-full"
                 >
                     {stage === "input" && (
-                        <div className="space-y-8">
+                        <div className="space-y-6 md:space-y-8">
                             {/* 6-Digit PIN Input */}
                             <div className="space-y-4">
-                                <label className="text-sm text-center block text-muted-foreground uppercase tracking-widest font-mono">
+                                <label className="text-xs md:text-sm text-center block text-muted-foreground uppercase tracking-widest font-mono">
                                     Enter 6-Digit Code
                                 </label>
 
                                 <div className="flex justify-center gap-2 md:gap-3 relative">
                                     {/* Invisible input for handling focus/typing */}
                                     <Input
-                                        type="tel"
+                                        type="text"
                                         value={accessCode}
                                         onChange={(e) => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                            // Allow alphanumeric, max 6 chars, uppercase
+                                            const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
                                             setAccessCode(val);
                                             if (val.length === 6) {
                                                 // Optional: Auto-submit or focus button
@@ -303,14 +304,14 @@ export default function AccessPage() {
                                                 key={i}
                                                 initial={false}
                                                 animate={{
-                                                    scale: isFocused ? 1.1 : 1,
+                                                    scale: isFocused ? 1.05 : 1,
                                                     borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
                                                     backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
                                                 }}
                                                 className={`
-                                                    w-12 h-16 md:w-14 md:h-20 
-                                                    border-2 rounded-xl flex items-center justify-center 
-                                                    text-2xl md:text-3xl font-mono font-bold
+                                                    w-10 h-14 md:w-14 md:h-20
+                                                    border-2 rounded-lg md:rounded-xl flex items-center justify-center 
+                                                    text-xl md:text-3xl font-mono font-bold
                                                     transition-colors duration-200
                                                     ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
                                                 `}
@@ -330,7 +331,7 @@ export default function AccessPage() {
                                                         isFocused && (
                                                             <motion.div
                                                                 layoutId="cursor"
-                                                                className="w-2 h-2 bg-primary/50 rounded-full animate-pulse"
+                                                                className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
                                                             />
                                                         )
                                                     )}
@@ -340,7 +341,7 @@ export default function AccessPage() {
                                     })}
                                 </div>
 
-                                <p className="text-xs text-muted-foreground text-center">
+                                <p className="text-xs text-muted-foreground text-center px-4">
                                     Check your email or secure message for the code
                                 </p>
                             </div>
@@ -351,14 +352,14 @@ export default function AccessPage() {
                                 disabled={accessCode.length !== 6}
                                 size="lg"
                                 className={`
-                                    w-full h-14 font-mono font-bold uppercase tracking-wider text-base
+                                    w-full h-12 md:h-14 font-mono font-bold uppercase tracking-wider text-sm md:text-base
                                     transition-all duration-300
                                     ${accessCode.length === 6
                                         ? "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_50px_rgba(16,185,129,0.6)] hover:scale-[1.02]"
                                         : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}
                                 `}
                             >
-                                <Lock className={`w-5 h-5 mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
+                                <Lock className={`w-4 h-4 md:w-5 md:h-5 mr-2 md:mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
                                 {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
                             </Button>
                         </div>
@@ -366,9 +367,9 @@ export default function AccessPage() {
 
                     {(stage === "fetching" || stage === "decrypting") && (
                         <div className="text-center py-8">
-                            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-                            <p className="text-lg font-medium">{statusText}</p>
-                            <p className="text-sm text-muted-foreground mt-2">
+                            <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-primary animate-spin mx-auto mb-4" />
+                            <p className="text-base md:text-lg font-medium">{statusText}</p>
+                            <p className="text-xs md:text-sm text-muted-foreground mt-2">
                                 Decryption happens in your browser
                             </p>
                         </div>
@@ -377,9 +378,9 @@ export default function AccessPage() {
                     {stage === "ready" && (
                         <div className="space-y-6">
                             <div className="text-center">
-                                <Shield className="w-12 h-12 text-primary mx-auto mb-4" />
-                                <h3 className="text-xl font-bold mb-2">Vault Unlocked!</h3>
-                                <p className="text-sm text-muted-foreground">
+                                <Shield className="w-10 h-10 md:w-12 md:h-12 text-primary mx-auto mb-4" />
+                                <h3 className="text-lg md:text-xl font-bold mb-2">Vault Unlocked!</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground">
                                     {fileMetadata.length} file(s) ready for download
                                 </p>
                             </div>
@@ -404,9 +405,9 @@ export default function AccessPage() {
                             {/* Download Button */}
                             <Button
                                 onClick={handleDownload}
-                                className="w-full h-14 cyber-btn text-base"
+                                className="w-full h-12 md:h-14 cyber-btn text-sm md:text-base"
                             >
-                                <Download className="w-5 h-5 mr-2" />
+                                <Download className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                                 Download All Files
                             </Button>
 
@@ -419,18 +420,18 @@ export default function AccessPage() {
 
                     {stage === "downloading" && (
                         <div className="text-center py-8">
-                            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-                            <p className="text-lg font-medium">{statusText}</p>
-                            <p className="text-sm text-muted-foreground mt-2">
+                            <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-primary animate-spin mx-auto mb-4" />
+                            <p className="text-base md:text-lg font-medium">{statusText}</p>
+                            <p className="text-xs md:text-sm text-muted-foreground mt-2">
                                 Files are being decrypted in your browser
                             </p>
                         </div>
                     )}
 
                     {/* Security Info */}
-                    <div className="mt-8 pt-6 border-t border-border/50">
-                        <div className="flex items-start gap-3 text-sm text-muted-foreground">
-                            <Shield className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="mt-6 md:mt-8 pt-6 border-t border-border/50">
+                        <div className="flex items-start gap-3 text-xs md:text-sm text-muted-foreground">
+                            <Shield className="w-4 h-4 md:w-5 md:h-5 text-primary mt-0.5 flex-shrink-0" />
                             <p>
                                 Files are decrypted in your browser using your PIN.
                                 The server never sees your PIN or decryption key.
@@ -444,11 +445,11 @@ export default function AccessPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="mt-8 text-center"
+                    className="mt-6 md:mt-8 text-center px-2"
                 >
                     <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                         <div className="flex items-start gap-3 text-left">
-                            <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+                            <AlertTriangle className="w-4 h-4 md:w-5 md:h-5 text-rose-400 flex-shrink-0 mt-0.5" />
                             <div>
                                 <p className="text-sm font-medium text-rose-400">Important</p>
                                 <p className="text-xs text-rose-300/80 mt-1">

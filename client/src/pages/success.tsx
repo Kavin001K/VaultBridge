@@ -124,20 +124,20 @@ export default function Success() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden flex flex-col">
       {/* Background Effects */}
       <div className="fixed inset-0 grid-bg opacity-50" />
       <div className="scanline" />
 
       {/* Success Glow */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] md:w-[1000px] md:h-[600px] bg-primary/10 rounded-full blur-[100px] md:blur-[150px] pointer-events-none" />
 
       {/* Confetti-like particles */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         {Array.from({ length: 20 }).map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-2 h-2 bg-primary/30 rounded-full"
+            className="absolute w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/30 rounded-full"
             initial={{
               x: Math.random() * window.innerWidth,
               y: -20,
@@ -159,12 +159,12 @@ export default function Success() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 px-6 py-8">
+      <header className="relative z-10 px-4 md:px-6 py-6 md:py-8">
         <div className="max-w-4xl mx-auto">
           <Button
             variant="ghost"
             onClick={() => (window.location.href = "/")}
-            className="gap-2"
+            className="gap-2 text-sm md:text-base"
           >
             <ArrowLeft className="w-4 h-4" />
             Create Another Vault
@@ -173,26 +173,26 @@ export default function Success() {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-4xl mx-auto px-6 pb-16">
+      <main className="relative z-10 flex-1 w-full max-w-4xl mx-auto px-4 md:px-6 pb-12 md:pb-16 flex flex-col items-center justify-center min-h-[50vh]">
         {/* Success Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-8 md:mb-12 w-full"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", delay: 0.2 }}
-            className="w-20 h-20 mx-auto mb-6 bg-primary/20 rounded-2xl flex items-center justify-center border-2 border-primary animate-pulse-glow"
+            className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 md:mb-6 bg-primary/20 rounded-2xl flex items-center justify-center border-2 border-primary animate-pulse-glow"
           >
-            <Sparkles className="w-10 h-10 text-primary" />
+            <Sparkles className="w-8 h-8 md:w-10 md:h-10 text-primary" />
           </motion.div>
 
-          <h1 className="text-4xl font-bold font-mono tracking-tight mb-3">
+          <h1 className="text-3xl md:text-4xl font-bold font-mono tracking-tight mb-2 md:mb-3">
             <span className="text-primary">VAULT</span> CREATED
           </h1>
-          <p className="text-lg text-muted-foreground max-w-md mx-auto">
+          <p className="text-sm md:text-lg text-muted-foreground max-w-md mx-auto">
             Your files are encrypted and ready to share. Share the access code below.
           </p>
         </motion.div>
@@ -205,6 +205,7 @@ export default function Success() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
+          className="w-full max-w-2xl"
         >
           {vault && (
             <VaultCard
@@ -226,11 +227,11 @@ export default function Success() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="mt-8 text-center"
+          className="mt-6 md:mt-8 text-center"
         >
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs md:text-sm text-muted-foreground">
             🔐 Zero-Knowledge Transfer: The PIN never touches our servers.
-            <br />
+            <br className="hidden md:block" />
             Only the recipient with the full 6-digit code can decrypt the files.
           </p>
         </motion.div>

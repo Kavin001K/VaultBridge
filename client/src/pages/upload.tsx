@@ -180,14 +180,14 @@ export default function UploadPage() {
     };
 
     return (
-        <div className="min-h-screen relative overflow-hidden">
+        <div className="min-h-screen relative overflow-hidden flex flex-col">
             {/* Background Effects */}
             <div className="fixed inset-0 grid-bg opacity-50" />
             <div className="scanline" />
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
             {/* Header */}
-            <header className="relative z-10 px-6 py-8">
+            <header className="relative z-10 px-4 md:px-6 py-6 md:py-8">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <Link href="/">
                         <motion.div
@@ -195,11 +195,11 @@ export default function UploadPage() {
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                         >
-                            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden">
+                            <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden">
                                 <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold font-mono tracking-tight">
+                                <h1 className="text-lg md:text-xl font-bold font-mono tracking-tight">
                                     VAULT<span className="text-primary">BRIDGE</span>
                                 </h1>
                             </div>
@@ -207,7 +207,7 @@ export default function UploadPage() {
                     </Link>
 
                     <Link href="/">
-                        <Button variant="ghost" className="gap-2">
+                        <Button variant="ghost" size="sm" className="gap-2">
                             <ArrowLeft className="w-4 h-4" />
                             Back
                         </Button>
@@ -216,20 +216,20 @@ export default function UploadPage() {
             </header>
 
             {/* Main Content */}
-            <main className="relative z-10 max-w-2xl mx-auto px-6 py-8">
+            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 md:px-6 py-8">
                 {/* Page Title */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-10"
+                    className="text-center mb-8 md:mb-10"
                 >
                     <div className="flex items-center justify-center gap-3 mb-4">
                         <div className="p-3 rounded-xl bg-primary/20 border border-primary/30">
-                            <Upload className="w-8 h-8 text-primary" />
+                            <Upload className="w-6 h-6 md:w-8 md:h-8 text-primary" />
                         </div>
                     </div>
-                    <h2 className="text-3xl font-bold mb-2">Upload Files</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-2xl md:text-3xl font-bold mb-2">Upload Files</h2>
+                    <p className="text-sm md:text-base text-muted-foreground">
                         Create a secure, encrypted vault for your files
                     </p>
                 </motion.div>
@@ -239,7 +239,7 @@ export default function UploadPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className={`glass-card p-8 relative ${isDragActive ? 'dropzone-glow active' : ''}`}
+                    className={`glass-card p-6 md:p-8 relative ${isDragActive ? 'dropzone-glow active' : ''}`}
                 >
                     {/* Progress Overlay */}
                     <AnimatePresence>
@@ -248,7 +248,7 @@ export default function UploadPage() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-background/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-8 rounded-2xl"
+                                className="absolute inset-0 bg-background/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 md:p-8 rounded-2xl"
                             >
                                 <EncryptionProgress
                                     stage={stage}
@@ -286,7 +286,7 @@ export default function UploadPage() {
 
                     {/* Settings */}
                     <div className="mt-8 space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
                                     <label className="text-sm text-muted-foreground flex items-center gap-2">
@@ -326,7 +326,7 @@ export default function UploadPage() {
                                 <Button
                                     variant={maxDownloads[0] === 1 ? "destructive" : "outline"}
                                     size="sm"
-                                    className="w-full text-xs h-7"
+                                    className="w-full text-xs h-8"
                                     onClick={() => setMaxDownloads(maxDownloads[0] === 1 ? [5] : [1])}
                                 >
                                     {maxDownloads[0] === 1 ? "🔥 Burn-on-read Active" : "Enable Burn-on-read"}
@@ -337,7 +337,7 @@ export default function UploadPage() {
                         <Button
                             onClick={handleUpload}
                             disabled={files.length === 0 || stage !== "idle"}
-                            className="w-full h-14 cyber-btn text-base"
+                            className="w-full h-12 md:h-14 cyber-btn text-base"
                         >
                             {stage === "encrypting" ? (
                                 <>
@@ -364,11 +364,11 @@ export default function UploadPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="mt-8 text-center"
+                    className="mt-8 text-center px-4"
                 >
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs md:text-sm text-muted-foreground">
                         🔐 Files are encrypted in your browser with AES-256-GCM before upload.
-                        <br />
+                        <br className="hidden md:block" />
                         We never see your files or encryption keys.
                     </p>
                 </motion.div>
