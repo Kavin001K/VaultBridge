@@ -175,8 +175,9 @@ export async function registerRoutes(
   // DIRECT EMAIL OPERATIONS (Transient Mode)
   // =============================================================================
 
-  app.post("/api/email/direct", (req, res, next) => {
-    upload.single("file")(req, res, (err) => {
+  // MULTI-FILE Email Endpoint
+  app.post("/api/email/direct-multi", (req, res, next) => {
+    upload.array("files", 10)(req, res, (err) => { // Allow up to 10 files
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ message: "File too large. Max limit is 10MB." });
@@ -189,21 +190,36 @@ export async function registerRoutes(
     });
   }, async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded." });
+      if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
+        return res.status(400).json({ message: "No files uploaded." });
       }
 
+      const files = req.files as Express.Multer.File[];
       const { to, subject, body } = req.body;
+
       if (!to || !subject || !body) {
         return res.status(400).json({ message: "Missing required fields: to, subject, body." });
       }
+
+      // Calculate total size check (Multer checks individual file size defined in limits, but we want cumulative)
+      const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+      if (totalSize > 25 * 1024 * 1024) { // 25MB Hard Limit
+        return res.status(413).json({ message: "Total attachment size exceeds 25MB limit." });
+      }
+
+      // Reuse existing service but modified to support array?? 
+      // Or just loop through them? No, standard email supports multiple attachments.
+      // We need to update sendDirectAttachment to accept array of attachments.
+      // For now, let's update that service signature or create a new one.
 
       const success = await sendDirectAttachment({
         to,
         subject,
         text: body,
-        filename: req.file.originalname,
-        fileBuffer: req.file.buffer, // Buffer from memory
+        files: files.map(f => ({
+          filename: f.originalname,
+          content: f.buffer
+        }))
       });
 
       if (!success) {
@@ -221,9 +237,9 @@ export async function registerRoutes(
   // EMAIL OPERATIONS (Phase 2.3)
   // =============================================================================
 
-  app.post("/api/v1/vault/:id/email", async (req, res) => {
+  app.post(api.vaults.email.path, async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const { to, senderName } = req.body;
 
       if (!to || typeof to !== "string") {

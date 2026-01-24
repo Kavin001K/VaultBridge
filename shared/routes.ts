@@ -51,7 +51,7 @@ export const api = {
       method: 'POST' as const, // POST because we might increment download count
       path: '/api/vaults/:id/download',
       responses: {
-        200: z.object({ success: true }),
+        200: z.object({ success: z.boolean() }),
         403: z.object({ message: z.string() }) // Limit exceeded
       }
     },
@@ -76,7 +76,25 @@ export const api = {
         404: errorSchemas.notFound,
         410: z.object({ message: z.string() }), // Gone (expired/deleted)
       }
-    }
+    },
+    email: {
+      method: 'POST' as const,
+      path: '/api/vaults/:id/email',
+      input: z.object({
+        to: z.string().email(),
+        senderName: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          remainingEmails: z.number(),
+          previewUrl: z.string().optional(),
+        }),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+        429: z.object({ message: z.string() }),
+      },
+    },
   },
   chunks: {
     getUploadUrl: {

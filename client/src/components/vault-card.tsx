@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Copy, Check, Clock, Download, HardDrive,
-  Share2, Mail, AlertTriangle, ExternalLink
+  Mail, AlertTriangle, ExternalLink, ShieldCheck, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,55 @@ interface VaultCardProps {
   onSendEmail?: (email: string) => Promise<void>;
 }
 
+// -----------------------------------------------------------------------------
+// SUB-COMPONENTS
+// -----------------------------------------------------------------------------
+
+function CountdownDigit({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative group">
+        <div className="absolute -inset-0.5 bg-primary/20 rounded-lg blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+        <div className="relative w-12 h-14 bg-zinc-900 border border-zinc-700 rounded-lg flex items-center justify-center overflow-hidden">
+          <AnimatePresence mode="popLayout">
+            <motion.span
+              key={value}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="font-mono text-2xl font-bold text-primary"
+            >
+              {value.toString().padStart(2, "0")}
+            </motion.span>
+          </AnimatePresence>
+
+          {/* Scanline overlay for digits */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent opacity-20 pointer-events-none" />
+        </div>
+      </div>
+      <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider font-mono">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function Separator() {
+  return (
+    <div className="flex flex-col justify-start pt-4 h-14">
+      <div className="space-y-2 animate-pulse">
+        <div className="w-1 h-1 bg-zinc-600 rounded-full" />
+        <div className="w-1 h-1 bg-zinc-600 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// MAIN COMPONENT
+// -----------------------------------------------------------------------------
+
 export function VaultCard({
   vaultId,
   shortCode,
@@ -34,7 +83,8 @@ export function VaultCard({
 }: VaultCardProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [countdown, setCountdown] = useState("");
+
+  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const { toast } = useToast();
@@ -47,7 +97,7 @@ export function VaultCard({
       const diff = expiry - now;
 
       if (diff <= 0) {
-        setCountdown("EXPIRED");
+        setTimeLeft(null); // Expired
         return;
       }
 
@@ -55,11 +105,7 @@ export function VaultCard({
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      setCountdown(
-        `${hours.toString().padStart(2, "0")}:${minutes
-          .toString()
-          .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
-      );
+      setTimeLeft({ hours, minutes, seconds });
     };
 
     updateCountdown();
@@ -77,7 +123,15 @@ export function VaultCard({
         setCopiedCode(true);
         setTimeout(() => setCopiedCode(false), 2000);
       }
-      toast({ title: "Copied!", description: `${type === 'link' ? 'Link' : 'Code'} copied to clipboard.` });
+      toast({
+        title: "Copied!",
+        description: (
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-primary" />
+            <span>{type === 'link' ? 'Secure link' : 'Access code'} copied to clipboard.</span>
+          </div>
+        )
+      });
     } catch (err) {
       toast({ variant: "destructive", title: "Failed to copy" });
     }
@@ -97,176 +151,249 @@ export function VaultCard({
     }
   };
 
-  const isExpiringSoon = new Date(expiresAt).getTime() - Date.now() < 3600000;
-  const isExpired = countdown === "EXPIRED";
+  const isExpired = timeLeft === null;
+  const isExpiringSoon = timeLeft ? timeLeft.hours === 0 && timeLeft.minutes < 60 : false;
   const downloadProgress = (downloads / maxDownloads) * 100;
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="glass-card overflow-hidden"
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="glass-card overflow-hidden ring-1 ring-white/10"
     >
-      {/* Header Stripe */}
-      <div className="h-1 bg-gradient-to-r from-primary via-emerald-400 to-primary" />
+      {/* Header Stripe & Active Status */}
+      <div className="relative h-1 w-full bg-zinc-900 pointer-events-none overflow-hidden">
+        <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${isExpired ? 'via-rose-500' : 'via-primary'} to-transparent w-1/2 animate-shimmer opacity-70`} />
+      </div>
 
-      <div className="p-8">
+      <div className="p-6 md:p-8">
         {/* Title Row */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-10">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30">
-              <HardDrive className="w-7 h-7 text-primary" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl flex items-center justify-center border border-zinc-700 shadow-inner">
+                <HardDrive className={`w-8 h-8 ${isExpired ? 'text-rose-500' : 'text-primary'}`} />
+              </div>
+              <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800">
+                {isExpired ? <AlertTriangle className="w-4 h-4 text-rose-500" /> : <ShieldCheck className="w-4 h-4 text-primary" />}
+              </div>
             </div>
             <div>
-              <h2 className="text-xl font-bold font-mono tracking-tight">SECURE VAULT</h2>
-              <p className="text-sm text-muted-foreground">
-                {filesCount} {filesCount === 1 ? 'file' : 'files'} • {(totalSize / (1024 * 1024)).toFixed(2)} MB
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-2xl font-bold font-mono tracking-tight text-foreground">SECURE VAULT</h2>
+                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${isExpired
+                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                  : 'bg-primary/10 border-primary/20 text-primary'
+                  }`}>
+                  {isExpired ? 'Archived' : 'Active'}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <span className="font-medium text-foreground">{filesCount}</span> {filesCount === 1 ? 'file' : 'files'}
+                <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                <span className="font-medium text-foreground">{(totalSize / (1024 * 1024)).toFixed(2)}</span> MB
               </p>
             </div>
           </div>
 
-          {/* Countdown Timer */}
-          <div className={`text-right ${isExpired ? 'text-destructive' : isExpiringSoon ? 'text-rose-400' : 'text-muted-foreground'}`}>
-            <div className="text-xs uppercase tracking-wider mb-1 flex items-center gap-1 justify-end">
-              <Clock className="w-3 h-3" />
-              {isExpired ? 'Expired' : 'Self-destructs in'}
+          {/* Enhanced Countdown Timer */}
+          <div className="flex flex-col items-end">
+            <div className={`flex items-center gap-2 mb-2 text-xs uppercase font-bold tracking-widest ${isExpiringSoon || isExpired ? 'text-rose-500' : 'text-primary'}`}>
+              <Clock className="w-3.5 h-3.5" />
+              {isExpired ? 'Vault Expired' : 'Auto-Purge In'}
             </div>
-            <div className="font-mono text-2xl font-bold tracking-wider">
-              {countdown.split("").map((char, i) => (
-                <span
-                  key={i}
-                  className={`inline-block ${char === ':' ? 'mx-0.5 text-muted-foreground' : 'countdown-digit mx-0.5 text-sm w-8 h-9'}`}
-                >
-                  {char}
-                </span>
-              ))}
-            </div>
+
+            {isExpired ? (
+              <div className="h-14 flex items-center px-4 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                <span className="font-mono text-xl font-bold text-rose-500 tracking-widest">DELETED</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-zinc-900/50 p-2 rounded-xl border border-zinc-800/50 backdrop-blur-sm">
+                <CountdownDigit value={timeLeft?.hours || 0} label="HRS" />
+                <Separator />
+                <CountdownDigit value={timeLeft?.minutes || 0} label="MIN" />
+                <Separator />
+                <CountdownDigit value={timeLeft?.seconds || 0} label="SEC" />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Main Content Grid */}
+        {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* QR Code */}
-          <div className="flex flex-col items-center justify-center p-6 bg-white rounded-xl">
-            <QRCodeSVG
-              value={fullLink}
-              size={140}
-              level="H"
-              includeMargin
-              bgColor="#ffffff"
-              fgColor="#09090b"
-            />
-            <p className="text-xs text-zinc-500 font-mono mt-3 uppercase tracking-wider">
-              Scan to access
-            </p>
-          </div>
 
-          {/* Access Details */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Short Code */}
-            <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">Access Code</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(shortCode, "code")}
-                  className="h-7 px-2"
-                >
-                  {copiedCode ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                </Button>
-              </div>
-              <div className="font-mono text-3xl font-bold text-primary tracking-[0.3em]">
-                {shortCode}
-              </div>
-            </div>
+          {/* Cyber QR Layout */}
+          <div className="flex flex-col items-center">
+            <div className="relative group">
+              {/* QR Container Frame */}
+              <div className="absolute -inset-0.5 bg-gradient-to-tr from-primary/50 to-emerald-600/50 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-500"></div>
+              <div className="relative bg-zinc-950 p-6 rounded-xl border border-primary/20 shadow-2xl overflow-hidden">
 
-            {/* Direct Link */}
-            <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">Direct Link</span>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyToClipboard(fullLink, "link")}
-                    className="h-7 px-2"
-                  >
-                    {copiedLink ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open(fullLink, '_blank')}
-                    className="h-7 px-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-              <code className="block text-sm font-mono text-primary/80 truncate">
-                {fullLink}
-              </code>
-            </div>
+                {/* Scanning Animation */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/10 to-transparent z-10"
+                  animate={{ top: ['-100%', '100%'] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                />
 
-            {/* Download Progress */}
-            <div className="flex items-center gap-4">
-              <Download className="w-5 h-5 text-muted-foreground" />
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Downloads</span>
-                  <span className="font-mono font-bold">{downloads} / {maxDownloads}</span>
-                </div>
-                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${downloadProgress}%` }}
-                    className={`h-full rounded-full transition-all duration-500 ${downloadProgress >= 80 ? 'bg-rose-500' : 'bg-primary'
-                      }`}
+                {/* Corner Accents */}
+                <div className="absolute top-0 left-0 w-8 h-8 border-l-2 border-t-2 border-primary z-20" />
+                <div className="absolute top-0 right-0 w-8 h-8 border-r-2 border-t-2 border-primary z-20" />
+                <div className="absolute bottom-0 left-0 w-8 h-8 border-l-2 border-b-2 border-primary z-20" />
+                <div className="absolute bottom-0 right-0 w-8 h-8 border-r-2 border-b-2 border-primary z-20" />
+
+                <div className="bg-white p-2 rounded-lg relative z-0">
+                  <QRCodeSVG
+                    value={fullLink}
+                    size={160}
+                    level="H"
+                    includeMargin={true}
+                    bgColor="#FFFFFF"
+                    fgColor="#16a34a"
+                    imageSettings={{
+                      src: "/vault-qr-icon.png",
+                      height: 48, // Slightly larger for better visibility
+                      width: 48,
+                      excavate: true,
+                    }}
                   />
                 </div>
               </div>
             </div>
+            <p className="mt-4 text-xs font-mono text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              Wait for scan
+            </p>
+          </div>
+
+          {/* Access Details Panel */}
+          <div className="lg:col-span-2 space-y-5">
+            {/* Short Code & Link */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Code Box */}
+              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl relative group overflow-hidden">
+                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => copyToClipboard(shortCode, "code")}
+                    className="h-8 w-8 hover:bg-zinc-800 text-zinc-400 hover:text-white"
+                  >
+                    {copiedCode ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2">Access PIN</div>
+                <div className="font-mono text-3xl font-bold text-primary tracking-[0.2em] drop-shadow-lg">
+                  {shortCode}
+                </div>
+              </div>
+
+              {/* Downloads Box */}
+              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Downloads Remaining</div>
+                  <span className="font-mono text-xs font-bold text-white bg-zinc-800 px-2 py-0.5 rounded">
+                    {downloads} / {maxDownloads}
+                  </span>
+                </div>
+
+                <div className="h-4 bg-black rounded-full overflow-hidden border border-zinc-800/50">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(downloadProgress, 100)}%` }}
+                    className={`h-full relative overflow-hidden transition-all duration-700 ${downloadProgress >= 80 ? 'bg-rose-500' : 'bg-primary'
+                      }`}
+                  >
+                    <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20" />
+                  </motion.div>
+                </div>
+                <div className="mt-2 text-xs text-zinc-600 text-right font-mono">
+                  {maxDownloads - downloads} downloads left
+                </div>
+              </div>
+            </div>
+
+            {/* Direct Link Field */}
+            <div>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
+                <div className="relative flex items-center bg-zinc-900/80 border border-zinc-700 hover:border-primary/50 rounded-xl p-1 pr-2 transition-colors">
+                  <div className="h-10 w-10 flex items-center justify-center text-zinc-500">
+                    <ExternalLink className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0 px-2">
+                    <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-0.5">Secure Link</div>
+                    <div className="text-sm font-mono text-zinc-300 truncate selection:bg-primary/30">
+                      {fullLink}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => copyToClipboard(fullLink, "link")}
+                    className="h-9 gap-2 shadow-sm font-medium"
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Email Section */}
+            {onSendEmail && !isExpired && (
+              <div className="pt-4 mt-2">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-1.5 bg-zinc-800 rounded-md">
+                    <Mail className="w-4 h-4 text-zinc-400" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">Secure Send</span>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="Enter recipient email..."
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 focus:border-primary/50 transition-colors"
+                  />
+                  <Button
+                    onClick={handleSendEmail}
+                    disabled={!emailInput || isSendingEmail}
+                    className="min-w-[100px] cyber-btn"
+                  >
+                    {isSendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send"}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-2 pl-1">
+                  * Encrypted link sent only. No files attached.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Email Section */}
-        {onSendEmail && (
-          <div className="mt-8 pt-8 border-t border-border/50">
-            <div className="flex items-center gap-3 mb-4">
-              <Mail className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Email this link</span>
-            </div>
-            <div className="flex gap-3">
-              <Input
-                type="email"
-                placeholder="recipient@example.com"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleSendEmail}
-                disabled={!emailInput || isSendingEmail}
-                className="px-6"
-              >
-                {isSendingEmail ? "Sending..." : "Send"}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              We'll send ONLY the link. No files are attached for security.
-            </p>
+        {/* Security Footer */}
+        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-start gap-4">
+          <div className="p-2 bg-rose-500/10 rounded-lg shrink-0">
+            <AlertTriangle className="w-5 h-5 text-rose-500" />
           </div>
-        )}
-
-        {/* Warning */}
-        <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-rose-400">Important</p>
-            <p className="text-xs text-rose-300/80 mt-1">
-              This link contains the encryption key. If you lose it, the files cannot be recovered.
-              We do not store encryption keys.
+            <h4 className="text-sm font-bold text-rose-500 mb-1">Self-Destruction Protocol Active</h4>
+            <p className="text-xs text-zinc-400 leading-relaxed max-w-2xl">
+              This vault is encrypted with a unique key that is not stored on our servers.
+              Once the download limit is reached or the timer expires, the data and the key are permanently purged.
+              <span className="text-zinc-300 font-medium"> There is no recovery option.</span>
             </p>
           </div>
         </div>
@@ -274,3 +401,4 @@ export function VaultCard({
     </motion.div>
   );
 }
+

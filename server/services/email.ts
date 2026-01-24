@@ -259,17 +259,19 @@ export interface SendDirectEmailInput {
   to: string;
   subject: string;
   text: string;
-  filename: string;
-  fileBuffer: Buffer;
+  files: {
+    filename: string;
+    content: Buffer;
+  }[];
 }
 
 /**
- * Send a file directly via email attachment (Transient Mode)
- * The file exists only in memory and is relayed to Resend.
+ * Send files directly via email attachment (Transient Mode)
+ * The files exist only in memory and are relayed to Resend.
  */
 export async function sendDirectAttachment(input: SendDirectEmailInput): Promise<boolean> {
   try {
-    const { to, subject, text, filename, fileBuffer } = input;
+    const { to, subject, text, files } = input;
 
     const data = await resend.emails.send({
       from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
@@ -282,20 +284,15 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
                 <p>${text}</p>
                 <hr />
                 <p style="font-size: 12px; color: #666;">
-                    <strong>Security Notice:</strong> This file was sent directly from the sender's browser. 
-                    VaultBridge did not store this file. It was relayed through secure memory.
+                    <strong>Security Notice:</strong> The files were sent directly from the sender's browser. 
+                    VaultBridge did not store these files. They were relayed through secure memory.
                 </p>
                 <p style="font-size: 13px; margin-top: 20px; font-weight: bold; color: #22c55e;">
                     Need help? Just reply to this email to contact support.
                 </p>
             </div>
             `,
-      attachments: [
-        {
-          filename: filename,
-          content: fileBuffer,
-        },
-      ],
+      attachments: files,
     });
 
     if (data.error) {
@@ -303,7 +300,7 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       return false;
     }
 
-    log(`Direct email sent to ${to} with attachment ${filename}`, "email");
+    log(`Direct email sent to ${to} with ${files.length} attachment(s)`, "email");
     return true;
   } catch (error) {
     log(`Failed to send direct email: ${error}`, "email");

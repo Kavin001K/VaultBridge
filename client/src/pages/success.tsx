@@ -111,7 +111,7 @@ export default function Success() {
   }, []);
 
   const handleSendEmail = async (email: string) => {
-    const res = await fetch(`/api/v1/vault/${vaultId}/email`, {
+    const res = await fetch(`/api/vaults/${vaultId}/email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: email }),

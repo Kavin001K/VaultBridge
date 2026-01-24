@@ -4,7 +4,7 @@ import {
     type ChunkRecord,
     type CreateVaultRequest
 } from "@shared/schema";
-import { supabase } from "./services/supabase_storage";
+import { supabase, supabaseStorage } from "./services/supabase_storage";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -237,18 +237,53 @@ export class DatabaseStorage implements IStorage {
     }
 
     async cleanupExpiredVaults(): Promise<void> {
-        // Delete where expires_at < now OR download_count >= max_downloads
         const now = new Date().toISOString();
+        console.log(`[Cleanup] Checking for expired vaults at ${now}...`);
 
-        // Since OR logic is complex in simple filters, we might do two queries
-        await supabase.from('vaults').delete().lt('expires_at', now);
-        // Note: comparing columns (download_count >= max_downloads) isn't directly supported in simple JS client filters easily
-        // We would need a stored proc or fetch all and check.
-        // For MVP, we'll skip the column comparison cleanup here or rely on the "burn on read" logic in routes.
+        // 1. Time expired vaults
+        const { data: expired } = await supabase
+            .from('vaults')
+            .select('id, short_code')
+            .lt('expires_at', now);
+
+        if (expired && expired.length > 0) {
+            console.log(`[Cleanup] Found ${expired.length} time-expired vaults.`);
+            for (const v of expired) {
+                console.log(`[Cleanup] Expired vault ${v.short_code} (${v.id}). Deleting...`);
+                await this.deleteVault(v.id);
+            }
+        } else {
+            console.log("[Cleanup] No expired vaults found.");
+        }
     }
 
     async deleteVault(id: string): Promise<void> {
+        // 1. Find all files/chunks to delete from Object Storage
+        try {
+            const files = await this.getFiles(id);
+            const fileIds = files.map(f => f.id);
+
+            if (fileIds.length > 0) {
+                const { data: chunks } = await supabase
+                    .from('chunks')
+                    .select('storage_path')
+                    .in('file_id', fileIds);
+
+                const paths = chunks?.map((c: any) => c.storage_path).filter(Boolean) || [];
+
+                if (paths.length > 0) {
+                    console.log(`[Storage] Deleting ${paths.length} chunks for vault ${id}...`);
+                    await supabaseStorage.deleteFiles(paths);
+                }
+            }
+        } catch (err) {
+            console.error(`[Storage] Error cleaning up files for vault ${id}:`, err);
+            // Continue to DB delete so we don't get stuck with metadata but no files
+        }
+
+        // 2. Delete metadata from DB
         await supabase.from('vaults').delete().eq('id', id);
+        console.log(`[Storage] Vault ${id} deleted from DB.`);
     }
 }
 

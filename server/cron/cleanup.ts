@@ -6,7 +6,7 @@
  * 2. Delete orphaned chunks from object storage
  */
 
-import { ephemeralStore } from "../services/store";
+import { storage } from "../storage";
 import { log } from "../index";
 
 // Track known storage paths for orphan detection
@@ -20,36 +20,11 @@ export async function runCleanup(): Promise<void> {
     log("Starting cleanup job...", "cleanup");
 
     try {
-        // 1. Get and delete expired vaults
-        const expiredVaults = await ephemeralStore.getExpiredVaults();
-        const orphanedPaths: string[] = [];
+        // Delegate cleanup to storage service (which now handles DB + Object Storage)
+        await storage.cleanupExpiredVaults();
 
-        for (const vault of expiredVaults) {
-            const paths = await ephemeralStore.deleteVault(vault.id);
-            orphanedPaths.push(...paths);
-        }
-
-        // 2. Clean up orphaned chunks from object storage
-        // In production, this would call the object storage API to delete files
-        if (orphanedPaths.length > 0) {
-            log(`Marked ${orphanedPaths.length} orphaned chunks for deletion`, "cleanup");
-
-            // TODO: Integrate with actual object storage deletion
-            // for (const path of orphanedPaths) {
-            //   await objectStorage.deleteObject(path);
-            // }
-        }
-
-        // 3. Log stats
-        const stats = ephemeralStore.getStats();
         const duration = Date.now() - startTime;
-
-        log(
-            `Cleanup complete in ${duration}ms. ` +
-            `Deleted ${expiredVaults.length} vaults, ${orphanedPaths.length} chunks. ` +
-            `Active: ${stats.vaultCount} vaults, ${stats.totalChunks} chunks.`,
-            "cleanup"
-        );
+        log(`Cleanup complete in ${duration}ms.`, "cleanup");
 
         lastCleanupRun = new Date();
     } catch (error) {

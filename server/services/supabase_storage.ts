@@ -60,6 +60,25 @@ export class SupabaseStorageService {
     getStoragePath(vaultId: string, fileId: string, chunkIndex: number): string {
         return `${vaultId}/${fileId}/${chunkIndex}.enc`;
     }
+
+    /**
+     * Delete files from storage
+     */
+    async deleteFiles(paths: string[]): Promise<void> {
+        if (paths.length === 0) return;
+
+        const { error } = await supabase
+            .storage
+            .from(BUCKET_NAME)
+            .remove(paths);
+
+        if (error) {
+            console.error("Supabase Delete Error:", error);
+            // We don't throw here to avoid blocking the DB cleanup if storage fails (orphan risk > blocking flow)
+        } else {
+            console.log(`[Storage] Successfully deleted ${paths.length} chunks from bucket.`);
+        }
+    }
 }
 
 export const supabaseStorage = new SupabaseStorageService();
