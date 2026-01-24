@@ -1,15 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Supabase Configuration
 // Prioritize Service Role Key for backend operations to bypass RLS
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+const IS_LOCAL = process.env.STORAGE_PROVIDER === 'local';
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
+if ((!SUPABASE_URL || !SUPABASE_KEY) && !IS_LOCAL) {
     throw new Error("Missing Supabase credentials in environment variables (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)");
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Initialize only if credentials exist or we are not in strict cloud mode
+// If local and no creds, we create a dummy client or undefined to avoid runtime crash on load, 
+// assuming methods won't be called.
+export const supabase: SupabaseClient | null = (SUPABASE_URL && SUPABASE_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_KEY)
+    : null;
+
 const BUCKET_NAME = "vaults";
 
 export class SupabaseStorageService {
@@ -20,6 +27,8 @@ export class SupabaseStorageService {
      * @param storagePath - The exact path in the bucket (e.g. "vaultId/fileId/chunkIndex")
      */
     async getUploadUrl(storagePath: string): Promise<string> {
+        if (!supabase) throw new Error("Supabase client not initialized (Local Mode active?)");
+
         // Create a signed URL for uploading (valid for 1 hour)
         const { data, error } = await supabase
             .storage
@@ -40,6 +49,8 @@ export class SupabaseStorageService {
      * @param storagePath - The exact path in the bucket
      */
     async getDownloadUrl(storagePath: string): Promise<string> {
+        if (!supabase) throw new Error("Supabase client not initialized (Local Mode active?)");
+
         // Create a signed URL for downloading (valid for 1 hour)
         const { data, error } = await supabase
             .storage
@@ -66,6 +77,7 @@ export class SupabaseStorageService {
      */
     async deleteFiles(paths: string[]): Promise<void> {
         if (paths.length === 0) return;
+        if (!supabase) return; // Silent return for local mode cleanup if erroneously called
 
         const { error } = await supabase
             .storage
