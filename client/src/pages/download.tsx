@@ -199,17 +199,17 @@ export default function DownloadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background p-4 md:p-8 flex flex-col">
+      <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 w-full flex-1">
 
         {/* Header */}
-        <header className="flex items-center justify-between mb-8">
+        <header className="flex items-center justify-between mb-6 md:mb-8">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.href = '/'}>
-            <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
               <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
             </div>
             <div>
-              <h1 className="text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
+              <h1 className="text-lg md:text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
             </div>
           </div>
         </header>
@@ -230,14 +230,14 @@ export default function DownloadPage() {
 
         {/* File List */}
         <div className="space-y-4">
-          <h3 className="text-lg font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
+          <h3 className="text-base md:text-lg font-bold font-mono uppercase tracking-wider text-muted-foreground mb-2 md:mb-4">
             Encrypted Contents
           </h3>
 
           {isDecrypting ? (
-            <div className="p-8 text-center text-muted-foreground animate-pulse">
-              <Unlock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              Decrypting metadata...
+            <div className="p-6 md:p-8 text-center text-muted-foreground animate-pulse">
+              <Unlock className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm md:text-base">Decrypting metadata...</p>
             </div>
           ) : (
             files.map((file) => (
@@ -247,31 +247,31 @@ export default function DownloadPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-card border border-border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-primary/30 transition-colors"
               >
-                <div className="flex items-center gap-4 overflow-hidden">
-                  <div className="p-3 bg-secondary rounded-lg">
-                    <File className="w-6 h-6 text-primary" />
+                <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                  <div className="p-2 md:p-3 bg-secondary rounded-lg flex-shrink-0">
+                    <File className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{file.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate text-sm md:text-base">{file.name}</p>
                     <p className="text-xs text-muted-foreground font-mono">
                       {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type || 'Unknown'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 w-full md:w-auto">
+                <div className="flex items-center gap-4 w-full md:w-auto mt-2 md:mt-0">
                   {activeDownload === file.fileId ? (
                     <div className="w-full md:w-48 space-y-2">
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>Decrypting...</span>
                         <span>{Math.round(downloadProgress)}%</span>
                       </div>
-                      <Progress value={downloadProgress} className="h-2" />
+                      <Progress value={downloadProgress} className="h-1.5 md:h-2" />
                     </div>
                   ) : (
                     <Button
                       onClick={() => handleDownload(file)}
-                      className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-mono"
+                      className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-sm md:text-base h-10 md:h-11"
                     >
                       <DownloadIcon className="w-4 h-4 mr-2" /> Download
                     </Button>

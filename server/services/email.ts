@@ -188,7 +188,7 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
     </div>
     
     <p style="text-align: center;">
-      <a href="${accessLink}" class="btn">🔓 Access Files</a>
+      <a href="${baseUrl}/access" class="btn">🔓 Access Files</a>
     </p>
     
     <div class="warning">
@@ -220,7 +220,7 @@ VaultBridge - Encrypted File Transfer
 ${input.senderName || "Someone"} shared encrypted files with you.
 
 Access Code: ${input.shortCode}
-Direct Link: ${accessLink}
+Direct Link: ${baseUrl}/access
 
 This link expires: ${expiryFormatted}
 

@@ -12,77 +12,65 @@ VaultBridge is a zero-knowledge, encrypted file transfer system. Files are encry
 - **No Tracking**: No analytics, cookies, or fingerprinting
 - **Public Computer Safe**: No localStorage, sessionStorage, or persistent data
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Local Development)
 
 ### Prerequisites
 
-- Node.js 18+ (20+ recommended)
-- Docker & Docker Compose (for Redis and MinIO)
+- Node.js 20+
+- PostgreSQL Database
+- Supabase Project (for Storage & DB)
 
-### 1. Start Infrastructure
+### 1. Setup Environment
 
-```bash
-# Start Redis and MinIO
-docker-compose up -d
-
-# Wait for services to be ready
-docker-compose logs -f minio-setup
-```
-
-### 2. Start Backend
+Copy `.env.example` to `.env` and fill in your Supabase credentials:
 
 ```bash
-cd backend
-
-# Install dependencies
-npm install
-
-# Copy environment file
 cp .env.example .env
-
-# Start development server
-npm run dev
 ```
 
-### 3. Start Frontend
+Required variables:
+- `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### 2. Install Dependencies
 
 ```bash
-cd frontend
-
-# Install dependencies
 npm install
+```
 
-# Start development server
+### 3. Run Development Server
+
+This command starts both the frontend and backend in development mode:
+
+```bash
 npm run dev
 ```
 
-### 4. Open the App
+Open `http://localhost:5000` in your browser.
 
-Navigate to `http://localhost:5173`
+## 🐳 Docker Deployment
+
+To build and run VaultBridge using Docker, please refer to the detailed [Docker Guide](DOCKER_GUIDE.md).
 
 ## 📁 Project Structure
 
 ```
 VaultBridge/
-├── frontend/                 # React + TypeScript + Vite
+├── client/                   # React + TypeScript + Vite Frontend
 │   ├── src/
 │   │   ├── components/       # UI components
-│   │   ├── hooks/            # React hooks for upload/download
-│   │   ├── lib/crypto/       # Client-side encryption
+│   │   ├── hooks/            # React hooks
+│   │   ├── lib/crypto/       # Client-side encryption logic
 │   │   ├── pages/            # Route pages
-│   │   ├── types/            # TypeScript types
-│   │   └── utils/            # Helpers and API client
+│   │   └── ...
+├── server/                   # Node.js + Express Backend
+│   ├── routes.ts             # API routes
+│   ├── storage.ts            # Database adapter
+│   ├── services/             # Email & Supabase services
 │   └── ...
-├── backend/                  # Node.js + Express + TypeScript
-│   ├── src/
-│   │   ├── routes/           # API routes
-│   │   ├── services/         # Business logic
-│   │   ├── middlewares/      # Security, validation, rate limiting
-│   │   ├── workers/          # Background cleanup jobs
-│   │   ├── types/            # TypeScript types
-│   │   └── utils/            # Helpers
-│   └── ...
-└── docker-compose.yml        # Redis + MinIO setup
+├── shared/                   # Shared types & schemas
+└── DOCKER_GUIDE.md           # Docker instructions
 ```
 
 ## 🔐 How It Works
@@ -93,7 +81,7 @@ VaultBridge/
 2. Browser generates AES-256 encryption key
 3. Files are chunked and encrypted client-side
 4. Encrypted chunks uploaded to server
-5. User receives short code + direct link (containing encryption key in URL fragment)
+5. User receives a **Short Code** (for manual access) + **Direct Link** (containing encryption key in URL fragment)
 
 ### Download Flow
 
@@ -104,95 +92,41 @@ VaultBridge/
 5. Files saved locally
 6. Vault deleted after download limit reached
 
-### Security Architecture
+### Email Flow
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ BROWSER (All encryption happens here)                   │
-│ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
-│ │ Generate    │→ │ Encrypt     │→ │ Upload      │      │
-│ │ AES-256 Key │  │ Chunks      │  │ Encrypted   │      │
-│ └─────────────┘  └─────────────┘  └─────────────┘      │
-│        ↓                                                │
-│ Key stored in URL fragment: example.com/d/ABC123#key=..│
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼ (Only encrypted data)
-┌─────────────────────────────────────────────────────────┐
-│ SERVER (Zero Knowledge)                                 │
-│ - Never receives encryption keys                        │
-│ - Never sees plaintext files                           │
-│ - Only stores encrypted chunks                         │
-│ - Auto-deletes after expiry                            │
-└─────────────────────────────────────────────────────────┘
-```
+1. Sender enters recipient email
+2. Server sends an email with the **Short Code** and a link to the Access Page
+3. Recipient clicks link -> enters Code -> Browser decrypts locally
+
+**Note:** The email link does *not* contain the decryption key directly for security reasons (Zero Knowledge). The user enters the code to unlock the vault.
 
 ## 📡 API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/vault` | Create a new vault |
-| `PUT` | `/api/v1/vault/:id/file/:fileId/chunk/:index` | Upload encrypted chunk |
-| `GET` | `/api/v1/vault/:id` | Get vault info |
-| `GET` | `/api/v1/vault/:id/file/:fileId/chunk/:index` | Download encrypted chunk |
-| `POST` | `/api/v1/vault/:id/complete` | Mark download complete |
-| `GET` | `/api/v1/code/:code` | Resolve short code to vault ID |
-| `DELETE` | `/api/v1/vault/:id` | Delete vault |
-
-## ⚙️ Configuration
-
-### Backend Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3001` | Server port |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `S3_ENDPOINT` | `http://localhost:9000` | S3-compatible storage endpoint |
-| `S3_BUCKET` | `vaultbridge` | Storage bucket name |
-| `S3_ACCESS_KEY` | `minioadmin` | S3 access key |
-| `S3_SECRET_KEY` | `minioadmin` | S3 secret key |
-| `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
-| `DEFAULT_VAULT_TTL_HOURS` | `24` | Default vault expiry |
-| `MAX_VAULT_TTL_HOURS` | `168` | Maximum vault expiry (7 days) |
-| `MAX_FILE_SIZE_BYTES` | `5368709120` | Max total upload size (5GB) |
+| `POST` | `/api/vaults` | Create a new vault |
+| `POST` | `/api/chunks/upload` | Get upload URL for chunk |
+| `GET` | `/api/vaults/:id` | Get vault info |
+| `GET` | `/api/chunks/download` | Get download URL for chunk |
+| `GET` | `/api/vaults/code/:code` | Resolve short code |
+| `POST` | `/api/vaults/:id/email` | Send vault access via email |
 
 ## 🛡️ Security Headers
 
 The server implements strict security headers:
-
-- **Content-Security-Policy**: Restricts resource loading
-- **X-Frame-Options**: DENY (prevents clickjacking)
+- **Content-Security-Policy**
+- **X-Frame-Options**: DENY
 - **Referrer-Policy**: no-referrer
-- **Cache-Control**: no-store (prevents caching)
-- **Permissions-Policy**: Disables unnecessary APIs
-
-## 📊 Rate Limits
-
-| Action | Limit |
-|--------|-------|
-| General API | 100/minute |
-| Uploads | 20/minute |
-| Code attempts | 10/minute |
-| Email triggers | 3/vault |
-
-## 🧹 Auto-Cleanup
-
-- Redis TTL automatically expires vault metadata
-- Background worker runs every 10 minutes to clean orphaned S3 objects
-- MinIO lifecycle policy deletes objects older than 7 days
+- **Cache-Control**: no-store
 
 ## 🏗️ Production Deployment
 
-For production, you should:
+VaultBridge is designed for:
+- **AWS Amplify** (Frontend/Backend)
+- **Docker** (Any container platform)
+- **Supabase** (Backend storage/DB)
 
-1. Use a managed Redis instance (e.g., AWS ElastiCache, Redis Cloud)
-2. Use a proper S3-compatible storage (AWS S3, Cloudflare R2, Backblaze B2)
-3. Set up HTTPS with proper certificates
-4. Configure appropriate rate limits
-5. Use environment-specific CORS origins
-6. Consider adding Cloudflare or similar for DDoS protection
-
-
+See `DOCKER_GUIDE.md` for containerization details.
 
 ---
 
