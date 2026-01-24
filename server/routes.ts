@@ -6,6 +6,7 @@ import { codeLimiter, uploadLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";
+import { localStorage } from "./services/local_storage"; // <--- Add this import!
 import multer from "multer";
 
 export async function registerRoutes(
@@ -17,6 +18,39 @@ export async function registerRoutes(
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   });
+
+  // =============================================================================
+  // LOCAL STORAGE ROUTES (Only active if STORAGE_PROVIDER=local)
+  // =============================================================================
+  if (process.env.STORAGE_PROVIDER === 'local') {
+
+    // Handle Local Upload Stream
+    app.post('/api/local/upload', async (req, res) => {
+      const storagePath = req.query.path as string;
+      if (!storagePath) return res.status(400).send("Missing path");
+
+      try {
+        await localStorage.uploadFile(storagePath, req);
+        res.json({ success: true });
+      } catch (e) {
+        console.error("Local upload failed", e);
+        res.status(500).send("Upload failed");
+      }
+    });
+
+    // Handle Local Download Stream
+    app.get('/api/local/download', async (req, res) => {
+      const storagePath = req.query.path as string;
+      if (!storagePath) return res.status(400).send("Missing path");
+
+      try {
+        const stream = await localStorage.downloadFile(storagePath);
+        stream.pipe(res);
+      } catch (e) {
+        res.status(404).send("File not found");
+      }
+    });
+  }
 
   // =============================================================================
   // VAULT OPERATIONS
@@ -298,7 +332,7 @@ export async function registerRoutes(
     const storagePath = supabaseStorage.getStoragePath(id, fileId, parseInt(chunkIndex));
 
     try {
-      const uploadUrl = await supabaseStorage.getUploadUrl(storagePath);
+      const uploadUrl = await storage.getUploadUrl(storagePath);
       res.json({
         uploadUrl,
         storagePath,
@@ -337,7 +371,7 @@ export async function registerRoutes(
 
     try {
       // Get signed download URL from Supabase
-      const downloadUrl = await supabaseStorage.getDownloadUrl(chunk.storagePath);
+      const downloadUrl = await storage.getDownloadUrl(chunk.storagePath);
       res.json({ downloadUrl });
     } catch (err) {
       console.error("Download URL Gen Failed:", err);
