@@ -44,8 +44,13 @@ export class DatabaseStorage {
     }
 
     async getVault(id: string) {
-        const [vault] = await db.select().from(vaults).where(eq(vaults.id, id));
-        return vault;
+        // Handle uuid validation or let db throw/return nothing
+        try {
+            const [vault] = await db.select().from(vaults).where(eq(vaults.id, id));
+            return vault;
+        } catch (e) {
+            return undefined;
+        }
     }
 
     async getVaultByShortCode(code: string) {
