@@ -44,13 +44,8 @@ export class DatabaseStorage {
     }
 
     async getVault(id: string) {
-        // Handle uuid validation or let db throw/return nothing
-        try {
-            const [vault] = await db.select().from(vaults).where(eq(vaults.id, id));
-            return vault;
-        } catch (e) {
-            return undefined;
-        }
+        const [vault] = await db.select().from(vaults).where(eq(vaults.id, id));
+        return vault;
     }
 
     async getVaultByShortCode(code: string) {
@@ -73,36 +68,12 @@ export class DatabaseStorage {
     }
 
     async createChunk(fileId: string, chunkIndex: number, size: number) {
-        // Resolve internal file ID first (Foreign Key Logic)
-        // The 'fileId' passed here is likely the Client UUID.
-        // The 'chunks' table likely references the internal 'files.id'.
-        const [fileRecord] = await db.select().from(files).where(eq(files.fileId, fileId));
-
-        if (!fileRecord) {
-            throw new Error(`File record not found for public fileId: ${fileId}`);
-        }
-
-        // Idempotent check using the resolved internal ID if necessary, 
-        // or simplistic check if using client ID. 
-        // Safer: Check if chunk exists using the resolved internal reference if possible, 
-        // or just proceed to try insert which might fail uniquely.
-        // Actually, we should check `getChunk` first. 
-        // CAUTION: getChunk currently uses 'fileId' raw. 
-        // If getChunk is broken too, we need to fix it. 
-        // Let's assume getChunk works or we fix it later. For now, createChunk is the blocker.
-
-        // We use fileRecord.id for the insert if the FK expects it.
-        // BUT wait, Drizzle schema 'fileId' in 'chunks' table... does it map to 'file_id' column?
-        // If we change the value we insert to 'fileRecord.id', we satisfy the FK.
-
-        // Check if chunk exists
+        // Idempotent check
         const existing = await this.getChunk(fileId, chunkIndex);
         if (existing) return existing;
 
-        // Use the INTERNAL ID for the relation
-        // We cast this to any because if the type definition is loose (string), it matches.
         const [chunk] = await db.insert(chunks).values({
-            fileId: fileRecord.id as unknown as string, // <--- THE FIX: Use internal ID
+            fileId,
             chunkIndex,
             size,
             isUploaded: false
@@ -111,25 +82,16 @@ export class DatabaseStorage {
     }
 
     async getChunk(fileId: string, chunkIndex: number) {
-        // To be safe, we should probably lookup the file first here too, 
-        // or assume the query uses the raw column which might match internal ID?
-        // If we stored Internal ID in createChunk, we must query by Internal ID here.
-        // So we translate Client ID -> Internal ID.
-        const [fileRecord] = await db.select().from(files).where(eq(files.fileId, fileId));
-        if (!fileRecord) return undefined;
-
+        // Find the chunk by matching fileId and index
         const [chunk] = await db.select().from(chunks)
-            .where(sql`${chunks.fileId} = ${fileRecord.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
+            .where(sql`${chunks.fileId} = ${fileId} AND ${chunks.chunkIndex} = ${chunkIndex}`);
         return chunk;
     }
 
     async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) {
-        const [fileRecord] = await db.select().from(files).where(eq(files.fileId, fileId));
-        if (!fileRecord) return;
-
         await db.update(chunks)
             .set({ isUploaded: true, storagePath })
-            .where(sql`${chunks.fileId} = ${fileRecord.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
+            .where(sql`${chunks.fileId} = ${fileId} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
     async incrementDownloadCount(vaultId: string) {
