@@ -80,7 +80,9 @@ export function VaultCard({
   downloads,
   maxDownloads,
   onSendEmail,
-}: VaultCardProps) {
+  className,
+  minimal = false,
+}: VaultCardProps & { className?: string; minimal?: boolean }) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -160,75 +162,78 @@ export function VaultCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="glass-card overflow-hidden ring-1 ring-white/10"
+      className={`glass-card overflow-hidden ring-1 ring-white/10 ${className}`}
     >
       {/* Header Stripe & Active Status */}
       <div className="relative h-1 w-full bg-zinc-900 pointer-events-none overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${isExpired ? 'via-rose-500' : 'via-primary'} to-transparent w-1/2 animate-shimmer opacity-70`} />
       </div>
 
-      <div className="p-6 md:p-8">
-        {/* Title Row */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-10">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="w-16 h-16 bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl flex items-center justify-center border border-zinc-700 shadow-inner">
-                <HardDrive className={`w-8 h-8 ${isExpired ? 'text-rose-500' : 'text-primary'}`} />
-              </div>
-              <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800">
-                {isExpired ? <AlertTriangle className="w-4 h-4 text-rose-500" /> : <ShieldCheck className="w-4 h-4 text-primary" />}
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold font-mono tracking-tight text-foreground">SECURE VAULT</h2>
-                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${isExpired
-                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
-                  : 'bg-primary/10 border-primary/20 text-primary'
-                  }`}>
-                  {isExpired ? 'Archived' : 'Active'}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <span className="font-medium text-foreground">{filesCount}</span> {filesCount === 1 ? 'file' : 'files'}
-                <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                <span className="font-medium text-foreground">{(totalSize / (1024 * 1024)).toFixed(2)}</span> MB
-              </p>
-            </div>
-          </div>
+      <div className="p-5 md:p-8">
 
-          {/* Enhanced Countdown Timer */}
-          <div className="flex flex-col items-end">
-            <div className={`flex items-center gap-2 mb-2 text-xs uppercase font-bold tracking-widest ${isExpiringSoon || isExpired ? 'text-rose-500' : 'text-primary'}`}>
-              <Clock className="w-3.5 h-3.5" />
-              {isExpired ? 'Vault Expired' : 'Auto-Purge In'}
+        {/* Optional Header Row */}
+        {!minimal && (
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 md:mb-10">
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl flex items-center justify-center border border-zinc-700 shadow-inner">
+                  <HardDrive className={`w-7 h-7 md:w-8 md:h-8 ${isExpired ? 'text-rose-500' : 'text-primary'}`} />
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800">
+                  {isExpired ? <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 text-rose-500" /> : <ShieldCheck className="w-3 h-3 md:w-4 md:h-4 text-primary" />}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-xl md:text-2xl font-bold font-mono tracking-tight text-foreground">SECURE VAULT</h2>
+                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${isExpired
+                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                    : 'bg-primary/10 border-primary/20 text-primary'
+                    }`}>
+                    {isExpired ? 'Archived' : 'Active'}
+                  </span>
+                </div>
+                <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-2">
+                  <span className="font-medium text-foreground">{filesCount}</span> {filesCount === 1 ? 'file' : 'files'}
+                  <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                  <span className="font-medium text-foreground">{(totalSize / (1024 * 1024)).toFixed(2)}</span> MB
+                </p>
+              </div>
             </div>
 
-            {isExpired ? (
-              <div className="h-14 flex items-center px-4 bg-rose-500/10 border border-rose-500/20 rounded-lg">
-                <span className="font-mono text-xl font-bold text-rose-500 tracking-widest">DELETED</span>
+            {/* Countdown Timer */}
+            <div className="flex flex-col items-end w-full md:w-auto mt-2 md:mt-0">
+              <div className={`flex items-center gap-2 mb-2 text-xs uppercase font-bold tracking-widest ${isExpiringSoon || isExpired ? 'text-rose-500' : 'text-primary'}`}>
+                <Clock className="w-3.5 h-3.5" />
+                {isExpired ? 'Vault Expired' : 'Auto-Purge In'}
               </div>
-            ) : (
-              <div className="flex items-center gap-2 bg-zinc-900/50 p-2 rounded-xl border border-zinc-800/50 backdrop-blur-sm">
-                <CountdownDigit value={timeLeft?.hours || 0} label="HRS" />
-                <Separator />
-                <CountdownDigit value={timeLeft?.minutes || 0} label="MIN" />
-                <Separator />
-                <CountdownDigit value={timeLeft?.seconds || 0} label="SEC" />
-              </div>
-            )}
+
+              {isExpired ? (
+                <div className="h-12 md:h-14 flex items-center px-4 bg-rose-500/10 border border-rose-500/20 rounded-lg w-full md:w-auto justify-center">
+                  <span className="font-mono text-lg md:text-xl font-bold text-rose-500 tracking-widest">DELETED</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-1.5 md:gap-2 bg-zinc-900/50 p-2 rounded-xl border border-zinc-800/50 backdrop-blur-sm w-full md:w-auto">
+                  <CountdownDigit value={timeLeft?.hours || 0} label="HRS" />
+                  <Separator />
+                  <CountdownDigit value={timeLeft?.minutes || 0} label="MIN" />
+                  <Separator />
+                  <CountdownDigit value={timeLeft?.seconds || 0} label="SEC" />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
 
-          {/* Cyber QR Layout */}
-          <div className="flex flex-col items-center">
-            <div className="relative group">
+          {/* Cyber QR Layout - Centered on Mobile */}
+          <div className="flex flex-col items-center order-1 lg:order-none">
+            <div className="relative group w-full max-w-[240px] lg:max-w-none">
               {/* QR Container Frame */}
               <div className="absolute -inset-0.5 bg-gradient-to-tr from-primary/50 to-emerald-600/50 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-500"></div>
-              <div className="relative bg-zinc-950 p-6 rounded-xl border border-primary/20 shadow-2xl overflow-hidden">
+              <div className="relative bg-zinc-950 p-4 md:p-6 rounded-xl border border-primary/20 shadow-2xl overflow-hidden aspect-square flex items-center justify-center">
 
                 {/* Scanning Animation */}
                 <motion.div
@@ -237,23 +242,18 @@ export function VaultCard({
                   transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                 />
 
-                {/* Corner Accents */}
-                <div className="absolute top-0 left-0 w-8 h-8 border-l-2 border-t-2 border-primary z-20" />
-                <div className="absolute top-0 right-0 w-8 h-8 border-r-2 border-t-2 border-primary z-20" />
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-l-2 border-b-2 border-primary z-20" />
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-r-2 border-b-2 border-primary z-20" />
-
-                <div className="bg-white p-2 rounded-lg relative z-0">
+                <div className="bg-white p-2 rounded-lg relative z-0 w-full h-full flex items-center justify-center">
                   <QRCodeSVG
                     value={fullLink}
-                    size={160}
+                    size={200}
+                    className="w-full h-full"
                     level="H"
                     includeMargin={true}
                     bgColor="#FFFFFF"
                     fgColor="#16a34a"
                     imageSettings={{
                       src: "/vault-qr-icon.png",
-                      height: 48, // Slightly larger for better visibility
+                      height: 48,
                       width: 48,
                       excavate: true,
                     }}
@@ -261,19 +261,19 @@ export function VaultCard({
                 </div>
               </div>
             </div>
-            <p className="mt-4 text-xs font-mono text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+            <p className="mt-4 text-[10px] md:text-xs font-mono text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Wait for scan
+              Scan to Access
             </p>
           </div>
 
           {/* Access Details Panel */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="lg:col-span-2 space-y-4 md:space-y-5 order-2 lg:order-none">
             {/* Short Code & Link */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Code Box */}
-              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl relative group overflow-hidden">
-                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
+              {/* Code Box - Optimized to prevent breaking */}
+              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl relative group overflow-hidden flex flex-col justify-between min-h-[110px]">
+                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity z-10">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -283,33 +283,54 @@ export function VaultCard({
                     {copiedCode ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
-                <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-2">Access PIN</div>
-                <div className="font-mono text-3xl font-bold text-primary tracking-[0.2em] drop-shadow-lg">
-                  {shortCode}
+                <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Access PIN</div>
+
+                <div className="flex-1 flex items-center justify-center w-full">
+                  <div className="font-mono text-xl sm:text-2xl md:text-3xl font-bold text-primary tracking-widest drop-shadow-lg whitespace-nowrap">
+                    {shortCode}
+                  </div>
                 </div>
               </div>
 
-              {/* Downloads Box */}
-              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl relative">
+              {/* Downloads Box - Redesigned */}
+              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl relative flex flex-col justify-between min-h-[110px]">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Downloads Remaining</div>
-                  <span className="font-mono text-xs font-bold text-white bg-zinc-800 px-2 py-0.5 rounded">
-                    {downloads} / {maxDownloads}
+                  <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider flex items-center gap-1.5">
+                    <Download className="w-3 h-3" />
+                    Downloads
+                  </div>
+                  <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${downloads >= maxDownloads
+                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                    : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+                    }`}>
+                    {maxDownloads - downloads} LEFT
                   </span>
                 </div>
 
-                <div className="h-4 bg-black rounded-full overflow-hidden border border-zinc-800/50">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(downloadProgress, 100)}%` }}
-                    className={`h-full relative overflow-hidden transition-all duration-700 ${downloadProgress >= 80 ? 'bg-rose-500' : 'bg-primary'
-                      }`}
-                  >
-                    <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20" />
-                  </motion.div>
-                </div>
-                <div className="mt-2 text-xs text-zinc-600 text-right font-mono">
-                  {maxDownloads - downloads} downloads left
+                {/* Segmented Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex gap-1 h-3 w-full">
+                    {Array.from({ length: Math.min(maxDownloads, 20) }).map((_, i) => {
+                      const isUsed = i < downloads;
+                      // Calculate if this segment should be active (reverse logic: filled bars = used downloads? 
+                      // Typically "Downloads Remaining" implies empty bars or filled bars representing used count.
+                      // Let's make "filled" = used.
+                      return (
+                        <div
+                          key={i}
+                          className={`flex-1 rounded-sm transition-all duration-300 ${isUsed
+                            ? 'bg-zinc-800' // Used downloads are dark/empty
+                            : 'bg-primary shadow-[0_0_10px_rgba(16,185,129,0.3)]' // Remaining are bright/filled
+                            }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-mono text-zinc-500">
+                    <span>0</span>
+                    <span>{downloads} / {maxDownloads} used</span>
+                    <span>{maxDownloads}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -319,10 +340,10 @@ export function VaultCard({
               <div className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
                 <div className="relative flex items-center bg-zinc-900/80 border border-zinc-700 hover:border-primary/50 rounded-xl p-1 pr-2 transition-colors">
-                  <div className="h-10 w-10 flex items-center justify-center text-zinc-500">
+                  <div className="h-10 w-10 flex items-center justify-center text-zinc-500 shrink-0">
                     <ExternalLink className="w-4 h-4" />
                   </div>
-                  <div className="flex-1 min-w-0 px-2">
+                  <div className="flex-1 min-w-0 px-2 overflow-hidden">
                     <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-0.5">Secure Link</div>
                     <div className="text-sm font-mono text-zinc-300 truncate selection:bg-primary/30">
                       {fullLink}
@@ -332,19 +353,10 @@ export function VaultCard({
                     variant="secondary"
                     size="sm"
                     onClick={() => copyToClipboard(fullLink, "link")}
-                    className="h-9 gap-2 shadow-sm font-medium"
+                    className="h-9 gap-2 shadow-sm font-medium shrink-0"
                   >
-                    {copiedLink ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
+                    {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span className="hidden md:inline">{copiedLink ? "Copied" : "Copy"}</span>
                   </Button>
                 </div>
               </div>
@@ -359,7 +371,7 @@ export function VaultCard({
                   </div>
                   <span className="text-sm font-medium text-foreground">Secure Send</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col md:flex-row gap-2">
                   <Input
                     type="email"
                     placeholder="Enter recipient email..."
@@ -370,7 +382,7 @@ export function VaultCard({
                   <Button
                     onClick={handleSendEmail}
                     disabled={!emailInput || isSendingEmail}
-                    className="min-w-[100px] cyber-btn"
+                    className="w-full md:w-auto min-w-[100px] cyber-btn"
                   >
                     {isSendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send"}
                   </Button>
@@ -383,17 +395,21 @@ export function VaultCard({
           </div>
         </div>
 
-        {/* Security Footer */}
+        {/* Security Footer - Simplified on Mobile */}
         <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-start gap-4">
-          <div className="p-2 bg-rose-500/10 rounded-lg shrink-0">
+          <div className="hidden md:block p-2 bg-rose-500/10 rounded-lg shrink-0">
             <AlertTriangle className="w-5 h-5 text-rose-500" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-rose-500 mb-1">Self-Destruction Protocol Active</h4>
+            <div className="flex items-center gap-2 md:hidden mb-2 text-rose-500 font-bold text-sm">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Self-Destruction Protocol</span>
+            </div>
+            <h4 className="hidden md:block text-sm font-bold text-rose-500 mb-1">Self-Destruction Protocol Active</h4>
             <p className="text-xs text-zinc-400 leading-relaxed max-w-2xl">
-              This vault is encrypted with a unique key that is not stored on our servers.
-              Once the download limit is reached or the timer expires, the data and the key are permanently purged.
-              <span className="text-zinc-300 font-medium"> There is no recovery option.</span>
+              This vault is encrypted with a unique key.
+              Once the limit is reached or timer expires, data is permanently purged.
+              <span className="text-zinc-300 font-medium"> No recovery option.</span>
             </p>
           </div>
         </div>

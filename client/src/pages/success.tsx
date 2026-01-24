@@ -30,37 +30,41 @@ function SplitCodeDisplay({ code }: { code: string }) {
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 0.4 }}
-      className="glass-card p-8 mb-8"
+      className="glass-card p-5 md:p-8 mb-6 md:mb-8 w-full"
     >
       {/* Code Display */}
       <div className="text-center mb-6">
         <div className="flex items-center justify-center gap-2 mb-4">
-          <Key className="w-6 h-6 text-primary" />
-          <span className="text-sm font-mono uppercase tracking-wider text-muted-foreground">
+          <Key className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+          <span className="text-xs md:text-sm font-mono uppercase tracking-wider text-muted-foreground">
             Access Code
           </span>
         </div>
 
-        <div className="flex items-center justify-center gap-4">
-          <div className="bg-primary/10 border-2 border-primary/30 rounded-xl py-4 px-6">
-            <span className="text-5xl font-mono font-bold tracking-[0.3em] text-primary">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+          <div className="bg-primary/10 border-2 border-primary/30 rounded-xl py-3 px-4 md:py-4 md:px-6 w-full sm:w-auto">
+            <span className="text-4xl md:text-5xl font-mono font-bold tracking-[0.2em] md:tracking-[0.3em] text-primary block sm:inline">
               {lookupId}
             </span>
+            <span className="text-[10px] uppercase text-primary/60 font-bold tracking-wider block sm:hidden mt-1">Public ID</span>
           </div>
-          <span className="text-4xl font-bold text-muted-foreground">—</span>
-          <div className="bg-zinc-800 border-2 border-zinc-600 rounded-xl py-4 px-6">
-            <span className="text-5xl font-mono font-bold tracking-[0.3em] text-white">
+
+          <span className="hidden sm:block text-2xl md:text-4xl font-bold text-muted-foreground">—</span>
+
+          <div className="bg-zinc-800 border-2 border-zinc-600 rounded-xl py-3 px-4 md:py-4 md:px-6 w-full sm:w-auto">
+            <span className="text-4xl md:text-5xl font-mono font-bold tracking-[0.2em] md:tracking-[0.3em] text-white block sm:inline">
               {pin}
             </span>
+            <span className="text-[10px] uppercase text-zinc-500 font-bold tracking-wider block sm:hidden mt-1">Private PIN</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-2 mt-4">
+        <div className="flex items-center justify-center gap-2 mt-6">
           <Button
             variant="outline"
             size="sm"
             onClick={handleCopy}
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copied ? "Copied!" : "Copy Code"}
@@ -69,12 +73,12 @@ function SplitCodeDisplay({ code }: { code: string }) {
       </div>
 
       {/* Security Warning */}
-      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-left">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-amber-400">Write this down. It works only once.</p>
-            <p className="text-xs text-amber-300/80 mt-1">
+            <p className="text-xs text-amber-300/80 mt-1 leading-relaxed">
               This code is your only way to access these files. The recipient needs both parts
               to decrypt the files. After download limit or expiration, it cannot be recovered.
             </p>
@@ -82,8 +86,8 @@ function SplitCodeDisplay({ code }: { code: string }) {
         </div>
       </div>
 
-      {/* How It Works */}
-      <div className="mt-6 pt-6 border-t border-border/50">
+      {/* How It Works - Hidden on mobile since we show labels inline above */}
+      <div className="hidden sm:block mt-6 pt-6 border-t border-border/50">
         <p className="text-xs text-muted-foreground text-center">
           <span className="text-primary font-semibold">{lookupId}</span> = Public ID (finds the file on server) •
           <span className="text-white font-semibold ml-1">{pin}</span> = Private PIN (decrypts the key locally)
@@ -114,7 +118,10 @@ export default function Success() {
     const res = await fetch(`/api/vaults/${vaultId}/email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: email }),
+      body: JSON.stringify({
+        to: email,
+        fullCode: splitCode // Send the full client-side code 
+      }),
     });
 
     if (!res.ok) {
@@ -173,8 +180,9 @@ export default function Success() {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 w-full max-w-4xl mx-auto px-4 md:px-6 pb-12 md:pb-16 flex flex-col items-center justify-center min-h-[50vh]">
-        {/* Success Header */}
+      <main className="relative z-10 flex-1 w-full max-w-4xl mx-auto px-4 md:px-6 pb-12 md:pb-16 flex flex-col items-center justify-center min-h-[60vh] md:min-h-[50vh]">
+
+        {/* Success Header - Mobile Optimized */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -189,18 +197,27 @@ export default function Success() {
             <Sparkles className="w-8 h-8 md:w-10 md:h-10 text-primary" />
           </motion.div>
 
-          <h1 className="text-3xl md:text-4xl font-bold font-mono tracking-tight mb-2 md:mb-3">
+          <h1 className="text-3xl md:text-5xl font-bold font-mono tracking-tight mb-3 md:mb-4">
             <span className="text-primary">VAULT</span> CREATED
           </h1>
-          <p className="text-sm md:text-lg text-muted-foreground max-w-md mx-auto">
-            Your files are encrypted and ready to share. Share the access code below.
+          <p className="text-sm md:text-lg text-muted-foreground max-w-md mx-auto px-4">
+            Your files are encrypted. Share the access code below to unlock them.
           </p>
         </motion.div>
 
-        {/* Split Code Display */}
-        {splitCode && <SplitCodeDisplay code={splitCode} />}
+        {/* Split Code Display (The "Keys") */}
+        {splitCode && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="w-full max-w-2xl mb-8"
+          >
+            <SplitCodeDisplay code={splitCode} />
+          </motion.div>
+        )}
 
-        {/* Vault Card (optional metadata) */}
+        {/* Vault Card (The "Container" - Minimal Mode) */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -218,6 +235,8 @@ export default function Success() {
               downloads={vault.downloadCount}
               maxDownloads={vault.maxDownloads}
               onSendEmail={handleSendEmail}
+              minimal={true}
+              className="border-t-4 border-t-primary"
             />
           )}
         </motion.div>
@@ -227,12 +246,11 @@ export default function Success() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="mt-6 md:mt-8 text-center"
+          className="mt-8 md:mt-12 text-center px-6"
         >
-          <p className="text-xs md:text-sm text-muted-foreground">
-            🔐 Zero-Knowledge Transfer: The PIN never touches our servers.
-            <br className="hidden md:block" />
-            Only the recipient with the full 6-digit code can decrypt the files.
+          <p className="text-xs md:text-sm text-zinc-500 max-w-lg mx-auto leading-relaxed">
+            🔐 <span className="font-semibold text-zinc-400">Zero-Knowledge Architecture:</span> The PIN is your decryption key.
+            It is generated in your browser and never sent to our servers. Without it, the data is mathematically irretrievable.
           </p>
         </motion.div>
       </main>

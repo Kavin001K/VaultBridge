@@ -218,43 +218,45 @@ export default function Home() {
               className="w-full"
             >
               {/* Hero */}
-              <div className="text-center mb-10 md:mb-12">
-                <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-4 md:mb-6 leading-tight">
+              <div className="text-center mb-10 md:mb-16 px-2">
+                <h2 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-4 md:mb-6 leading-[1.1]">
                   Share files <span className="text-gradient">secretly</span>.
                 </h2>
-                <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-4 px-4">
+                <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-4 leading-relaxed">
                   End-to-end encrypted. Ephemeral. Anonymous.
                 </p>
-                <p className="text-sm md:text-lg text-muted-foreground/70 max-w-xl mx-auto px-4">
+                <p className="text-sm md:text-lg text-muted-foreground/70 max-w-xl mx-auto">
                   Your files are encrypted in your browser before they ever leave your device.
                 </p>
               </div>
 
               {/* Action Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 w-full max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full max-w-4xl mx-auto px-2">
                 {/* Upload Card */}
                 <Link href="/upload">
                   <motion.div
                     whileHover={{ scale: 1.02, y: -5 }}
                     whileTap={{ scale: 0.98 }}
-                    className="glass-card p-6 md:p-8 cursor-pointer group h-full"
+                    className="glass-card p-6 md:p-8 cursor-pointer group h-full flex flex-col justify-between"
                   >
-                    <div className="flex items-center gap-4 mb-4 md:mb-6">
-                      <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 group-hover:animate-pulse-glow transition-all">
-                        <Upload className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+                    <div>
+                      <div className="flex items-center gap-4 mb-4 md:mb-6">
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 group-hover:animate-pulse-glow transition-all shrink-0">
+                          <Upload className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl md:text-2xl font-bold">Upload Files</h3>
+                          <p className="text-xs md:text-sm text-muted-foreground">Create a secure vault</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-xl md:text-2xl font-bold">Upload Files</h3>
-                        <p className="text-xs md:text-sm text-muted-foreground">Create a secure vault</p>
-                      </div>
+
+                      <p className="text-sm md:text-base text-muted-foreground mb-6 leading-relaxed">
+                        Drag & drop files, set expiration and download limits,
+                        then share the encrypted link.
+                      </p>
                     </div>
 
-                    <p className="text-sm md:text-base text-muted-foreground mb-6">
-                      Drag & drop files, set expiration and download limits,
-                      then share the encrypted link.
-                    </p>
-
-                    <div className="flex items-center gap-2 text-primary font-mono font-bold uppercase tracking-wider group-hover:gap-4 transition-all text-sm md:text-base">
+                    <div className="flex items-center gap-2 text-primary font-mono font-bold uppercase tracking-wider group-hover:gap-4 transition-all text-sm md:text-base mt-2">
                       <span>Get Started</span>
                       <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
                     </div>
@@ -266,24 +268,26 @@ export default function Home() {
                   <motion.div
                     whileHover={{ scale: 1.02, y: -5 }}
                     whileTap={{ scale: 0.98 }}
-                    className="glass-card p-6 md:p-8 cursor-pointer group h-full border-zinc-700"
+                    className="glass-card p-6 md:p-8 cursor-pointer group h-full border-zinc-700 flex flex-col justify-between"
                   >
-                    <div className="flex items-center gap-4 mb-4 md:mb-6">
-                      <div className="w-12 h-12 md:w-14 md:h-14 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 group-hover:border-primary/50 transition-all">
-                        <KeyRound className="w-6 h-6 md:w-7 md:h-7 text-zinc-400 group-hover:text-primary transition-colors" />
+                    <div>
+                      <div className="flex items-center gap-4 mb-4 md:mb-6">
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 group-hover:border-primary/50 transition-all shrink-0">
+                          <KeyRound className="w-6 h-6 md:w-7 md:h-7 text-zinc-400 group-hover:text-primary transition-colors" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl md:text-2xl font-bold">Access Vault</h3>
+                          <p className="text-xs md:text-sm text-muted-foreground">Enter your 6-digit code</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-xl md:text-2xl font-bold">Access Vault</h3>
-                        <p className="text-xs md:text-sm text-muted-foreground">Enter your 6-digit code</p>
-                      </div>
+
+                      <p className="text-sm md:text-base text-muted-foreground mb-6 leading-relaxed">
+                        Have an access code? Enter it to unlock and download
+                        encrypted files securely.
+                      </p>
                     </div>
 
-                    <p className="text-sm md:text-base text-muted-foreground mb-6">
-                      Have an access code? Enter it to unlock and download
-                      encrypted files securely.
-                    </p>
-
-                    <div className="flex items-center gap-2 text-zinc-400 font-mono font-bold uppercase tracking-wider group-hover:text-primary group-hover:gap-4 transition-all text-sm md:text-base">
+                    <div className="flex items-center gap-2 text-zinc-400 font-mono font-bold uppercase tracking-wider group-hover:text-primary group-hover:gap-4 transition-all text-sm md:text-base mt-2">
                       <span>Unlock Vault</span>
                       <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
                     </div>
@@ -298,11 +302,11 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="w-full max-w-2xl mx-auto"
+              className="w-full max-w-2xl mx-auto px-2"
             >
-              <div className="glass-card p-6 md:p-8 border-primary/20">
+              <div className="glass-card p-5 md:p-8 border-primary/20">
                 <div className="flex items-center gap-4 mb-6 md:mb-8">
-                  <div className="w-12 h-12 md:w-14 md:h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
+                  <div className="w-12 h-12 md:w-14 md:h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-500/30 shrink-0">
                     <Send className="w-6 h-6 md:w-7 md:h-7 text-indigo-400" />
                   </div>
                   <div>
@@ -385,7 +389,7 @@ export default function Home() {
                           placeholder="friend@example.com"
                           value={emailTo}
                           onChange={(e) => setEmailTo(e.target.value)}
-                          className="bg-zinc-900/50 border-zinc-800 focus:border-indigo-500/50"
+                          className="bg-zinc-900/50 border-zinc-800 focus:border-indigo-500/50 text-base"
                         />
                       </div>
                       <div className="space-y-2">
@@ -394,7 +398,7 @@ export default function Home() {
                           placeholder="Here are your files..."
                           value={emailSubject}
                           onChange={(e) => setEmailSubject(e.target.value)}
-                          className="bg-zinc-900/50 border-zinc-800 focus:border-indigo-500/50"
+                          className="bg-zinc-900/50 border-zinc-800 focus:border-indigo-500/50 text-base"
                         />
                       </div>
                     </div>
@@ -403,7 +407,7 @@ export default function Home() {
                       <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Message</label>
                       <Textarea
                         placeholder="Encrypted message..."
-                        className="min-h-[100px] bg-zinc-900/50 border-zinc-800 focus:border-indigo-500/50 resize-none"
+                        className="min-h-[100px] bg-zinc-900/50 border-zinc-800 focus:border-indigo-500/50 resize-none text-base"
                         value={emailBody}
                         onChange={(e) => setEmailBody(e.target.value)}
                       />
@@ -445,7 +449,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 md:mt-20 w-full max-w-4xl"
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 md:mt-24 w-full max-w-4xl px-4"
           >
             {[
               {
@@ -469,11 +473,11 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 + i * 0.1 }}
-                className="text-center p-4 md:p-6 bg-zinc-900/20 rounded-xl md:bg-transparent"
+                className="text-center p-4 md:p-6 bg-zinc-900/20 rounded-xl md:bg-transparent border border-white/5 md:border-transparent"
               >
                 <feature.icon className="w-6 h-6 md:w-8 md:h-8 text-primary mx-auto mb-3 md:mb-4" />
                 <h4 className="font-semibold mb-2 text-sm md:text-base">{feature.title}</h4>
-                <p className="text-xs md:text-sm text-muted-foreground">{feature.desc}</p>
+                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
           </motion.div>

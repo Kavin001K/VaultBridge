@@ -294,51 +294,110 @@ export default function AccessPage() {
                                     />
 
                                     {/* Visual Boxes */}
-                                    {Array.from({ length: 6 }).map((_, i) => {
-                                        const num = accessCode[i] || "";
-                                        const isFocused = accessCode.length === i;
-                                        const isFilled = !!num;
+                                    <div className="flex items-center gap-1 md:gap-2">
+                                        {/* First 3 Digits (Lookup ID) */}
+                                        <div className="flex gap-1.5 md:gap-2">
+                                            {Array.from({ length: 3 }).map((_, i) => {
+                                                const index = i;
+                                                const num = accessCode[index] || "";
+                                                const isFocused = accessCode.length === index;
+                                                const isFilled = !!num;
 
-                                        return (
-                                            <motion.div
-                                                key={i}
-                                                initial={false}
-                                                animate={{
-                                                    scale: isFocused ? 1.05 : 1,
-                                                    borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
-                                                    backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
-                                                }}
-                                                className={`
-                                                    w-10 h-14 md:w-14 md:h-20
-                                                    border-2 rounded-lg md:rounded-xl flex items-center justify-center 
-                                                    text-xl md:text-3xl font-mono font-bold
-                                                    transition-colors duration-200
-                                                    ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
-                                                `}
-                                            >
-                                                <AnimatePresence mode="popLayout">
-                                                    {num ? (
-                                                        <motion.span
-                                                            key={num}
-                                                            initial={{ y: 20, opacity: 0 }}
-                                                            animate={{ y: 0, opacity: 1 }}
-                                                            exit={{ y: -20, opacity: 0 }}
-                                                            className="text-primary"
-                                                        >
-                                                            {num}
-                                                        </motion.span>
-                                                    ) : (
-                                                        isFocused && (
-                                                            <motion.div
-                                                                layoutId="cursor"
-                                                                className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
-                                                            />
-                                                        )
-                                                    )}
-                                                </AnimatePresence>
-                                            </motion.div>
-                                        );
-                                    })}
+                                                return (
+                                                    <motion.div
+                                                        key={index}
+                                                        initial={false}
+                                                        animate={{
+                                                            scale: isFocused ? 1.05 : 1,
+                                                            borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                                                            backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
+                                                        }}
+                                                        className={`
+                                                            w-10 h-12 md:w-14 md:h-20
+                                                            border-2 rounded-lg md:rounded-xl flex items-center justify-center 
+                                                            text-xl md:text-3xl font-mono font-bold
+                                                            transition-colors duration-200
+                                                            ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
+                                                        `}
+                                                    >
+                                                        <AnimatePresence mode="popLayout">
+                                                            {num ? (
+                                                                <motion.span
+                                                                    key={num}
+                                                                    initial={{ y: 20, opacity: 0 }}
+                                                                    animate={{ y: 0, opacity: 1 }}
+                                                                    exit={{ y: -20, opacity: 0 }}
+                                                                    className="text-primary"
+                                                                >
+                                                                    {num}
+                                                                </motion.span>
+                                                            ) : (
+                                                                isFocused && (
+                                                                    <motion.div
+                                                                        layoutId="cursor"
+                                                                        className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
+                                                                    />
+                                                                )
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </motion.div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Divider */}
+                                        <div className="w-2 md:w-4 border-t-2 border-zinc-700/50"></div>
+
+                                        {/* Last 3 Digits (PIN) */}
+                                        <div className="flex gap-1.5 md:gap-2">
+                                            {Array.from({ length: 3 }).map((_, i) => {
+                                                const index = i + 3;
+                                                const num = accessCode[index] || "";
+                                                const isFocused = accessCode.length === index;
+                                                const isFilled = !!num;
+
+                                                return (
+                                                    <motion.div
+                                                        key={index}
+                                                        initial={false}
+                                                        animate={{
+                                                            scale: isFocused ? 1.05 : 1,
+                                                            borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                                                            backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
+                                                        }}
+                                                        className={`
+                                                            w-10 h-12 md:w-14 md:h-20
+                                                            border-2 rounded-lg md:rounded-xl flex items-center justify-center 
+                                                            text-xl md:text-3xl font-mono font-bold
+                                                            transition-colors duration-200
+                                                            ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
+                                                        `}
+                                                    >
+                                                        <AnimatePresence mode="popLayout">
+                                                            {num ? (
+                                                                <motion.span
+                                                                    key={num}
+                                                                    initial={{ y: 20, opacity: 0 }}
+                                                                    animate={{ y: 0, opacity: 1 }}
+                                                                    exit={{ y: -20, opacity: 0 }}
+                                                                    className="text-primary" // PIN is also shown for confirmation, could obscure if desired but usually helpful to see
+                                                                >
+                                                                    {num}
+                                                                </motion.span>
+                                                            ) : (
+                                                                isFocused && (
+                                                                    <motion.div
+                                                                        layoutId="cursor"
+                                                                        className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
+                                                                    />
+                                                                )
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </motion.div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <p className="text-xs text-muted-foreground text-center px-4">

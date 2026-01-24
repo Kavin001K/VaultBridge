@@ -107,9 +107,16 @@ export class DatabaseStorage {
     }
 
     async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) {
+        // Resolve internal file ID
+        const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
+        if (!file) {
+            console.error(`File not found for ID during update: ${fileId}`);
+            return;
+        }
+
         await db.update(chunks)
             .set({ isUploaded: true, storagePath })
-            .where(sql`${chunks.fileId} = ${fileId} AND ${chunks.chunkIndex} = ${chunkIndex}`);
+            .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
     async incrementDownloadCount(vaultId: string) {
