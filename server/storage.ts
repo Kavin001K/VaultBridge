@@ -68,12 +68,20 @@ export class DatabaseStorage {
     }
 
     async createChunk(fileId: string, chunkIndex: number, size: number) {
-        // Idempotent check
-        const existing = await this.getChunk(fileId, chunkIndex);
+        // Resolve internal file ID
+        const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
+        if (!file) {
+            throw new Error(`File not found for ID: ${fileId}`);
+        }
+
+        // Idempotent check using internal ID
+        const [existing] = await db.select().from(chunks).where(
+            sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`
+        );
         if (existing) return existing;
 
         const [chunk] = await db.insert(chunks).values({
-            fileId,
+            fileId: file.id,
             chunkIndex,
             size,
             isUploaded: false
@@ -82,9 +90,19 @@ export class DatabaseStorage {
     }
 
     async getChunk(fileId: string, chunkIndex: number) {
-        // Find the chunk by matching fileId and index
-        const [chunk] = await db.select().from(chunks)
-            .where(sql`${chunks.fileId} = ${fileId} AND ${chunks.chunkIndex} = ${chunkIndex}`);
+        // Find the chunk by matching fileId (client ID) and index
+        // Join with files table to resolve fileId
+        const [chunk] = await db.select({
+            id: chunks.id,
+            fileId: chunks.fileId,
+            chunkIndex: chunks.chunkIndex,
+            storagePath: chunks.storagePath,
+            size: chunks.size,
+            isUploaded: chunks.isUploaded
+        })
+            .from(chunks)
+            .innerJoin(files, eq(chunks.fileId, files.id))
+            .where(sql`${files.fileId} = ${fileId} AND ${chunks.chunkIndex} = ${chunkIndex}`);
         return chunk;
     }
 

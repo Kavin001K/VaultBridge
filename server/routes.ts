@@ -24,8 +24,8 @@ export async function registerRoutes(
   // =============================================================================
   if (process.env.STORAGE_PROVIDER === 'local') {
 
-    // Handle Local Upload Stream
-    app.post('/api/local/upload', async (req, res) => {
+    // Handle Local Upload Stream (Support both POST and PUT)
+    const uploadHandler = async (req: any, res: any) => {
       const storagePath = req.query.path as string;
       if (!storagePath) return res.status(400).send("Missing path");
 
@@ -36,7 +36,10 @@ export async function registerRoutes(
         console.error("Local upload failed", e);
         res.status(500).send("Upload failed");
       }
-    });
+    };
+
+    app.post('/api/local/upload', uploadHandler);
+    app.put('/api/local/upload', uploadHandler);
 
     // Handle Local Download Stream
     app.get('/api/local/download', async (req, res) => {

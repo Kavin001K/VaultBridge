@@ -1,6 +1,12 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from "../shared/schema";
+import dns from 'node:dns';
+
+// Force IPv4 to avoid EHOSTUNREACH on some networks
+if (dns && dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set.");
