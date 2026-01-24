@@ -25,38 +25,18 @@ export async function registerRoutes(
   if (process.env.STORAGE_PROVIDER === 'local') {
 
     // Handle Local Upload Stream
-    // Supports both POST and PUT (PUT is standard for signed URLs)
-    // Handle Local Upload Stream
-    // Supports both POST and PUT (PUT is standard for signed URLs)
-    const localUploadHandler = async (req: any, res: any) => {
+    app.post('/api/local/upload', async (req, res) => {
       const storagePath = req.query.path as string;
-      console.log(`[Local Upload] Starting upload for: ${storagePath}`);
-
-      if (!storagePath) {
-        console.error("[Local Upload] Missing path query param");
-        return res.status(400).send("Missing path");
-      }
+      if (!storagePath) return res.status(400).send("Missing path");
 
       try {
-        // Log headers to debug content-length/type
-        console.log(`[Local Upload] Headers: content-length=${req.headers['content-length']}, content-type=${req.headers['content-type']}`);
-
-        const result = await localStorage.uploadFile(storagePath, req);
-        console.log(`[Local Upload] Success: ${JSON.stringify(result)}`);
-
+        await localStorage.uploadFile(storagePath, req);
         res.json({ success: true });
-      } catch (e: any) {
-        console.error("[Local Upload] Failed:", e);
-        res.status(500).send(`Upload failed: ${e.message}`);
+      } catch (e) {
+        console.error("Local upload failed", e);
+        res.status(500).send("Upload failed");
       }
-    };
-
-    // We must bypass body parsing for these routes if possible, 
-    // but since middlewares are global in index.ts, we rely on req being a stream.
-    // Express req IS a stream, even if body-parser ran (unless it fully consumed it).
-    // For raw binary uploads (application/octet-stream), body-parser usually skips if not configured for it.
-    app.post('/api/local/upload', localUploadHandler);
-    app.put('/api/local/upload', localUploadHandler);
+    });
 
     // Handle Local Download Stream
     app.get('/api/local/download', async (req, res) => {
