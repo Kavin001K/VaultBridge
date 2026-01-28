@@ -19,7 +19,7 @@ export const vaults = pgTable("vaults", {
 
 export const files = pgTable("files", {
   id: uuid("id").primaryKey().defaultRandom(),
-  vaultId: uuid("vault_id").references(() => vaults.id).notNull(),
+  vaultId: uuid("vault_id").references(() => vaults.id, { onDelete: "cascade" }).notNull(),
   fileId: text("file_id").notNull(), // Client-generated UUID for the file
   chunkCount: integer("chunk_count").notNull(),
   totalSize: integer("total_size").notNull(), // Bytes
@@ -27,7 +27,7 @@ export const files = pgTable("files", {
 
 export const chunks = pgTable("chunks", {
   id: serial("id").primaryKey(),
-  fileId: uuid("file_id").references(() => files.id).notNull(),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "cascade" }).notNull(),
   chunkIndex: integer("chunk_index").notNull(),
   storagePath: text("storage_path"), // Path in Object Storage
   size: integer("size").notNull(),

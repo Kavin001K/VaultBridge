@@ -15,7 +15,7 @@ import { generateKey, exportKey, encryptMetadata, encryptData, generateUUID, gen
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
 type UploadStage = "idle" | "encrypting" | "uploading" | "success";
-type ProgressStep = "keys" | "metadata" | "chunks" | "upload" | "done";
+type ProgressStep = "keys" | "metadata" | "transfer" | "done";
 
 export default function UploadPage() {
     const [files, setFiles] = useState<File[]>([]);
@@ -33,6 +33,19 @@ export default function UploadPage() {
     const createVault = useCreateVault();
     const getChunkUrl = useGetChunkUploadUrl();
     const markUploaded = useMarkChunkUploaded();
+
+    const truncateName = (name: string, maxLength: number = 20) => {
+        if (name.length <= maxLength) return name;
+        const extIndex = name.lastIndexOf('.');
+        if (extIndex !== -1) {
+            const ext = name.substring(extIndex);
+            const base = name.substring(0, extIndex);
+            if (base.length > maxLength - ext.length - 3) {
+                return base.substring(0, maxLength - ext.length - 3) + '...' + ext;
+            }
+        }
+        return name.substring(0, maxLength - 3) + '...';
+    };
 
     const handleUpload = async () => {
         if (files.length === 0) return;
@@ -57,7 +70,7 @@ export default function UploadPage() {
 
             // Step 2: Encrypt Metadata
             setCurrentStep("metadata");
-            setStatusText("Encrypting file metadata...");
+            setStatusText(`Encrypting metadata for ${files.length} file${files.length > 1 ? 's' : ''}...`);
             const fileMetadata = files.map(f => ({
                 name: f.name,
                 type: f.type,
@@ -88,7 +101,7 @@ export default function UploadPage() {
 
             // Step 4: Encrypt & Upload Chunks
             setStage("uploading");
-            setCurrentStep("chunks");
+            setCurrentStep("transfer");
             const totalChunks = filesPayload.reduce((acc, f) => acc + f.chunks, 0);
             let processedChunks = 0;
 
@@ -115,10 +128,12 @@ export default function UploadPage() {
                 const file = files[i];
                 const fileId = fileMetadata[i].fileId;
                 const totalFileChunks = Math.ceil(file.size / CHUNK_SIZE);
+                const displayName = truncateName(file.name);
 
                 for (let chunkIndex = 0; chunkIndex < totalFileChunks; chunkIndex++) {
-                    setStatusText(`Encrypting ${file.name} [${chunkIndex + 1}/${totalFileChunks}]`);
-                    setCurrentStep("chunks");
+                    const chunkLabel = totalFileChunks > 1 ? ` (Chunk ${chunkIndex + 1}/${totalFileChunks})` : "";
+                    const fileLabel = files.length > 1 ? `File ${i + 1}/${files.length}: ` : "";
+                    setStatusText(`${fileLabel}Encrypting ${displayName}${chunkLabel}`);
 
                     const start = chunkIndex * CHUNK_SIZE;
                     const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -132,8 +147,7 @@ export default function UploadPage() {
                     combinedBuffer.set(iv, 0);
                     combinedBuffer.set(new Uint8Array(encryptedData), iv.byteLength);
 
-                    setCurrentStep("upload");
-                    setStatusText(`Uploading ${file.name} [${chunkIndex + 1}/${totalFileChunks}]`);
+                    setStatusText(`${fileLabel}Uploading ${displayName}${chunkLabel}`);
 
                     const { uploadUrl, storagePath } = await getChunkUrl.mutateAsync({
                         vaultId: vault.id,

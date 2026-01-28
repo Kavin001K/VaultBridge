@@ -32,6 +32,10 @@ export default function DownloadPage() {
   const [activeDownload, setActiveDownload] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
 
+  // Self-Destruct State
+  const [isDestructing, setIsDestructing] = useState(false);
+  const [isDestroyed, setIsDestroyed] = useState(false);
+
   const { data: vault, isLoading, error: apiError } = useGetVault(vaultId || "");
   const getDownloadUrl = useGetChunkDownloadUrl();
   const trackDownload = useTrackDownload();
@@ -160,6 +164,20 @@ export default function DownloadPage() {
 
       toast({ title: "Download Complete", description: `Saved ${file.name}` });
 
+      // 8. Self-Destruct Sequence
+      setTimeout(() => {
+        toast({
+          title: "Self-Destruct Initiated",
+          description: "This link is burning...",
+          variant: "destructive"
+        });
+        setIsDestructing(true);
+      }, 2000);
+
+      setTimeout(() => {
+        setIsDestroyed(true);
+      }, 4500);
+
     } catch (err) {
       console.error(err);
       toast({ variant: "destructive", title: "Download Failed", description: "Could not decrypt file." });
@@ -170,6 +188,32 @@ export default function DownloadPage() {
   };
 
   // === RENDER STATES ===
+
+  if (isDestroyed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 animate-in fade-in duration-1000">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-20 h-20 bg-zinc-900 border-2 border-zinc-800 rounded-full flex items-center justify-center mx-auto relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-t from-destructive/20 to-transparent" />
+            <ShieldCheck className="w-10 h-10 text-muted-foreground/50" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold font-mono text-muted-foreground uppercase tracking-widest">
+              Link Terminated
+            </h1>
+            <p className="text-zinc-500">
+              This vault has self-destructed. No data remains.
+            </p>
+          </div>
+
+          <Button onClick={() => window.location.href = '/'} variant="outline" className="border-zinc-800 hover:bg-zinc-900 hover:text-white">
+            Return to Safety
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -199,7 +243,7 @@ export default function DownloadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 flex flex-col">
+    <div className={`min-h-screen bg-background p-4 md:p-8 flex flex-col ${isDestructing ? 'burn-container' : ''}`}>
       <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 w-full flex-1">
 
         {/* Header */}

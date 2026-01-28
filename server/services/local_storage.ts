@@ -14,6 +14,13 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 export const localStorage = {
     async uploadFile(filename: string, fileStream: any) {
         const filePath = path.join(UPLOAD_DIR, filename);
+
+        // Ensure parent directory exists
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
         const writeStream = createWriteStream(filePath);
         await pipeline(fileStream, writeStream);
         return { path: filePath };

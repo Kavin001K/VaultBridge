@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Lock, KeyRound, ArrowLeft, Shield, AlertTriangle, Download, Loader2
+    Lock, KeyRound, ArrowLeft, Shield, AlertTriangle, Download, Loader2, Clock, HardDrive, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,71 @@ interface FileMetadata {
     lastModified: number;
 }
 
+// SVG Filter for Heat Distortion
+const BurnFilter = () => (
+    <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+            <filter id="heat-wave">
+                <feTurbulence
+                    type="fractalNoise"
+                    baseFrequency="0.01"
+                    numOctaves="3"
+                    result="noise"
+                >
+                    <animate
+                        attributeName="baseFrequency"
+                        dur="2s"
+                        values="0.01;0.05;0.2"
+                        repeatCount="1"
+                    />
+                </feTurbulence>
+                <feDisplacementMap
+                    in="SourceGraphic"
+                    in2="noise"
+                    scale="20"
+                />
+            </filter>
+        </defs>
+    </svg>
+);
+
+function CountdownTimer({ expiresAt }: { expiresAt: string }) {
+    const [timeLeft, setTimeLeft] = useState<{ h: number, m: number, s: number } | null>(null);
+
+    useEffect(() => {
+        const update = () => {
+            const now = new Date().getTime();
+            const end = new Date(expiresAt).getTime();
+            const diff = end - now;
+
+            if (diff <= 0) {
+                setTimeLeft(null);
+                return;
+            }
+            setTimeLeft({
+                h: Math.floor(diff / (1000 * 60 * 60)),
+                m: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+                s: Math.floor((diff % (1000 * 60)) / 1000)
+            });
+        };
+        update();
+        const interval = setInterval(update, 1000);
+        return () => clearInterval(interval);
+    }, [expiresAt]);
+
+    if (!timeLeft) return <span className="text-zinc-500 font-mono text-xs">Expired</span>;
+
+    return (
+        <div className="flex items-center gap-1 font-mono text-sm font-bold text-primary">
+            <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 rounded min-w-[2ch] text-center">{timeLeft.h.toString().padStart(2, '0')}</span>
+            <span className="text-zinc-500">:</span>
+            <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 rounded min-w-[2ch] text-center">{timeLeft.m.toString().padStart(2, '0')}</span>
+            <span className="text-zinc-500">:</span>
+            <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 rounded min-w-[2ch] text-center">{timeLeft.s.toString().padStart(2, '0')}</span>
+        </div>
+    );
+}
+
 export default function AccessPage() {
     const [accessCode, setAccessCode] = useState("");
     const [stage, setStage] = useState<AccessStage>("input");
@@ -27,6 +92,7 @@ export default function AccessPage() {
     const [fileMetadata, setFileMetadata] = useState<FileMetadata[]>([]);
     const [vaultData, setVaultData] = useState<any>(null);
     const [fileKey, setFileKey] = useState<CryptoKey | null>(null);
+    const [isBurned, setIsBurned] = useState(false);
 
     const [, setLocation] = useLocation();
     const { toast } = useToast();
@@ -107,67 +173,145 @@ export default function AccessPage() {
         }
     };
 
+    const downloadFile = async (file: FileMetadata) => {
+        if (!vaultData || !fileKey) return;
+
+        try {
+            setStatusText(`Downloading ${file.name}...`);
+            const vaultFile = vaultData.files.find((f: any) => f.fileId === file.fileId);
+            if (!vaultFile) throw new Error("File metadata not found in vault");
+
+            const chunks: ArrayBuffer[] = [];
+
+            // Download and decrypt each chunk
+            for (let i = 0; i < vaultFile.chunkCount; i++) {
+                setStatusText(`Decrypting ${file.name} [${i + 1}/${vaultFile.chunkCount}]...`);
+
+                const { downloadUrl } = await getChunkUrl.mutateAsync({
+                    vaultId: vaultData.id,
+                    fileId: file.fileId,
+                    chunkIndex: i,
+                });
+
+                // Fetch the encrypted chunk with Retry Logic
+                let response: Response | null = null;
+                let fetchError;
+
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        response = await fetch(downloadUrl);
+                        if (response.ok) break; // Success
+
+                        // If 4xx error (Not Found, Gone, Forbidden), do not retry
+                        if (response.status >= 400 && response.status < 500) {
+                            throw new Error(`Server returned ${response.status}`);
+                        }
+
+                        // If 5xx, throw to trigger retry
+                        throw new Error(`Server error ${response.status}`);
+                    } catch (err) {
+                        fetchError = err;
+                        if (attempt < 2) {
+                            // Exponential backoff: 500ms, 1000ms
+                            await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+                        }
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    throw new Error(`Failed to download chunk ${i} after 3 attempts: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`);
+                }
+
+                const encryptedChunk = await response.arrayBuffer();
+
+                // Validate chunk size
+                if (encryptedChunk.byteLength < 12) {
+                    throw new Error(`Chunk ${i} is too small / corrupted.`);
+                }
+
+                // Extract IV (first 12 bytes) and encrypted data
+                const iv = new Uint8Array(encryptedChunk, 0, 12);
+                const encryptedData = new Uint8Array(encryptedChunk, 12);
+
+                // Decrypt the chunk
+                const decryptedChunk = await decryptData(encryptedData, iv, fileKey);
+                chunks.push(decryptedChunk);
+            }
+
+            // Combine all chunks and create blob
+            const totalSize = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+            const combinedBuffer = new Uint8Array(totalSize);
+            let offset = 0;
+            for (const chunk of chunks) {
+                combinedBuffer.set(new Uint8Array(chunk), offset);
+                offset += chunk.byteLength;
+            }
+
+            const blob = new Blob([combinedBuffer], { type: file.type || 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+
+            // Trigger download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // Only show success toast if we are NOT in bulk download mode (which handles its own toast)
+            if (stage === "ready") {
+                toast({ title: "File Downloaded", description: `${file.name} saved to device.` });
+
+                // Track individual download
+                try {
+                    const res = await trackDownload.mutateAsync(vaultData.id);
+                    setVaultData((prev: any) => ({
+                        ...prev,
+                        downloadCount: prev.maxDownloads - res.remainingDownloads
+                    }));
+
+                    if (res.remainingDownloads <= 0) {
+                        toast({
+                            title: "Vault Depleted",
+                            description: "Initiating self-destruct sequence...",
+                            variant: "destructive"
+                        });
+                        setTimeout(() => setIsBurned(true), 1500);
+                    }
+                } catch (e) {
+                    console.error("Tracking failed", e);
+                }
+            }
+
+        } catch (error) {
+            console.error("Download failed", error);
+            toast({
+                variant: "destructive",
+                title: "Download Error",
+                description: error instanceof Error ? error.message : "Failed to download file"
+            });
+            if (stage === "downloading") throw error; // Propagate to handleDownload
+        }
+    };
+
     const handleDownload = async () => {
         if (!vaultData || !fileKey || fileMetadata.length === 0) return;
 
         setStage("downloading");
 
         try {
-            // Track the download
-            await trackDownload.mutateAsync(vaultData.id);
-
             for (const file of fileMetadata) {
-                setStatusText(`Downloading ${file.name}...`);
-
-                const vaultFile = vaultData.files.find((f: any) => f.fileId === file.fileId);
-                if (!vaultFile) continue;
-
-                const chunks: ArrayBuffer[] = [];
-
-                // Download and decrypt each chunk
-                for (let i = 0; i < vaultFile.chunkCount; i++) {
-                    setStatusText(`Decrypting ${file.name} [${i + 1}/${vaultFile.chunkCount}]...`);
-
-                    const { downloadUrl } = await getChunkUrl.mutateAsync({
-                        vaultId: vaultData.id,
-                        fileId: file.fileId,
-                        chunkIndex: i,
-                    });
-
-                    // Fetch the encrypted chunk
-                    const response = await fetch(downloadUrl);
-                    const encryptedChunk = await response.arrayBuffer();
-
-                    // Extract IV (first 12 bytes) and encrypted data
-                    const iv = new Uint8Array(encryptedChunk, 0, 12);
-                    const encryptedData = new Uint8Array(encryptedChunk, 12);
-
-                    // Decrypt the chunk
-                    const decryptedChunk = await decryptData(encryptedData, iv, fileKey);
-                    chunks.push(decryptedChunk);
-                }
-
-                // Combine all chunks and create blob
-                const totalSize = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-                const combinedBuffer = new Uint8Array(totalSize);
-                let offset = 0;
-                for (const chunk of chunks) {
-                    combinedBuffer.set(new Uint8Array(chunk), offset);
-                    offset += chunk.byteLength;
-                }
-
-                const blob = new Blob([combinedBuffer], { type: file.type || 'application/octet-stream' });
-                const url = URL.createObjectURL(blob);
-
-                // Trigger download
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = file.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                await downloadFile(file);
             }
+
+            // Track download AFTER successful retrieval
+            const res = await trackDownload.mutateAsync(vaultData.id);
+
+            setVaultData((prev: any) => ({
+                ...prev,
+                downloadCount: prev.maxDownloads - res.remainingDownloads
+            }));
 
             setStage("ready");
             setStatusText("All files downloaded!");
@@ -176,6 +320,15 @@ export default function AccessPage() {
                 title: "Download Complete!",
                 description: `${fileMetadata.length} file(s) downloaded successfully.`,
             });
+
+            if (res.remainingDownloads <= 0) {
+                toast({
+                    title: "Vault Depleted",
+                    description: "Initiating self-destruct sequence...",
+                    variant: "destructive"
+                });
+                setTimeout(() => setIsBurned(true), 1500);
+            }
 
         } catch (err) {
             setStage("ready");
@@ -201,7 +354,8 @@ export default function AccessPage() {
     };
 
     return (
-        <div className="min-h-screen relative overflow-hidden flex flex-col">
+        <div className={`min-h-screen relative overflow-hidden flex flex-col transition-colors duration-1000 ${isBurned ? 'bg-black' : ''}`}>
+            <BurnFilter />
             {/* Background Effects */}
             <div className="fixed inset-0 grid-bg opacity-50" />
             <div className="scanline" />
@@ -237,267 +391,382 @@ export default function AccessPage() {
             </header>
 
             {/* Main Content */}
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-lg mx-auto px-4 md:px-6 py-8">
-                {/* Page Title */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-8 md:mb-10"
-                >
-                    <div className="flex items-center justify-center gap-3 mb-4">
-                        <div className="p-3 rounded-xl bg-zinc-800 border border-zinc-700">
-                            <KeyRound className="w-6 h-6 md:w-8 md:h-8 text-zinc-400" />
+            <main className={`relative z-10 flex-1 flex flex-col items-center justify-center w-full mx-auto px-4 md:px-6 py-8 transition-all duration-500 ${stage === "ready" ? "max-w-5xl" : "max-w-lg"}`}>
+                {stage !== "ready" && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-center mb-8 md:mb-10"
+                    >
+                        <div className="flex items-center justify-center gap-3 mb-4">
+                            <div className="p-3 rounded-xl bg-zinc-800 border border-zinc-700">
+                                <KeyRound className="w-6 h-6 md:w-8 md:h-8 text-zinc-400" />
+                            </div>
                         </div>
-                    </div>
-                    <h2 className="text-2xl md:text-3xl font-bold mb-2">Access Vault</h2>
-                    <p className="text-sm md:text-base text-muted-foreground">
-                        Enter your 6-digit access code to unlock the vault
-                    </p>
-                </motion.div>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-2">Access Vault</h2>
+                        <p className="text-sm md:text-base text-muted-foreground">
+                            Enter your 6-digit access code to unlock the vault
+                        </p>
+                    </motion.div>
+                )}
 
                 {/* Access Card */}
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="glass-card p-6 md:p-8 w-full"
-                >
-                    {stage === "input" && (
-                        <div className="space-y-6 md:space-y-8">
-                            {/* 6-Digit PIN Input */}
-                            <div className="space-y-4">
-                                <label className="text-xs md:text-sm text-center block text-muted-foreground uppercase tracking-widest font-mono">
-                                    Enter 6-Digit Code
-                                </label>
+                <AnimatePresence mode="wait">
+                    {!isBurned ? (
+                        <motion.div
+                            key="content"
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{
+                                opacity: 0,
+                                scale: 0.9,
+                                y: -50,
+                                filter: 'url(#heat-wave) grayscale(100%) contrast(200%)',
+                                transition: { duration: 2 }
+                            }}
+                            style={{ filter: isBurned ? 'url(#heat-wave)' : 'none' }}
+                            transition={{ delay: 0.1 }}
+                            className={`w-full transition-all duration-500 overflow-hidden ${stage === "ready" ? "bg-zinc-950/90 backdrop-blur-2xl border border-zinc-800 rounded-3xl shadow-2xl" : "glass-card p-6 md:p-8"}`}
+                        >
+                            {stage === "input" && (
+                                <div className="space-y-6 md:space-y-8">
+                                    {/* 6-Digit PIN Input */}
+                                    <div className="space-y-4">
+                                        <label className="text-xs md:text-sm text-center block text-muted-foreground uppercase tracking-widest font-mono">
+                                            Enter 6-Digit Code
+                                        </label>
 
-                                <div className="flex justify-center gap-2 md:gap-3 relative">
-                                    {/* Invisible input for handling focus/typing */}
-                                    <Input
-                                        type="text"
-                                        value={accessCode}
-                                        onChange={(e) => {
-                                            // Allow alphanumeric, max 6 chars, uppercase
-                                            const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
-                                            setAccessCode(val);
-                                            if (val.length === 6) {
-                                                // Optional: Auto-submit or focus button
-                                            }
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && accessCode.length === 6) {
-                                                handleCodeSubmit();
-                                            }
-                                        }}
-                                        className="absolute inset-0 opacity-0 cursor-pointer z-10 h-16 w-full"
-                                        autoFocus
-                                        autoComplete="off"
-                                    />
+                                        <div className="flex justify-center gap-2 md:gap-3 relative">
+                                            {/* Invisible input for handling focus/typing */}
+                                            <Input
+                                                type="text"
+                                                value={accessCode}
+                                                onChange={(e) => {
+                                                    // Allow alphanumeric, max 6 chars, uppercase
+                                                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+                                                    setAccessCode(val);
+                                                    if (val.length === 6) {
+                                                        // Optional: Auto-submit or focus button
+                                                    }
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && accessCode.length === 6) {
+                                                        handleCodeSubmit();
+                                                    }
+                                                }}
+                                                className="absolute inset-0 opacity-0 cursor-pointer z-10 h-16 w-full"
+                                                autoFocus
+                                                autoComplete="off"
+                                            />
 
-                                    {/* Visual Boxes */}
-                                    <div className="flex items-center gap-1 md:gap-2">
-                                        {/* First 3 Digits (Lookup ID) */}
-                                        <div className="flex gap-1.5 md:gap-2">
-                                            {Array.from({ length: 3 }).map((_, i) => {
-                                                const index = i;
-                                                const num = accessCode[index] || "";
-                                                const isFocused = accessCode.length === index;
-                                                const isFilled = !!num;
+                                            {/* Visual Boxes */}
+                                            <div className="flex items-center gap-1 md:gap-2">
+                                                {/* First 3 Digits (Lookup ID) */}
+                                                <div className="flex gap-1.5 md:gap-2">
+                                                    {Array.from({ length: 3 }).map((_, i) => {
+                                                        const index = i;
+                                                        const num = accessCode[index] || "";
+                                                        const isFocused = accessCode.length === index;
+                                                        const isFilled = !!num;
 
-                                                return (
-                                                    <motion.div
-                                                        key={index}
-                                                        initial={false}
-                                                        animate={{
-                                                            scale: isFocused ? 1.05 : 1,
-                                                            borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
-                                                            backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
-                                                        }}
-                                                        className={`
+                                                        return (
+                                                            <motion.div
+                                                                key={index}
+                                                                initial={false}
+                                                                animate={{
+                                                                    scale: isFocused ? 1.05 : 1,
+                                                                    borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                                                                    backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "rgba(16, 185, 129, 0)"
+                                                                }}
+                                                                className={`
                                                             w-10 h-12 md:w-14 md:h-20
                                                             border-2 rounded-lg md:rounded-xl flex items-center justify-center 
                                                             text-xl md:text-3xl font-mono font-bold
                                                             transition-colors duration-200
                                                             ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
                                                         `}
-                                                    >
-                                                        <AnimatePresence mode="popLayout">
-                                                            {num ? (
-                                                                <motion.span
-                                                                    key={num}
-                                                                    initial={{ y: 20, opacity: 0 }}
-                                                                    animate={{ y: 0, opacity: 1 }}
-                                                                    exit={{ y: -20, opacity: 0 }}
-                                                                    className="text-primary"
-                                                                >
-                                                                    {num}
-                                                                </motion.span>
-                                                            ) : (
-                                                                isFocused && (
-                                                                    <motion.div
-                                                                        layoutId="cursor"
-                                                                        className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
-                                                                    />
-                                                                )
-                                                            )}
-                                                        </AnimatePresence>
-                                                    </motion.div>
-                                                );
-                                            })}
-                                        </div>
+                                                            >
+                                                                <AnimatePresence mode="popLayout">
+                                                                    {num ? (
+                                                                        <motion.span
+                                                                            key={num}
+                                                                            initial={{ y: 20, opacity: 0 }}
+                                                                            animate={{ y: 0, opacity: 1 }}
+                                                                            exit={{ y: -20, opacity: 0 }}
+                                                                            className="text-primary"
+                                                                        >
+                                                                            {num}
+                                                                        </motion.span>
+                                                                    ) : (
+                                                                        isFocused && (
+                                                                            <motion.div
+                                                                                layoutId="cursor"
+                                                                                className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
+                                                                            />
+                                                                        )
+                                                                    )}
+                                                                </AnimatePresence>
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </div>
 
-                                        {/* Divider */}
-                                        <div className="w-2 md:w-4 border-t-2 border-zinc-700/50"></div>
+                                                {/* Divider */}
+                                                <div className="w-2 md:w-4 border-t-2 border-zinc-700/50"></div>
 
-                                        {/* Last 3 Digits (PIN) */}
-                                        <div className="flex gap-1.5 md:gap-2">
-                                            {Array.from({ length: 3 }).map((_, i) => {
-                                                const index = i + 3;
-                                                const num = accessCode[index] || "";
-                                                const isFocused = accessCode.length === index;
-                                                const isFilled = !!num;
+                                                {/* Last 3 Digits (PIN) */}
+                                                <div className="flex gap-1.5 md:gap-2">
+                                                    {Array.from({ length: 3 }).map((_, i) => {
+                                                        const index = i + 3;
+                                                        const num = accessCode[index] || "";
+                                                        const isFocused = accessCode.length === index;
+                                                        const isFilled = !!num;
 
-                                                return (
-                                                    <motion.div
-                                                        key={index}
-                                                        initial={false}
-                                                        animate={{
-                                                            scale: isFocused ? 1.05 : 1,
-                                                            borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
-                                                            backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "transparent"
-                                                        }}
-                                                        className={`
+                                                        return (
+                                                            <motion.div
+                                                                key={index}
+                                                                initial={false}
+                                                                animate={{
+                                                                    scale: isFocused ? 1.05 : 1,
+                                                                    borderColor: isFocused ? "var(--primary)" : isFilled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                                                                    backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "rgba(16, 185, 129, 0)"
+                                                                }}
+                                                                className={`
                                                             w-10 h-12 md:w-14 md:h-20
                                                             border-2 rounded-lg md:rounded-xl flex items-center justify-center 
                                                             text-xl md:text-3xl font-mono font-bold
                                                             transition-colors duration-200
                                                             ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-primary/20" : ""}
                                                         `}
-                                                    >
-                                                        <AnimatePresence mode="popLayout">
-                                                            {num ? (
-                                                                <motion.span
-                                                                    key={num}
-                                                                    initial={{ y: 20, opacity: 0 }}
-                                                                    animate={{ y: 0, opacity: 1 }}
-                                                                    exit={{ y: -20, opacity: 0 }}
-                                                                    className="text-primary" // PIN is also shown for confirmation, could obscure if desired but usually helpful to see
-                                                                >
-                                                                    {num}
-                                                                </motion.span>
-                                                            ) : (
-                                                                isFocused && (
-                                                                    <motion.div
-                                                                        layoutId="cursor"
-                                                                        className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
-                                                                    />
-                                                                )
-                                                            )}
-                                                        </AnimatePresence>
-                                                    </motion.div>
-                                                );
-                                            })}
+                                                            >
+                                                                <AnimatePresence mode="popLayout">
+                                                                    {num ? (
+                                                                        <motion.span
+                                                                            key={num}
+                                                                            initial={{ y: 20, opacity: 0 }}
+                                                                            animate={{ y: 0, opacity: 1 }}
+                                                                            exit={{ y: -20, opacity: 0 }}
+                                                                            className="text-primary" // PIN is also shown for confirmation, could obscure if desired but usually helpful to see
+                                                                        >
+                                                                            {num}
+                                                                        </motion.span>
+                                                                    ) : (
+                                                                        isFocused && (
+                                                                            <motion.div
+                                                                                layoutId="cursor"
+                                                                                className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary/50 rounded-full animate-pulse"
+                                                                            />
+                                                                        )
+                                                                    )}
+                                                                </AnimatePresence>
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                         </div>
+
+                                        <p className="text-xs text-muted-foreground text-center px-4">
+                                            Check your email or secure message for the code
+                                        </p>
                                     </div>
-                                </div>
 
-                                <p className="text-xs text-muted-foreground text-center px-4">
-                                    Check your email or secure message for the code
-                                </p>
-                            </div>
-
-                            {/* Submit Button */}
-                            <Button
-                                onClick={handleCodeSubmit}
-                                disabled={accessCode.length !== 6}
-                                size="lg"
-                                className={`
+                                    {/* Submit Button */}
+                                    <Button
+                                        onClick={handleCodeSubmit}
+                                        disabled={accessCode.length !== 6}
+                                        size="lg"
+                                        className={`
                                     w-full h-12 md:h-14 font-mono font-bold uppercase tracking-wider text-sm md:text-base
                                     transition-all duration-300
                                     ${accessCode.length === 6
-                                        ? "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_50px_rgba(16,185,129,0.6)] hover:scale-[1.02]"
-                                        : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}
+                                                ? "bg-primary text-primary-foreground shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_50px_rgba(16,185,129,0.6)] hover:scale-[1.02]"
+                                                : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}
                                 `}
-                            >
-                                <Lock className={`w-4 h-4 md:w-5 md:h-5 mr-2 md:mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
-                                {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
-                            </Button>
-                        </div>
-                    )}
-
-                    {(stage === "fetching" || stage === "decrypting") && (
-                        <div className="text-center py-8">
-                            <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-primary animate-spin mx-auto mb-4" />
-                            <p className="text-base md:text-lg font-medium">{statusText}</p>
-                            <p className="text-xs md:text-sm text-muted-foreground mt-2">
-                                Decryption happens in your browser
-                            </p>
-                        </div>
-                    )}
-
-                    {stage === "ready" && (
-                        <div className="space-y-6">
-                            <div className="text-center">
-                                <Shield className="w-10 h-10 md:w-12 md:h-12 text-primary mx-auto mb-4" />
-                                <h3 className="text-lg md:text-xl font-bold mb-2">Vault Unlocked!</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">
-                                    {fileMetadata.length} file(s) ready for download
-                                </p>
-                            </div>
-
-                            {/* File List */}
-                            <div className="space-y-2">
-                                {fileMetadata.map((file, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg"
                                     >
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{file.name}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                                        <Lock className={`w-4 h-4 md:w-5 md:h-5 mr-2 md:mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
+                                        {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {(stage === "fetching" || stage === "decrypting") && (
+                                <div className="text-center py-8">
+                                    <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-primary animate-spin mx-auto mb-4" />
+                                    <p className="text-base md:text-lg font-medium">{statusText}</p>
+                                    <p className="text-xs md:text-sm text-muted-foreground mt-2">
+                                        Decryption happens in your browser
+                                    </p>
+                                </div>
+                            )}
+
+                            {stage === "ready" && (
+                                <div className="flex flex-col md:grid md:grid-cols-12 min-h-[550px]">
+                                    {/* LEFT SIDEBAR (Vault Info) */}
+                                    <div className="md:col-span-4 bg-zinc-900/50 border-r border-white/5 p-6 md:p-8 flex flex-col relative group">
+                                        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+                                        <div className="relative z-10">
+                                            <motion.div
+                                                initial={{ scale: 0.8, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                className="w-16 h-16 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-center mb-6 shadow-xl"
+                                            >
+                                                <Shield className="w-8 h-8 text-emerald-500" />
+                                            </motion.div>
+
+                                            <h3 className="text-3xl font-bold text-white tracking-tight mb-2">Unlocked</h3>
+                                            <p className="text-zinc-500 text-sm leading-relaxed mb-8">
+                                                Secure session established.<br />
+                                                End-to-end encrypted.
+                                            </p>
+
+                                            {/* Stats List */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
+                                                    <div className="flex items-center gap-3 text-zinc-400">
+                                                        <div className="p-1.5 rounded bg-zinc-900">
+                                                            <Clock className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="text-xs font-bold uppercase tracking-wider">Expires</span>
+                                                    </div>
+                                                    <CountdownTimer expiresAt={vaultData.expiresAt} />
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
+                                                    <div className="flex items-center gap-3 text-zinc-400">
+                                                        <div className="p-1.5 rounded bg-zinc-900">
+                                                            <Download className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="text-xs font-bold uppercase tracking-wider">Downloads</span>
+                                                    </div>
+                                                    <span className="font-mono text-sm font-bold text-zinc-200">
+                                                        {vaultData.maxDownloads - vaultData.downloadCount} <span className="text-zinc-600">/</span> {vaultData.maxDownloads}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
+                                                    <div className="flex items-center gap-3 text-zinc-400">
+                                                        <div className="p-1.5 rounded bg-zinc-900">
+                                                            <HardDrive className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="text-xs font-bold uppercase tracking-wider">Size</span>
+                                                    </div>
+                                                    <span className="font-mono text-sm font-bold text-zinc-200">
+                                                        {(fileMetadata.reduce((acc: any, f: any) => acc + f.size, 0) / (1024 * 1024)).toFixed(2)} MB
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-auto pt-8 relative z-10">
+                                            <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-950/20 border border-emerald-900/30">
+                                                <Shield className="w-5 h-5 text-emerald-500 mt-0.5" />
+                                                <p className="text-xs text-emerald-200/60 leading-relaxed">
+                                                    Files are decrypted locally using your browser's WebCrypto API. No keys leave this device.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* RIGHT CONTENT (File List) */}
+                                    <div className="md:col-span-8 p-6 md:p-8 bg-black/20 flex flex-col">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 text-xs font-bold text-white border border-zinc-700">
+                                                    {fileMetadata.length}
+                                                </span>
+                                                <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Available Files</h4>
+                                            </div>
+
+                                            {/* Desktop actions could go here */}
+                                        </div>
+
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 mb-6 min-h-[300px] max-h-[500px]">
+                                            {fileMetadata.map((file, index) => (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: index * 0.05 }}
+                                                    key={file.fileId}
+                                                    className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-zinc-900/40 border border-zinc-800/60 rounded-xl hover:bg-zinc-900/80 hover:border-zinc-700 transition-all duration-300"
+                                                >
+                                                    <div className="flex items-center gap-4 min-w-0 mb-3 sm:mb-0">
+                                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shrink-0 border border-zinc-700 group-hover:border-primary/50 group-hover:from-primary/10 group-hover:to-zinc-900 transition-colors">
+                                                            <FileText className="w-6 h-6 text-zinc-400 group-hover:text-primary transition-colors" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-bold text-zinc-100 truncate max-w-[200px] sm:max-w-xs">{file.name}</p>
+                                                            <div className="flex items-center gap-3 mt-1">
+                                                                <span className="text-xs text-zinc-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                                <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                                                                <span className="text-[10px] text-zinc-500 uppercase font-bold">{file.type?.split('/')[1] || 'FILE'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="bg-transparent border-zinc-700 hover:bg-zinc-800 hover:text-white group-hover:border-zinc-600 shrink-0"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            downloadFile(file);
+                                                        }}
+                                                    >
+                                                        <Download className="w-4 h-4 mr-2" />
+                                                        Download
+                                                    </Button>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-auto pt-6 border-t border-white/5">
+                                            <Button
+                                                onClick={handleDownload}
+                                                className="w-full h-16 cyber-btn text-lg font-bold tracking-widest uppercase shadow-[0_0_40px_rgba(16,185,129,0.1)] hover:shadow-[0_0_60px_rgba(16,185,129,0.2)]"
+                                            >
+                                                <Download className="w-6 h-6 mr-3" />
+                                                Download All Files
+                                            </Button>
+                                            <p className="text-center text-[10px] uppercase tracking-widest text-zinc-600 mt-4 font-bold">
+                                                {vaultData?.maxDownloads - vaultData?.downloadCount} Downloads remaining
                                             </p>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                            )}
+
+                            {stage === "downloading" && (
+                                <div className="text-center py-8">
+                                    <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-primary animate-spin mx-auto mb-4" />
+                                    <p className="text-base md:text-lg font-medium">{statusText}</p>
+                                    <p className="text-xs md:text-sm text-muted-foreground mt-2">
+                                        Files are being decrypted in your browser
+                                    </p>
+                                </div>
+                            )}
+
+
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 2 }}
+                            className="flex flex-col items-center justify-center p-8 font-mono text-red-500 w-full"
+                        >
+                            <AlertTriangle className="w-16 h-16 mb-4 animate-pulse" />
+                            <h1 className="text-2xl md:text-4xl tracking-[0.2em] uppercase font-bold text-center mb-4">Vault Incinerated</h1>
+                            <div className="text-sm md:text-base text-zinc-500 space-y-2 text-center">
+                                <p className="typing-effect">&gt; SYSTEM_PURGE_COMPLETE</p>
+                                <p className="typing-effect delay-100">&gt; FILES_OVERWRITTEN</p>
+                                <p className="typing-effect delay-200 text-red-700">&gt; LINK_TERMINATED</p>
                             </div>
-
-                            {/* Download Button */}
-                            <Button
-                                onClick={handleDownload}
-                                className="w-full h-12 md:h-14 cyber-btn text-sm md:text-base"
-                            >
-                                <Download className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                                Download All Files
-                            </Button>
-
-                            {/* Remaining Downloads */}
-                            <p className="text-xs text-center text-muted-foreground">
-                                {vaultData?.maxDownloads - vaultData?.downloadCount} downloads remaining
-                            </p>
-                        </div>
+                        </motion.div>
                     )}
-
-                    {stage === "downloading" && (
-                        <div className="text-center py-8">
-                            <Loader2 className="w-10 h-10 md:w-12 md:h-12 text-primary animate-spin mx-auto mb-4" />
-                            <p className="text-base md:text-lg font-medium">{statusText}</p>
-                            <p className="text-xs md:text-sm text-muted-foreground mt-2">
-                                Files are being decrypted in your browser
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Security Info */}
-                    <div className="mt-6 md:mt-8 pt-6 border-t border-border/50">
-                        <div className="flex items-start gap-3 text-xs md:text-sm text-muted-foreground">
-                            <Shield className="w-4 h-4 md:w-5 md:h-5 text-primary mt-0.5 flex-shrink-0" />
-                            <p>
-                                Files are decrypted in your browser using your PIN.
-                                The server never sees your PIN or decryption key.
-                            </p>
-                        </div>
-                    </div>
-                </motion.div>
+                </AnimatePresence>
 
                 {/* Or use direct link */}
                 <motion.div
