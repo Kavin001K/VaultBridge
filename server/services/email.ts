@@ -1,16 +1,16 @@
 /**
  * Email Service for VaultBridge
  * 
- * Sends vault links via email. NEVER sends file attachments.
- * In production, configure with a real SMTP server or Resend/SendGrid.
+ * Premium branded email templates with dark theme aesthetic.
+ * Sends vault links or direct attachments via Resend.
  */
 
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { log } from "../index";
 
-// Resend Configuration (using provided key)
-const resend = new Resend("re_Cmka1787_2LURzpiKv1pMVXU3GwziPHny");
+// Resend Configuration
+const resend = new Resend(process.env.RESEND_API_KEY || "re_Cmka1787_2LURzpiKv1pMVXU3GwziPHny");
 
 // Rate limit tracking per vault
 const emailsSentPerVault: Map<string, number> = new Map();
@@ -22,7 +22,6 @@ let transporter: nodemailer.Transporter | null = null;
 async function getTransporter(): Promise<nodemailer.Transporter> {
   if (transporter) return transporter;
 
-  // Check for production SMTP config
   if (process.env.SMTP_HOST) {
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -36,7 +35,6 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
     return transporter;
   }
 
-  // Development: Use Ethereal (fake SMTP)
   const testAccount = await nodemailer.createTestAccount();
   transporter = nodemailer.createTransport({
     host: "smtp.ethereal.email",
@@ -48,15 +46,362 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
     },
   });
 
-  log(`Email dev mode: View sent emails at https://ethereal.email`, "email");
+  log(`Email dev mode: View at https://ethereal.email`, "email");
   return transporter;
 }
+
+// ============================================
+// EMAIL TEMPLATE HELPERS
+// ============================================
+
+const getEmailStyles = () => `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(180deg, #0a0a0f 0%, #0f0f15 100%);
+    color: #e4e4e7;
+    padding: 40px 20px;
+    margin: 0;
+    min-height: 100vh;
+  }
+  
+  .wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .container {
+    background: linear-gradient(145deg, #18181b 0%, #1f1f23 100%);
+    border: 1px solid #27272a;
+    border-radius: 24px;
+    padding: 40px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+  
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+  
+  .logo-vault { color: #fafafa; }
+  .logo-bridge { color: #10b981; }
+  
+  .logo-icon {
+    display: inline-block;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 14px;
+    margin-bottom: 16px;
+    line-height: 48px;
+    font-size: 24px;
+    text-align: center;
+  }
+  
+  .tagline {
+    font-size: 13px;
+    color: #71717a;
+    margin-top: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fafafa;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  
+  .subtitle {
+    color: #a1a1aa;
+    font-size: 15px;
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  
+  .code-container {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 16px;
+    padding: 28px;
+    text-align: center;
+    margin: 24px 0;
+  }
+  
+  .code-label {
+    font-size: 11px;
+    color: #10b981;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  
+  .code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px;
+    font-weight: 700;
+    color: #10b981;
+    letter-spacing: 8px;
+    text-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+  }
+  
+  .btn-container {
+    text-align: center;
+    margin: 32px 0;
+  }
+  
+  .btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #052e16 !important;
+    text-decoration: none;
+    padding: 16px 40px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 10px 30px -5px rgba(16, 185, 129, 0.4);
+    transition: transform 0.2s;
+  }
+  
+  .btn:hover {
+    transform: translateY(-2px);
+  }
+  
+  .info-grid {
+    display: flex;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  
+  .info-card {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  
+  .info-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  
+  .info-label {
+    font-size: 11px;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  
+  .info-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fafafa;
+  }
+  
+  .warning-box {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 24px;
+  }
+  
+  .warning-title {
+    color: #fbbf24;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .warning-text {
+    color: #a1a1aa;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  
+  .security-badge {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 24px;
+    text-align: center;
+  }
+  
+  .security-title {
+    color: #10b981;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .security-text {
+    color: #71717a;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, #27272a 50%, transparent 100%);
+    margin: 32px 0;
+  }
+  
+  .footer {
+    text-align: center;
+    padding-top: 24px;
+  }
+  
+  .footer-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #52525b;
+    margin-bottom: 12px;
+  }
+  
+  .footer-text {
+    font-size: 12px;
+    color: #52525b;
+    line-height: 1.6;
+  }
+  
+  .footer-link {
+    color: #10b981;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .feature-list {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #a1a1aa;
+  }
+  
+  .feature-icon {
+    color: #10b981;
+  }
+  
+  .attachment-list {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 24px 0;
+  }
+  
+  .attachment-header {
+    font-size: 12px;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  
+  .attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .attachment-item:last-child {
+    margin-bottom: 0;
+  }
+  
+  .attachment-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  
+  .attachment-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fafafa;
+  }
+  
+  .attachment-size {
+    font-size: 12px;
+    color: #71717a;
+  }
+`;
+
+const getEmailHeader = () => `
+  <div class="header">
+    <div class="logo-icon">🔐</div>
+    <div class="logo">
+      <span class="logo-vault">VAULT</span><span class="logo-bridge">BRIDGE</span>
+    </div>
+    <div class="tagline">Zero-Knowledge File Transfer</div>
+  </div>
+`;
+
+const getEmailFooter = () => `
+  <div class="divider"></div>
+  <div class="footer">
+    <div class="footer-logo">VAULTBRIDGE</div>
+    <div class="footer-text">
+      End-to-end encrypted file transfer<br>
+      <a href="https://vaultbridge.io" class="footer-link">vaultbridge.io</a>
+    </div>
+  </div>
+`;
+
+// ============================================
+// INTERFACES
+// ============================================
 
 export interface SendVaultEmailInput {
   to: string;
   vaultId: string;
   shortCode: string;
-  fullCode?: string; // Client provided full 6-digit code
+  fullCode?: string;
   expiresAt: Date;
   senderName?: string;
 }
@@ -68,197 +413,6 @@ export interface SendEmailResult {
   error?: string;
 }
 
-/**
- * Send vault link via email
- * IMPORTANT: Never sends file attachments - only the link!
- */
-export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEmailResult> {
-  try {
-    // Rate limit check
-    const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
-    if (sentCount >= MAX_EMAILS_PER_VAULT) {
-      return {
-        success: false,
-        error: `Maximum ${MAX_EMAILS_PER_VAULT} emails per vault reached.`,
-      };
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(input.to)) {
-      return { success: false, error: "Invalid email address." };
-    }
-
-    const transport = await getTransporter();
-    const baseUrl = process.env.APP_URL || "http://localhost:5001";
-    const accessLink = `${baseUrl}/access`;
-
-    // Use full code if available (client provided), otherwise partial (server knowledge)
-    const displayCode = input.fullCode || input.shortCode;
-
-    const expiryFormatted = input.expiresAt.toLocaleString("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #09090b;
-      color: #fafafa;
-      padding: 40px 20px;
-      margin: 0;
-    }
-    .container {
-      max-width: 500px;
-      margin: 0 auto;
-      background: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 16px;
-      padding: 32px;
-    }
-    .logo {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 24px;
-      font-weight: bold;
-      margin-bottom: 24px;
-    }
-    .logo span { color: #22c55e; }
-    .code-box {
-      background: #09090b;
-      border: 2px solid #22c55e;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      margin: 24px 0;
-    }
-    .code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 32px;
-      font-weight: bold;
-      color: #22c55e;
-      letter-spacing: 4px;
-    }
-    .btn {
-      display: inline-block;
-      background: #22c55e;
-      color: #052e16;
-      text-decoration: none;
-      padding: 14px 28px;
-      border-radius: 8px;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-size: 14px;
-    }
-    .warning {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      border-radius: 8px;
-      padding: 16px;
-      margin-top: 24px;
-      font-size: 13px;
-      color: #fca5a5;
-    }
-    .footer {
-      margin-top: 32px;
-      font-size: 12px;
-      color: #71717a;
-      text-align: center;
-    }
-    .help-note {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #27272a;
-      font-weight: bold;
-      color: #22c55e;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo">VAULT<span>BRIDGE</span></div>
-    
-    ${input.senderName ? `<p>${input.senderName} shared encrypted files with you.</p>` : `<p>Someone shared encrypted files with you.</p>`}
-    
-    <div class="code-box">
-      <p style="margin: 0 0 8px 0; font-size: 12px; color: #71717a; text-transform: uppercase; letter-spacing: 2px;">Access Code</p>
-      <div class="code">${displayCode}</div>
-    </div>
-    
-    <p style="text-align: center;">
-      <a href="${accessLink}" class="btn">🔓 Access Files</a>
-    </p>
-    
-    <div class="warning">
-      <strong>⚠️ This link expires ${expiryFormatted}</strong><br>
-      Files are end-to-end encrypted and will be permanently deleted after expiration.
-    </div>
-    
-    <div class="footer">
-      VaultBridge — Zero-Knowledge Encrypted File Transfer<br>
-      This email contains NO attachments for your security.
-      <div class="help-note">
-        Need help? Just reply to this email to contact support.
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-    `;
-
-    // Send via Resend
-    const { data, error } = await resend.emails.send({
-      from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-      to: [input.to],
-      replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
-      subject: `${input.senderName || "Someone"} shared encrypted files with you`,
-      text: `
-VaultBridge - Encrypted File Transfer
-
-${input.senderName || "Someone"} shared encrypted files with you.
-
-Access Code: ${displayCode}
-Direct Link: ${accessLink}
-
-This link expires: ${expiryFormatted}
-
-Files are end-to-end encrypted. This email contains NO attachments for your security.
-
-Need help? Just reply to this email to contact support.
-      `,
-      html,
-    });
-
-    if (error) {
-      log(`Resend Error (Vault Email): ${error.message}`, "email");
-      return { success: false, error: error.message };
-    }
-
-    // Track email sent
-    emailsSentPerVault.set(input.vaultId, sentCount + 1);
-
-    log(`Email sent to ${input.to} for vault ${input.shortCode}`, "email");
-
-    return {
-      success: true,
-      messageId: data?.id,
-    };
-  } catch (error) {
-    log(`Failed to send email: ${error}`, "email");
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to send email",
-    };
-  }
-}
-
-
 export interface SendDirectEmailInput {
   to: string;
   subject: string;
@@ -269,38 +423,254 @@ export interface SendDirectEmailInput {
   }[];
 }
 
-/**
- * Send files directly via email attachment (Transient Mode)
- * The files exist only in memory and are relayed to Resend.
- */
+// ============================================
+// VAULT ACCESS EMAIL
+// ============================================
+
+export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEmailResult> {
+  try {
+    const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
+    if (sentCount >= MAX_EMAILS_PER_VAULT) {
+      return { success: false, error: `Maximum ${MAX_EMAILS_PER_VAULT} emails per vault reached.` };
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(input.to)) {
+      return { success: false, error: "Invalid email address." };
+    }
+
+    const baseUrl = process.env.APP_URL || "https://vaultbridge.io";
+    const accessLink = `${baseUrl}/access`;
+    const displayCode = input.fullCode || input.shortCode;
+
+    const expiryFormatted = input.expiresAt.toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Secure Files Shared with You</title>
+  <style>${getEmailStyles()}</style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      ${getEmailHeader()}
+      
+      <h1 class="title">Secure Files Shared With You</h1>
+      <p class="subtitle">
+        ${input.senderName ? `<strong>${input.senderName}</strong> has sent you encrypted files via VaultBridge.` : `Someone has sent you encrypted files via VaultBridge.`}
+        Use the access code below to decrypt and download.
+      </p>
+      
+      <div class="code-container">
+        <div class="code-label">🔑 Your Access Code</div>
+        <div class="code">${displayCode}</div>
+      </div>
+      
+      <div class="btn-container">
+        <a href="${accessLink}" class="btn">🔓 Access Your Files</a>
+      </div>
+      
+      <div class="feature-list">
+        <div class="feature-item">
+          <span class="feature-icon">🛡️</span> End-to-End Encrypted
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🚫</span> No Logs Kept
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">💨</span> Auto-Deletes
+        </div>
+      </div>
+      
+      <div class="warning-box">
+        <div class="warning-title">
+          ⏱️ Time Sensitive
+        </div>
+        <div class="warning-text">
+          This vault expires on <strong>${expiryFormatted}</strong>. 
+          Files will be permanently and irreversibly deleted after expiration or download limit is reached.
+        </div>
+      </div>
+      
+      <div class="security-badge">
+        <div class="security-title">🛡️ Security Notice</div>
+        <div class="security-text">
+          This email contains NO file attachments. Your files are stored encrypted on our servers 
+          and can only be decrypted with your access code in your browser.
+        </div>
+      </div>
+      
+      ${getEmailFooter()}
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const { data, error } = await resend.emails.send({
+      from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
+      to: [input.to],
+      replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
+      subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
+      text: `
+VAULTBRIDGE - Secure File Transfer
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${input.senderName || "Someone"} shared encrypted files with you.
+
+ACCESS CODE: ${displayCode}
+ACCESS LINK: ${accessLink}
+
+⏱️ Expires: ${expiryFormatted}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ SECURITY NOTICE
+This email contains NO attachments.
+Files are end-to-end encrypted.
+
+Need help? Reply to this email.
+      `,
+      html,
+    });
+
+    if (error) {
+      log(`Resend Error (Vault): ${error.message}`, "email");
+      return { success: false, error: error.message };
+    }
+
+    emailsSentPerVault.set(input.vaultId, sentCount + 1);
+    log(`Vault email sent to ${input.to} for code ${displayCode}`, "email");
+
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    log(`Failed to send vault email: ${error}`, "email");
+    return { success: false, error: error instanceof Error ? error.message : "Failed to send email" };
+  }
+}
+
+// ============================================
+// DIRECT ATTACHMENT EMAIL (Zero-Knowledge Relay)
+// ============================================
+
 export async function sendDirectAttachment(input: SendDirectEmailInput): Promise<boolean> {
   try {
     const { to, subject, text, files } = input;
+
+    // Calculate total size
+    const totalSize = files.reduce((acc, f) => acc + f.content.length, 0);
+    const formatSize = (bytes: number) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    const attachmentListHtml = files.map(f => `
+      <div class="attachment-item">
+        <div class="attachment-icon">📄</div>
+        <div class="attachment-name">${f.filename}</div>
+        <div class="attachment-size">${formatSize(f.content.length)}</div>
+      </div>
+    `).join('');
+
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Files Received via VaultBridge</title>
+  <style>${getEmailStyles()}</style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      ${getEmailHeader()}
+      
+      <h1 class="title">📬 Files Delivered to You</h1>
+      <p class="subtitle">
+        You've received files through VaultBridge's Zero-Knowledge Relay. 
+        Files flow directly through server memory and are never stored.
+      </p>
+      
+      ${text ? `
+      <div style="background: rgba(255,255,255,0.02); border-radius: 12px; padding: 20px; margin: 24px 0; border-left: 3px solid #10b981;">
+        <div style="font-size: 12px; color: #71717a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Message from sender</div>
+        <div style="color: #e4e4e7; font-size: 15px; line-height: 1.6;">${text}</div>
+      </div>
+      ` : ''}
+      
+      <div class="attachment-list">
+        <div class="attachment-header">
+          📎 ${files.length} Attachment${files.length > 1 ? 's' : ''} (${formatSize(totalSize)} total)
+        </div>
+        ${attachmentListHtml}
+      </div>
+      
+      <div class="feature-list">
+        <div class="feature-item">
+          <span class="feature-icon">⚡</span> Direct Relay
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🚫</span> Zero Storage
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🔒</span> Secure Transit
+        </div>
+      </div>
+      
+      <div class="security-badge">
+        <div class="security-title">🛡️ Zero-Knowledge Relay</div>
+        <div class="security-text">
+          These files were transmitted directly from the sender's browser through our secure memory relay.
+          VaultBridge did not store, log, or retain any file data. This is completely ephemeral transfer.
+        </div>
+      </div>
+      
+      ${getEmailFooter()}
+    </div>
+  </div>
+</body>
+</html>
+    `;
 
     const data = await resend.emails.send({
       from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
       to: [to],
       replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
-      subject: subject,
-      html: `
-            <div style="font-family: sans-serif; color: #333;">
-                <h2>File Received via VaultBridge</h2>
-                <p>${text}</p>
-                <hr />
-                <p style="font-size: 12px; color: #666;">
-                    <strong>Security Notice:</strong> The files were sent directly from the sender's browser. 
-                    VaultBridge did not store these files. They were relayed through secure memory.
-                </p>
-                <p style="font-size: 13px; margin-top: 20px; font-weight: bold; color: #22c55e;">
-                    Need help? Just reply to this email to contact support.
-                </p>
-            </div>
-            `,
+      subject: `📬 ${subject}`,
+      text: `
+VAULTBRIDGE - Zero-Knowledge Relay
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You received ${files.length} file(s) via direct relay.
+
+${text ? `MESSAGE:\n${text}\n` : ''}
+
+ATTACHMENTS:
+${files.map(f => `• ${f.filename} (${formatSize(f.content.length)})`).join('\n')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ SECURITY NOTICE
+Files were relayed through secure memory.
+VaultBridge never stored these files.
+
+Need help? Reply to this email.
+      `,
+      html,
       attachments: files,
     });
 
     if (data.error) {
-      log(`Resend Error: ${data.error.message}`, "email");
+      log(`Resend Error (Direct): ${data.error.message}`, "email");
       return false;
     }
 
@@ -312,9 +682,10 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
   }
 }
 
-/**
- * Get remaining email quota for a vault
- */
+// ============================================
+// UTILITIES
+// ============================================
+
 export function getRemainingEmailQuota(vaultId: string): number {
   const sent = emailsSentPerVault.get(vaultId) || 0;
   return Math.max(0, MAX_EMAILS_PER_VAULT - sent);

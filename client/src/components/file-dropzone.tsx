@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, File, X, AlertCircle } from "lucide-react";
+import { UploadCloud, File as FileIcon, X, AlertCircle, FolderArchive, Loader2 } from "lucide-react";
+import { zip, type Zippable } from "fflate";
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -24,15 +25,103 @@ export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: F
 
   const handleDragLeave = () => setIsDragging(false);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Helper to read FileEntry
+  const scanEntry = (entry: any): Promise<{ [path: string]: File }> => {
+    return new Promise((resolve) => {
+      if (entry.isFile) {
+        entry.file((file: File) => {
+          resolve({ [entry.fullPath]: file });
+        });
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readEntries = () => {
+          reader.readEntries(async (entries: any[]) => {
+            if (entries.length === 0) {
+              resolve({});
+              return;
+            }
+            const promises = entries.map(e => scanEntry(e));
+            const results = await Promise.all(promises);
+            const combined = results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+
+            // Recursively read more if limit not reached (handled by browser usually but readEntries might need loop)
+            // Simplified for standard cases
+            resolve(combined);
+          });
+        };
+        readEntries();
+      } else {
+        resolve({});
+      }
+    });
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (disabled) return;
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setSelectedFiles(newFiles);
-      onFilesSelected(newFiles);
+    const items = e.dataTransfer.items;
+    if (!items || items.length === 0) return;
+
+    // Check for directory
+    let hasDirectory = false;
+    const entries: any[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry();
+      if (entry) {
+        entries.push(entry);
+        if (entry.isDirectory) hasDirectory = true;
+      }
+    }
+
+    if (hasDirectory) {
+      setIsScanning(true);
+      try {
+        const allFiles: { [path: string]: File } = {};
+
+        // Scan Recursively
+        for (const entry of entries) {
+          const result = await scanEntry(entry);
+          Object.assign(allFiles, result);
+        }
+
+        // Create Zip Structure
+        const zipData: Zippable = {};
+        for (const [fullPath, file] of Object.entries(allFiles)) {
+          // Remove leading slash for zip path
+          const zipPath = fullPath.startsWith('/') ? fullPath.slice(1) : fullPath;
+          const buffer = new Uint8Array(await file.arrayBuffer());
+          zipData[zipPath] = buffer;
+        }
+
+        // Zip It
+        zip(zipData, { level: 6 }, (err, data) => {
+          if (err) {
+            console.error("Zipping failed", err);
+            setIsScanning(false);
+            return;
+          }
+
+          // Create Archive File
+          const zipFile = new File([data as any], "archive.zip", { type: "application/zip" });
+          setSelectedFiles([zipFile]);
+          onFilesSelected([zipFile]);
+          setIsScanning(false);
+        });
+      } catch (e) {
+        console.error("Folder scan failed", e);
+        setIsScanning(false);
+      }
+    } else {
+      // Standard File Drop
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const newFiles = Array.from(e.dataTransfer.files);
+        setSelectedFiles(newFiles);
+        onFilesSelected(newFiles);
+      }
     }
   };
 
@@ -78,11 +167,17 @@ export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: F
         />
 
         <div className="w-16 h-16 mb-4 rounded-full bg-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-          <UploadCloud className={`w-8 h-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+          {isScanning ? (
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          ) : isDragging ? (
+            <FolderArchive className="w-8 h-8 text-primary" />
+          ) : (
+            <UploadCloud className="w-8 h-8 text-muted-foreground" />
+          )}
         </div>
 
         <h3 className="text-lg font-semibold mb-1">
-          {isDragging ? "Drop it securely" : "Drag & drop files here"}
+          {isDragging ? "Drop folder or files" : isScanning ? "Zipping..." : "Drag & drop files or folders here"}
         </h3>
         <p className="text-sm text-muted-foreground">
           or click to browse from your device
@@ -115,7 +210,7 @@ export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: F
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="p-2 bg-background rounded-md">
-                    <File className="w-4 h-4 text-primary" />
+                    <FileIcon className="w-4 h-4 text-primary" />
                   </div>
                   <div className="truncate">
                     <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>

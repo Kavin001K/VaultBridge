@@ -1,16 +1,25 @@
 import { useEffect, useState, useRef } from "react";
 import { useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Unlock, File, Download as DownloadIcon, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
+import {
+  Unlock, File, Download as DownloadIcon, Loader2, AlertTriangle,
+  ShieldCheck, Zap
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useGetVault, useGetChunkDownloadUrl, useTrackDownload } from "@/hooks/use-vaults";
-import { importKey, decryptMetadata, decryptData } from "@/lib/crypto";
+import { importKey, decryptMetadata, decryptData, exportKey } from "@/lib/crypto";
 import { VaultCard } from "@/components/vault-card";
 
-// Chunk Size must match upload (5MB)
-const CHUNK_SIZE = 5 * 1024 * 1024;
+// Streamed Download Support
+import {
+  initiateStreamDownload,
+  shouldUseStreamedDownload,
+  isServiceWorkerAvailable,
+  ChunkInfo,
+  DownloadProgress
+} from "@/lib/downloadStream";
 
 interface DecryptedFile {
   fileId: string;
@@ -18,6 +27,7 @@ interface DecryptedFile {
   size: number;
   type: string;
   chunks: number;
+  isCompressed?: boolean;
 }
 
 export default function DownloadPage() {
@@ -31,6 +41,7 @@ export default function DownloadPage() {
   // Download State
   const [activeDownload, setActiveDownload] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadMethod, setDownloadMethod] = useState<'memory' | 'stream' | null>(null);
 
   // Self-Destruct State
   const [isDestructing, setIsDestructing] = useState(false);
@@ -49,25 +60,6 @@ export default function DownloadPage() {
     return () => workerRef.current?.terminate();
   }, []);
 
-  const decryptWithWorker = (data: ArrayBuffer, iv: Uint8Array, key: CryptoKey) => {
-    return new Promise<ArrayBuffer>((resolve, reject) => {
-      if (!workerRef.current) return reject("Worker not ready");
-      const id = Math.random();
-
-      const handler = (e: MessageEvent) => {
-        if (e.data.id === id) {
-          workerRef.current?.removeEventListener('message', handler);
-          if (e.data.type === 'error') reject(e.data.error);
-          else resolve(e.data.decryptedData);
-        }
-      };
-
-      workerRef.current.addEventListener('message', handler);
-      // Transfer 'data' (encrypted chunk) to worker
-      workerRef.current.postMessage({ type: 'decrypt', data, iv, key, id }, [data]);
-    });
-  };
-
   useEffect(() => {
     // 1. Extract Key from URL Hash
     const hash = window.location.hash;
@@ -79,7 +71,7 @@ export default function DownloadPage() {
       return;
     }
 
-    // 2. Import Key & Decrypt Metadata when vault data arrives
+    // 2. Import Key & Decrypt Metadata
     const initVault = async () => {
       if (!vault) return;
 
@@ -89,12 +81,13 @@ export default function DownloadPage() {
 
         const metadata = await decryptMetadata(vault.encryptedMetadata, key);
 
-        // Merge metadata with backend info (chunk counts)
+        // Merge metadata with backend info
         const mergedFiles = metadata.map((meta: any) => {
           const backendFile = vault.files.find((f: any) => f.fileId === meta.fileId);
           return {
             ...meta,
-            chunks: backendFile?.chunkCount || 0
+            chunks: backendFile?.chunkCount || 0,
+            isCompressed: backendFile?.isCompressed || false // Ensure schema supports this or we rely on metadata
           };
         });
 
@@ -110,81 +103,159 @@ export default function DownloadPage() {
     if (vault) initVault();
   }, [vault]);
 
+  const fetchChunkUrls = async (file: DecryptedFile) => {
+    const urls: ChunkInfo[] = [];
+    const batchSize = 10; // Request 10 URLs at a time
+
+    for (let i = 0; i < file.chunks; i += batchSize) {
+      const batchPromises = [];
+      for (let j = 0; j < batchSize && (i + j) < file.chunks; j++) {
+        batchPromises.push(
+          getDownloadUrl.mutateAsync({
+            vaultId: vaultId!,
+            fileId: file.fileId,
+            chunkIndex: i + j
+          }).then(res => ({
+            index: i + j,
+            downloadUrl: res.downloadUrl
+          }))
+        );
+      }
+      const batchResults = await Promise.all(batchPromises);
+      urls.push(...batchResults);
+
+      // Update progress purely for UX during preparation
+      setDownloadProgress((i / file.chunks) * 10); // First 10% is prep
+    }
+    return urls.sort((a, b) => a.index - b.index);
+  };
+
   const handleDownload = async (file: DecryptedFile) => {
     if (!decryptionKey || !vaultId) return;
 
     setActiveDownload(file.fileId);
     setDownloadProgress(0);
 
+    const useStream = shouldUseStreamedDownload(file.size);
+    setDownloadMethod(useStream ? 'stream' : 'memory');
+
     try {
-      const chunks: Uint8Array[] = [];
-      let downloadedSize = 0;
+      if (useStream) {
+        // === STREAMED DOWNLOAD ===
+        toast({ title: "Optimizing Download", description: "Preparing secure stream..." });
 
-      for (let i = 0; i < file.chunks; i++) {
-        // 1. Get Signed URL
-        const { downloadUrl } = await getDownloadUrl.mutateAsync({
-          vaultId,
-          fileId: file.fileId,
-          chunkIndex: i
-        });
+        // 1. Fetch ALL chunk URLs (this takes time for large files)
+        // Ideally backend would have a "get all URLs" endpoint, but we batch it.
+        const chunkUrls = await fetchChunkUrls(file);
 
-        // 2. Fetch Encrypted Chunk
-        const res = await fetch(downloadUrl);
-        const buffer = await res.arrayBuffer();
+        // 2. Initiate Stream
+        const result = await initiateStreamDownload(
+          file.fileId,
+          decryptionKey,
+          chunkUrls,
+          {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            fileId: file.fileId,
+            isCompressed: file.isCompressed
+          },
+          (prog: DownloadProgress) => {
+            // Normalize progress (10-100%)
+            setDownloadProgress(10 + (prog.progress * 0.9));
+          }
+        );
 
-        // 3. Separate IV and Data
-        // Format: [IV (12 bytes)] + [Encrypted Data]
-        const iv = new Uint8Array(buffer.slice(0, 12));
-        const encryptedData = buffer.slice(12);
+        if (!result.success) throw new Error(result.error);
 
-        // 4. Decrypt with Worker
-        const decryptedBuffer = await decryptWithWorker(encryptedData, iv, decryptionKey);
-        chunks.push(new Uint8Array(decryptedBuffer));
+      } else {
+        // === MEMORY DOWNLOAD (Fallback/Small Files) ===
+        const chunks: Uint8Array[] = [];
+        let downloadedSize = 0;
 
-        // Update Progress
-        downloadedSize += decryptedBuffer.byteLength;
-        setDownloadProgress((downloadedSize / file.size) * 100);
+        for (let i = 0; i < file.chunks; i++) {
+          // 1. Get Signed URL
+          const { downloadUrl } = await getDownloadUrl.mutateAsync({
+            vaultId,
+            fileId: file.fileId,
+            chunkIndex: i
+          });
+
+          // 2. Fetch Encrypted Chunk
+          const res = await fetch(downloadUrl);
+          const buffer = await res.arrayBuffer();
+
+          // 3. Separate IV and Data
+          const iv = new Uint8Array(buffer.slice(0, 12));
+          const encryptedData = buffer.slice(12);
+
+          // 4. Decrypt via Worker
+          const decryptedBuffer = await decryptWithWorker(encryptedData, iv, decryptionKey, file.isCompressed);
+          chunks.push(new Uint8Array(decryptedBuffer as ArrayBuffer));
+
+          // Update Progress
+          downloadedSize += (decryptedBuffer as ArrayBuffer).byteLength;
+          setDownloadProgress((downloadedSize / file.size) * 100);
+        }
+
+        // 5. Reassemble & Save
+        const blob = new Blob(chunks as BlobPart[], { type: file.type });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       }
 
-      // 5. Reassemble File
-      const blob = new Blob(chunks as any, { type: file.type });
-      const url = window.URL.createObjectURL(blob);
-
-      // 6. Trigger Browser Download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      // 7. Track analytics
+      // === POST DOWNLOAD ACTIONS ===
       trackDownload.mutate(vaultId);
-
       toast({ title: "Download Complete", description: `Saved ${file.name}` });
 
-      // 8. Self-Destruct Sequence
-      setTimeout(() => {
-        toast({
-          title: "Self-Destruct Initiated",
-          description: "This link is burning...",
-          variant: "destructive"
-        });
-        setIsDestructing(true);
-      }, 2000);
+      // Self-Destruct if limit reached
+      if (vault?.maxDownloads === 1 || (vault?.downloadCount || 0) + 1 >= (vault?.maxDownloads || 5)) {
+        setTimeout(() => {
+          toast({
+            title: "Self-Destruct Initiated",
+            description: "This link is burning...",
+            variant: "destructive"
+          });
+          setIsDestructing(true);
+        }, 2000);
 
-      setTimeout(() => {
-        setIsDestroyed(true);
-      }, 4500);
+        setTimeout(() => {
+          setIsDestroyed(true);
+        }, 4500);
+      }
 
     } catch (err) {
       console.error(err);
-      toast({ variant: "destructive", title: "Download Failed", description: "Could not decrypt file." });
+      toast({ variant: "destructive", title: "Download Failed", description: "Encryption error or network failure." });
     } finally {
       setActiveDownload(null);
       setDownloadProgress(0);
+      setDownloadMethod(null);
     }
+  };
+
+  const decryptWithWorker = (data: ArrayBuffer, iv: Uint8Array, key: CryptoKey, isCompressed?: boolean) => {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      if (!workerRef.current) return reject("Worker not ready");
+      const id = Math.random();
+
+      const handler = (e: MessageEvent) => {
+        if (e.data.id === id) {
+          workerRef.current?.removeEventListener('message', handler);
+          if (e.data.type === 'error') reject(e.data.error);
+          else resolve(e.data.decryptedData);
+        }
+      };
+
+      workerRef.current.addEventListener('message', handler);
+      workerRef.current.postMessage({ type: 'decrypt', data, iv, key, id, isCompressed }, [data]);
+    });
   };
 
   // === RENDER STATES ===
@@ -197,7 +268,6 @@ export default function DownloadPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-destructive/20 to-transparent" />
             <ShieldCheck className="w-10 h-10 text-muted-foreground/50" />
           </div>
-
           <div className="space-y-2">
             <h1 className="text-3xl font-bold font-mono text-muted-foreground uppercase tracking-widest">
               Link Terminated
@@ -206,7 +276,6 @@ export default function DownloadPage() {
               This vault has self-destructed. No data remains.
             </p>
           </div>
-
           <Button onClick={() => window.location.href = '/'} variant="outline" className="border-zinc-800 hover:bg-zinc-900 hover:text-white">
             Return to Safety
           </Button>
@@ -307,7 +376,7 @@ export default function DownloadPage() {
                   {activeDownload === file.fileId ? (
                     <div className="w-full md:w-48 space-y-2">
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Decrypting...</span>
+                        <span>{downloadMethod === 'stream' ? 'Stream ' : ''}Decrypting...</span>
                         <span>{Math.round(downloadProgress)}%</span>
                       </div>
                       <Progress value={downloadProgress} className="h-1.5 md:h-2" />
@@ -317,7 +386,12 @@ export default function DownloadPage() {
                       onClick={() => handleDownload(file)}
                       className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-sm md:text-base h-10 md:h-11"
                     >
-                      <DownloadIcon className="w-4 h-4 mr-2" /> Download
+                      {shouldUseStreamedDownload(file.size) ? (
+                        <Zap className="w-4 h-4 mr-2 text-amber-500" />
+                      ) : (
+                        <DownloadIcon className="w-4 h-4 mr-2" />
+                      )}
+                      Download
                     </Button>
                   )}
                 </div>

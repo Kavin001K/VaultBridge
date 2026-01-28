@@ -6,16 +6,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useSEO } from "@/components/SEO";
 
 // Lazy Load Pages
 const Home = lazy(() => import("@/pages/home"));
 const UploadPage = lazy(() => import("@/pages/upload"));
 const AccessPage = lazy(() => import("@/pages/access"));
 const DownloadPage = lazy(() => import("@/pages/download"));
-const Success = lazy(() => import("@/pages/success"));
+const SuccessPage = lazy(() => import("@/pages/success"));
 const NotFound = lazy(() => import("@/pages/not-found"));
-const HowItWorksPage = lazy(() => import("@/pages/how-it-works"));
-const TermsPage = lazy(() => import("@/pages/terms"));
+const HowItWorks = lazy(() => import("@/pages/how-it-works"));
+const Terms = lazy(() => import("@/pages/terms"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const LivePage = lazy(() => import("@/pages/live"));
 
 function LoadingFallback() {
   return (
@@ -26,22 +29,25 @@ function LoadingFallback() {
 }
 
 function Router() {
+  // Dynamic SEO based on current route
+  useSEO();
+
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/upload" component={UploadPage} />
       <Route path="/access" component={AccessPage} />
-      <Route path="/v/:id" component={DownloadPage} />
-      <Route path="/success/:id" component={Success} />
-      <Route path="/how-it-works" component={HowItWorksPage} />
-      <Route path="/terms" component={TermsPage} />
-      {/* Fallback to 404 */}
+      <Route path="/download/:id" component={DownloadPage} />
+      <Route path="/success/:id" component={SuccessPage} />
+      <Route path="/how-it-works" component={HowItWorks} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/live" component={LivePage} />
+      <Route path="/live/:code" component={LivePage} />
       <Route component={NotFound} />
     </Switch>
   );
 }
-
-
 
 function App() {
   return (
@@ -59,3 +65,4 @@ function App() {
 }
 
 export default App;
+

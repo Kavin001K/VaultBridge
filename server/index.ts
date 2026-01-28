@@ -158,6 +158,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   // Start cleanup worker (Phase 1.2)
   startCleanupWorker();
 
+  // Error handling middleware
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -172,12 +173,19 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   });
 
   // Setup Vite in development, static serving in production
+  // IMPORTANT: Vite MUST be set up BEFORE any other WebSocket servers
+  // to prevent HMR WebSocket upgrade conflicts
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
+
+  // Initialize WebRTC Signaling AFTER Vite to avoid WebSocket conflicts
+  // The ws library's WebSocketServer will still work because it only handles /ws-signal path
+  const { setupWebsocketSignaling } = await import("./websocket");
+  setupWebsocketSignaling(httpServer);
 
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(

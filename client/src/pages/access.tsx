@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload } from "@/hooks/use-vaults";
 import { unwrapFileKey, decryptMetadata, decryptData } from "@/lib/crypto";
+import { initiateStreamDownload } from "@/lib/downloadStream";
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
@@ -17,6 +18,7 @@ interface FileMetadata {
     type: string;
     size: number;
     fileId: string;
+    isCompressed?: boolean;
     lastModified: number;
 }
 
@@ -173,7 +175,7 @@ export default function AccessPage() {
         }
     };
 
-    const downloadFile = async (file: FileMetadata) => {
+    const downloadFileInMemory = async (file: FileMetadata) => {
         if (!vaultData || !fileKey) return;
 
         try {
@@ -193,52 +195,44 @@ export default function AccessPage() {
                     chunkIndex: i,
                 });
 
-                // Fetch the encrypted chunk with Retry Logic
+                // Fetch logic...
                 let response: Response | null = null;
-                let fetchError;
-
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
                         response = await fetch(downloadUrl);
-                        if (response.ok) break; // Success
-
-                        // If 4xx error (Not Found, Gone, Forbidden), do not retry
-                        if (response.status >= 400 && response.status < 500) {
-                            throw new Error(`Server returned ${response.status}`);
-                        }
-
-                        // If 5xx, throw to trigger retry
+                        if (response.ok) break;
+                        if (response.status >= 400 && response.status < 500) throw new Error(`Server returned ${response.status}`);
                         throw new Error(`Server error ${response.status}`);
                     } catch (err) {
-                        fetchError = err;
-                        if (attempt < 2) {
-                            // Exponential backoff: 500ms, 1000ms
-                            await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
-                        }
+                        if (attempt < 2) await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
                     }
                 }
 
-                if (!response || !response.ok) {
-                    throw new Error(`Failed to download chunk ${i} after 3 attempts: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`);
-                }
+                if (!response || !response.ok) throw new Error("Failed to download chunk");
 
                 const encryptedChunk = await response.arrayBuffer();
+                // Validate size
+                if (encryptedChunk.byteLength < 12) throw new Error("Chunk too small");
 
-                // Validate chunk size
-                if (encryptedChunk.byteLength < 12) {
-                    throw new Error(`Chunk ${i} is too small / corrupted.`);
-                }
-
-                // Extract IV (first 12 bytes) and encrypted data
                 const iv = new Uint8Array(encryptedChunk, 0, 12);
                 const encryptedData = new Uint8Array(encryptedChunk, 12);
-
                 // Decrypt the chunk
                 const decryptedChunk = await decryptData(encryptedData, iv, fileKey);
-                chunks.push(decryptedChunk);
+
+                if (file.isCompressed) {
+                    // Lazy load Brotli
+                    const brotli = await import("brotli-wasm");
+                    await brotli.default; // init
+                    // Explicitly cast to ArrayBuffer to satisfy strict type checks
+                    const inputBuffer = new Uint8Array(decryptedChunk as ArrayBuffer);
+                    const decompressed = brotli.decompress(inputBuffer);
+                    chunks.push(decompressed.buffer as ArrayBuffer);
+                } else {
+                    chunks.push(decryptedChunk);
+                }
             }
 
-            // Combine all chunks and create blob
+            // Create blob
             const totalSize = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
             const combinedBuffer = new Uint8Array(totalSize);
             let offset = 0;
@@ -249,8 +243,6 @@ export default function AccessPage() {
 
             const blob = new Blob([combinedBuffer], { type: file.type || 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
-
-            // Trigger download
             const a = document.createElement('a');
             a.href = url;
             a.download = file.name;
@@ -259,11 +251,55 @@ export default function AccessPage() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            // Only show success toast if we are NOT in bulk download mode (which handles its own toast)
-            if (stage === "ready") {
-                toast({ title: "File Downloaded", description: `${file.name} saved to device.` });
+            return true;
+        } catch (error) {
+            throw error;
+        }
+    };
 
-                // Track individual download
+    const downloadFile = async (file: FileMetadata) => {
+        if (!vaultData || !fileKey) return;
+
+        try {
+            // Check for Service Worker Support (Streamed Download)
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > 10 * 1024 * 1024) { // Only stream > 10MB to verify optimization
+                console.log("Using Streamed Download for " + file.name);
+                setStatusText(`Preparing stream for ${file.name}...`);
+
+                const vaultFile = vaultData.files.find((f: any) => f.fileId === file.fileId);
+                if (!vaultFile) throw new Error("File not found");
+
+                // Generate all chunk URLs upfront
+                const chunks = [];
+                for (let i = 0; i < vaultFile.chunkCount; i++) {
+                    const { downloadUrl } = await getChunkUrl.mutateAsync({
+                        vaultId: vaultData.id,
+                        fileId: file.fileId,
+                        chunkIndex: i
+                    });
+                    chunks.push({ downloadUrl, index: i });
+                }
+
+                await initiateStreamDownload(file.fileId, fileKey, chunks, file);
+
+                if (stage === "ready") {
+                    toast({ title: "Download Started", description: `Streaming ${file.name}...` });
+                }
+            } else {
+                // Fallback to Memory Download
+                console.log("Using Memory Download for " + file.name);
+                await downloadFileInMemory(file);
+            }
+
+            // Track individual download (Shared logic)
+            if (stage === "ready") {
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > 10 * 1024 * 1024) {
+                    // For stream, we tracked start. Completion is hard to track from here seamlessly without bi-directional comms.
+                    // We assume success for tracking purposes or track immediately.
+                } else {
+                    toast({ title: "File Downloaded", description: `${file.name} saved.` });
+                }
+
                 try {
                     const res = await trackDownload.mutateAsync(vaultData.id);
                     setVaultData((prev: any) => ({
@@ -291,7 +327,7 @@ export default function AccessPage() {
                 title: "Download Error",
                 description: error instanceof Error ? error.message : "Failed to download file"
             });
-            if (stage === "downloading") throw error; // Propagate to handleDownload
+            if (stage === "downloading") throw error;
         }
     };
 
@@ -439,7 +475,9 @@ export default function AccessPage() {
                                         <div className="flex justify-center gap-2 md:gap-3 relative">
                                             {/* Invisible input for handling focus/typing */}
                                             <Input
-                                                type="text"
+                                                type="search"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
                                                 value={accessCode}
                                                 onChange={(e) => {
                                                     // Allow alphanumeric, max 6 chars, uppercase
@@ -457,6 +495,9 @@ export default function AccessPage() {
                                                 className="absolute inset-0 opacity-0 cursor-pointer z-10 h-16 w-full"
                                                 autoFocus
                                                 autoComplete="off"
+                                                spellCheck="false"
+                                                name="vault_access_code_search"
+                                                id="vault_access_code_search"
                                             />
 
                                             {/* Visual Boxes */}
@@ -662,9 +703,14 @@ export default function AccessPage() {
                                         <div className="mt-auto pt-8 relative z-10">
                                             <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-950/20 border border-emerald-900/30">
                                                 <Shield className="w-5 h-5 text-emerald-500 mt-0.5" />
-                                                <p className="text-xs text-emerald-200/60 leading-relaxed">
-                                                    Files are decrypted locally using your browser's WebCrypto API. No keys leave this device.
-                                                </p>
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-emerald-200/60 leading-relaxed font-bold">
+                                                        Zero-Knowledge Architecture
+                                                    </p>
+                                                    <p className="text-xs text-emerald-200/60 leading-relaxed">
+                                                        Files are decrypted locally. Use {('serviceWorker' in navigator) ? <span className="text-emerald-400 font-bold">Streamed Mode</span> : "High Speed Mode"} for large files.
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
