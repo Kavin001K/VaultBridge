@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /v/
+Disallow: /access
+Disallow: /success
+
+Sitemap: https://vaultbridge.io/sitemap.xml

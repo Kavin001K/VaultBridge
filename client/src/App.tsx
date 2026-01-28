@@ -3,14 +3,27 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Home from "@/pages/home";
-import UploadPage from "@/pages/upload";
-import AccessPage from "@/pages/access";
-import DownloadPage from "@/pages/download";
-import Success from "@/pages/success";
-import NotFound from "@/pages/not-found";
-import HowItWorksPage from "@/pages/how-it-works";
-import TermsPage from "@/pages/terms";
+import { lazy, Suspense } from "react";
+import { Loader2 } from "lucide-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+// Lazy Load Pages
+const Home = lazy(() => import("@/pages/home"));
+const UploadPage = lazy(() => import("@/pages/upload"));
+const AccessPage = lazy(() => import("@/pages/access"));
+const DownloadPage = lazy(() => import("@/pages/download"));
+const Success = lazy(() => import("@/pages/success"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const HowItWorksPage = lazy(() => import("@/pages/how-it-works"));
+const TermsPage = lazy(() => import("@/pages/terms"));
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-black/90 text-primary">
+      <Loader2 className="w-10 h-10 animate-spin" />
+    </div>
+  );
+}
 
 function Router() {
   return (
@@ -28,12 +41,18 @@ function Router() {
   );
 }
 
+
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <Router />
+          </Suspense>
+        </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
   );

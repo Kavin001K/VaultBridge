@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Key, FileText, Lock, Upload, CheckCircle, Loader2 } from "lucide-react";
 
-type ProgressStep = "keys" | "metadata" | "chunks" | "upload" | "done";
+type ProgressStep = "keys" | "metadata" | "transfer" | "done";
 type UploadStage = "idle" | "encrypting" | "uploading" | "success";
 
 interface EncryptionProgressProps {
@@ -14,8 +14,7 @@ interface EncryptionProgressProps {
 const steps = [
     { id: "keys", label: "Generating Keys", icon: Key },
     { id: "metadata", label: "Encrypting Metadata", icon: FileText },
-    { id: "chunks", label: "Encrypting Chunks", icon: Lock },
-    { id: "upload", label: "Uploading", icon: Upload },
+    { id: "transfer", label: "Encrypting & Uploading", icon: Upload },
     { id: "done", label: "Complete", icon: CheckCircle },
 ];
 
@@ -26,7 +25,7 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
         <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md mx-auto text-center"
+            className="w-full max-w-md mx-auto text-center px-4"
         >
             {/* Animated Lock Icon */}
             <motion.div
@@ -39,16 +38,16 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
                     repeat: stage === "encrypting" ? Infinity : 0,
                     repeatDelay: 1
                 }}
-                className="w-20 h-20 mx-auto mb-6 relative"
+                className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-6 relative"
             >
                 <div className={`w-full h-full rounded-2xl flex items-center justify-center ${stage === "success"
-                        ? 'bg-primary/20 border-2 border-primary'
-                        : 'bg-zinc-800 border border-zinc-700'
+                    ? 'bg-primary/20 border-2 border-primary'
+                    : 'bg-zinc-800 border border-zinc-700'
                     }`}>
                     {stage === "success" ? (
-                        <CheckCircle className="w-10 h-10 text-primary" />
+                        <CheckCircle className="w-8 h-8 md:w-10 md:h-10 text-primary" />
                     ) : (
-                        <Lock className="w-10 h-10 text-primary animate-pulse" />
+                        <Lock className="w-8 h-8 md:w-10 md:h-10 text-primary animate-pulse" />
                     )}
                 </div>
 
@@ -82,7 +81,7 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
                 key={statusText}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-xl font-bold mb-2 font-mono"
+                className="text-lg md:text-xl font-bold mb-2 font-mono break-words line-clamp-2 min-h-[3.5rem] flex items-center justify-center"
             >
                 {statusText}
             </motion.h3>
@@ -102,12 +101,12 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
             </div>
 
             {/* Progress Percentage */}
-            <div className="text-4xl font-mono font-bold text-primary mb-8">
+            <div className="text-3xl md:text-4xl font-mono font-bold text-primary mb-8">
                 {Math.round(progress)}%
             </div>
 
             {/* Step Indicators */}
-            <div className="space-y-2">
+            <div className="space-y-2 text-left bg-zinc-900/50 p-4 rounded-xl">
                 {steps.map((s, index) => {
                     const isActive = s.id === step;
                     const isCompleted = index < currentStepIndex;
@@ -122,7 +121,7 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
                             transition={{ delay: index * 0.1 }}
                             className={`progress-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${isPending ? 'pending' : ''}`}
                         >
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isCompleted ? 'bg-primary/20' : isActive ? 'bg-primary/10' : 'bg-zinc-800'
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isCompleted ? 'bg-primary/20' : isActive ? 'bg-primary/10' : 'bg-zinc-800'
                                 }`}>
                                 {isCompleted ? (
                                     <CheckCircle className="w-4 h-4 text-primary" />
@@ -132,7 +131,7 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
                                     <StepIcon className="w-3 h-3" />
                                 )}
                             </div>
-                            <span className="text-sm font-mono">{s.label}</span>
+                            <span className="text-xs md:text-sm font-mono truncate">{s.label}</span>
                         </motion.div>
                     );
                 })}

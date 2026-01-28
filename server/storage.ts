@@ -6,6 +6,7 @@ import { db } from "./db";
 import { eq, sql, lt } from "drizzle-orm";
 import { localStorage } from "./services/local_storage";
 import { supabaseStorage } from "./services/supabase_storage";
+import path from "path";
 
 // THE SWITCH: Checks .env to decide storage mode
 const USE_LOCAL_STORAGE = process.env.STORAGE_PROVIDER === 'local';
@@ -127,13 +128,59 @@ export class DatabaseStorage {
         return updated?.downloadCount || 0;
     }
 
+
+
     async deleteVault(id: string) {
+        // 1. Gather all file paths for this vault
+        try {
+            const vaultFiles = await db.select({ id: files.id }).from(files).where(eq(files.vaultId, id));
+
+            for (const file of vaultFiles) {
+                const fileChunks = await db.select({ storagePath: chunks.storagePath })
+                    .from(chunks)
+                    .where(eq(chunks.fileId, file.id));
+
+                const validPaths = fileChunks
+                    .map(c => c.storagePath)
+                    .filter(p => p !== null && p !== undefined) as string[];
+
+                if (validPaths.length > 0) {
+                    if (USE_LOCAL_STORAGE) {
+                        // Local: Delete one by one
+                        for (const p of validPaths) {
+                            // DB stores absolute path for local.
+                            // localStorage.deleteFile expects relative filename (it joins UPLOAD_DIR).
+                            const filename = path.basename(p);
+                            await localStorage.deleteFile(filename);
+                        }
+                    } else {
+                        // Supabase: Batch delete
+                        await supabaseStorage.deleteFiles(validPaths);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(`[Cleanup Error] Failed to delete physical files for vault ${id}:`, err);
+            // Continue to delete DB record anyway to prevent loop
+        }
+
+        // 2. Delete DB Record (Cascades to files/chunks)
         await db.delete(vaults).where(eq(vaults.id, id));
+        console.log(`[Storage] Deleted vault ${id} and resources.`);
     }
 
     async cleanupExpiredVaults() {
         const now = new Date();
-        await db.delete(vaults).where(lt(vaults.expiresAt, now));
+        const expiredVaults = await db.select({ id: vaults.id })
+            .from(vaults)
+            .where(lt(vaults.expiresAt, now));
+
+        if (expiredVaults.length > 0) {
+            console.log(`[Cleanup] Found ${expiredVaults.length} expired vaults. Purging...`);
+            for (const vault of expiredVaults) {
+                await this.deleteVault(vault.id);
+            }
+        }
     }
 
     // --- FILE STORAGE SWITCHER ---

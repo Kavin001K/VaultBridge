@@ -376,14 +376,27 @@ export async function registerRoutes(
     const fileId = req.params.fileId as string;
     const chunkIndex = req.params.chunkIndex as string;
 
-    const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
-    if (!chunk || !chunk.storagePath) {
-      return res.status(404).json({ message: "Chunk not found" });
-    }
+    console.log(`[Download Debug] Requesting chunk: Vault=${id}, File=${fileId}, Index=${chunkIndex}`);
 
     try {
+      const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
+
+      if (!chunk) {
+        console.error(`[Download Debug] Chunk not found in DB: File=${fileId}, Index=${chunkIndex}`);
+        return res.status(404).json({ message: "Chunk not found" });
+      }
+
+      if (!chunk.storagePath) {
+        console.error(`[Download Debug] Chunk has no storagePath: File=${fileId}, Index=${chunkIndex}`);
+        return res.status(404).json({ message: "Chunk not found (no path)" });
+      }
+
+      console.log(`[Download Debug] Chunk found. Path=${chunk.storagePath}. Getting signed URL...`);
+
       // Get signed download URL from Supabase
       const downloadUrl = await storage.getDownloadUrl(chunk.storagePath);
+      console.log(`[Download Debug] Signed URL generated successfully.`);
+
       res.json({ downloadUrl });
     } catch (err) {
       console.error("Download URL Gen Failed:", err);
