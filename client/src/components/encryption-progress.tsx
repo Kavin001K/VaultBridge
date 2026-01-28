@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Key, FileText, Lock, Upload, CheckCircle, Loader2 } from "lucide-react";
 
 type ProgressStep = "keys" | "metadata" | "transfer" | "done";
-type UploadStage = "idle" | "encrypting" | "uploading" | "success";
+type UploadStage = "idle" | "encrypting" | "uploading" | "success" | "resuming";
 
 interface EncryptionProgressProps {
     stage: UploadStage;

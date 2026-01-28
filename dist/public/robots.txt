@@ -1,8 +1,22 @@
+# VaultBridge Robots.txt
+# https://vaultbridge.io
+
 User-agent: *
 Allow: /
-Disallow: /api/
-Disallow: /v/
-Disallow: /access
-Disallow: /success
+Allow: /upload
+Allow: /access
+Allow: /live
+Allow: /how-it-works
+Allow: /terms
+Allow: /privacy
 
+# Disallow temporary/dynamic pages
+Disallow: /download/
+Disallow: /success/
+Disallow: /live/
+
+# Crawl delay (be respectful to server)
+Crawl-delay: 1
+
+# Sitemaps
 Sitemap: https://vaultbridge.io/sitemap.xml

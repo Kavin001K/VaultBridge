@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type CreateVaultRequest, type VaultResponse } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
+import { type CreateVaultRequest, type VaultResponse } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 // === QUERY HOOKS ===

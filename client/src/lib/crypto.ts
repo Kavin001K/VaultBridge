@@ -217,3 +217,199 @@ export async function unwrapFileKey(wrappedKeyBase64: string, pin: string): Prom
     ["encrypt", "decrypt"]
   );
 }
+
+// ============================================================================
+// PASSWORD-BASED ENCRYPTION (2FA)
+// ============================================================================
+
+// Higher iterations for password-based protection (more secure than PIN)
+const PASSWORD_PBKDF2_ITERATIONS = 600000;
+const PASSWORD_SALT_PREFIX = "VaultBridge-Password-v1";
+
+/**
+ * Derive a wrapper key from a user password using PBKDF2.
+ * Uses high iteration count for security against brute force attacks.
+ * 
+ * @param password - User-provided password
+ * @param salt - Optional salt (generated if not provided)
+ * @returns Promise<{ key: CryptoKey, salt: Uint8Array }>
+ */
+export async function derivePasswordKey(
+  password: string,
+  salt?: Uint8Array
+): Promise<{ key: CryptoKey; salt: Uint8Array }> {
+  const encoder = new TextEncoder();
+
+  // Generate or use provided salt
+  const finalSalt = salt || window.crypto.getRandomValues(new Uint8Array(16));
+
+  // Import password as key material
+  const passwordKey = await window.crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  // Derive AES-KW key for wrapping
+  const derivedKey = await window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: finalSalt,
+      iterations: PASSWORD_PBKDF2_ITERATIONS,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    { name: "AES-KW", length: 256 },
+    false,
+    ["wrapKey", "unwrapKey"]
+  );
+
+  return { key: derivedKey, salt: finalSalt };
+}
+
+/**
+ * Wrap (encrypt) the file key using a user password.
+ * Returns a combined string: base64(salt + wrappedKey)
+ * 
+ * @param fileKey - The CryptoKey to protect
+ * @param password - User-provided password
+ * @returns Promise<string> - Base64 encoded salt + wrapped key
+ */
+export async function wrapKeyWithPassword(
+  fileKey: CryptoKey,
+  password: string
+): Promise<string> {
+  const { key: wrapperKey, salt } = await derivePasswordKey(password);
+
+  const wrappedKeyBuffer = await window.crypto.subtle.wrapKey(
+    "raw",
+    fileKey,
+    wrapperKey,
+    "AES-KW"
+  );
+
+  // Combine salt (16 bytes) + wrapped key
+  const combined = new Uint8Array(salt.length + wrappedKeyBuffer.byteLength);
+  combined.set(salt, 0);
+  combined.set(new Uint8Array(wrappedKeyBuffer), salt.length);
+
+  return arrayBufferToBase64(combined.buffer);
+}
+
+/**
+ * Unwrap (decrypt) the file key using a user password.
+ * Expects the combined format: base64(salt + wrappedKey)
+ * 
+ * @param wrappedData - Base64 encoded salt + wrapped key
+ * @param password - User-provided password
+ * @returns Promise<CryptoKey> - The unwrapped file key
+ */
+export async function unwrapKeyWithPassword(
+  wrappedData: string,
+  password: string
+): Promise<CryptoKey> {
+  const combined = base64ToArrayBuffer(wrappedData);
+  const combinedBytes = new Uint8Array(combined);
+
+  // Extract salt (first 16 bytes) and wrapped key (rest)
+  const salt = combinedBytes.slice(0, 16);
+  const wrappedKey = combinedBytes.slice(16);
+
+  // Derive the same wrapper key using salt
+  const { key: wrapperKey } = await derivePasswordKey(password, salt);
+
+  // Unwrap the file key
+  return window.crypto.subtle.unwrapKey(
+    "raw",
+    wrappedKey.buffer,
+    wrapperKey,
+    "AES-KW",
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+
+/**
+ * Verify a password by attempting to unwrap a key.
+ * Returns true if the password is correct, false otherwise.
+ * 
+ * @param wrappedData - Base64 encoded salt + wrapped key
+ * @param password - Password to verify
+ * @returns Promise<boolean>
+ */
+export async function verifyPassword(
+  wrappedData: string,
+  password: string
+): Promise<boolean> {
+  try {
+    await unwrapKeyWithPassword(wrappedData, password);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// DECOY VAULT SUPPORT (DURESS PASSWORD)
+// ============================================================================
+
+/**
+ * Create a decoy vault key structure.
+ * Uses a different salt prefix to ensure different derived keys.
+ * 
+ * @param realFileKey - The real file key
+ * @param realPassword - The real password
+ * @param duressPassword - The duress/decoy password
+ * @param decoyFileKey - Key for decoy files
+ * @returns Promise<{ realWrapped: string, decoyWrapped: string }>
+ */
+export async function createDecoyVault(
+  realFileKey: CryptoKey,
+  realPassword: string,
+  duressPassword: string,
+  decoyFileKey: CryptoKey
+): Promise<{ realWrapped: string; decoyWrapped: string }> {
+  // Wrap real key with real password
+  const realWrapped = await wrapKeyWithPassword(realFileKey, realPassword);
+
+  // Wrap decoy key with duress password
+  const decoyWrapped = await wrapKeyWithPassword(decoyFileKey, duressPassword);
+
+  return { realWrapped, decoyWrapped };
+}
+
+/**
+ * Test if entered password is the real or duress password.
+ * Returns null if neither password works.
+ * 
+ * @param realWrapped - Wrapped real key
+ * @param decoyWrapped - Wrapped decoy key
+ * @param enteredPassword - Password entered by user
+ * @returns Promise<{ type: 'real' | 'decoy', key: CryptoKey } | null>
+ */
+export async function testVaultPassword(
+  realWrapped: string,
+  decoyWrapped: string,
+  enteredPassword: string
+): Promise<{ type: 'real' | 'decoy'; key: CryptoKey } | null> {
+  // Try real password first
+  try {
+    const realKey = await unwrapKeyWithPassword(realWrapped, enteredPassword);
+    return { type: 'real', key: realKey };
+  } catch {
+    // Not the real password
+  }
+
+  // Try decoy password
+  try {
+    const decoyKey = await unwrapKeyWithPassword(decoyWrapped, enteredPassword);
+    return { type: 'decoy', key: decoyKey };
+  } catch {
+    // Not the decoy password either
+  }
+
+  return null;
+}

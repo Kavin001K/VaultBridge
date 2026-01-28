@@ -21,7 +21,7 @@ export interface VaultMetadata {
         fileId: string;
         chunkCount: number;
         totalSize: number;
-        storagePaths: string[];
+        storagePaths: (string | null)[];
     }[];
 }
 
@@ -33,7 +33,7 @@ export interface CreateVaultInput {
     wrappedKey?: string; // File key encrypted by PIN (for split-code vaults)
     files: {
         fileId: string;
-        chunks: number;
+        chunkCount: number;
         size: number;
     }[];
 }
@@ -88,9 +88,9 @@ class EphemeralStore {
             downloadCount: 0,
             files: input.files.map(f => ({
                 fileId: f.fileId,
-                chunkCount: f.chunks,
+                chunkCount: f.chunkCount,
                 totalSize: f.size,
-                storagePaths: new Array(f.chunks).fill(null),
+                storagePaths: new Array(f.chunkCount).fill(null),
             })),
         };
 
@@ -197,7 +197,9 @@ class EphemeralStore {
 
         const storagePaths: string[] = [];
         for (const file of vault.files) {
-            storagePaths.push(...file.storagePaths.filter(p => p !== null));
+            // Filter out nulls safely
+            const validPaths = file.storagePaths.filter((p): p is string => p !== null);
+            storagePaths.push(...validPaths);
         }
 
         this.vaults.delete(id);
@@ -219,7 +221,8 @@ class EphemeralStore {
         const now = new Date();
         const expired: VaultMetadata[] = [];
 
-        for (const vault of this.vaults.values()) {
+        // Use Array.from to avoid iteration issues
+        for (const vault of Array.from(this.vaults.values())) {
             if (now > vault.expiresAt || vault.downloadCount >= vault.maxDownloads) {
                 expired.push(vault);
             }
@@ -246,7 +249,8 @@ class EphemeralStore {
      */
     getAllStoragePaths(): Set<string> {
         const paths = new Set<string>();
-        for (const vault of this.vaults.values()) {
+        // Use Array.from
+        for (const vault of Array.from(this.vaults.values())) {
             for (const file of vault.files) {
                 for (const path of file.storagePaths) {
                     if (path) paths.add(path);
@@ -261,7 +265,8 @@ class EphemeralStore {
      */
     getStats(): { vaultCount: number; totalChunks: number } {
         let totalChunks = 0;
-        for (const vault of this.vaults.values()) {
+        // Use Array.from
+        for (const vault of Array.from(this.vaults.values())) {
             for (const file of vault.files) {
                 totalChunks += file.storagePaths.filter(p => p !== null).length;
             }

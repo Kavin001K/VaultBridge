@@ -23,6 +23,8 @@ export const files = pgTable("files", {
   fileId: text("file_id").notNull(), // Client-generated UUID for the file
   chunkCount: integer("chunk_count").notNull(),
   totalSize: integer("total_size").notNull(), // Bytes
+  isCompressed: boolean("is_compressed").default(false).notNull(),
+  originalSize: integer("original_size"), // Original size before compression/encryption
 });
 
 export const chunks = pgTable("chunks", {
@@ -66,6 +68,8 @@ export const createVaultRequestSchema = z.object({
     fileId: z.string(),
     chunks: z.number(),
     size: z.number(),
+    isCompressed: z.boolean().default(false),
+    originalSize: z.number().optional(),
   })),
 });
 
@@ -76,5 +80,7 @@ export type VaultResponse = Vault & {
     fileId: string;
     chunkCount: number;
     totalSize: number;
+    isCompressed: boolean;
+    originalSize: number | null;
   }[];
 };

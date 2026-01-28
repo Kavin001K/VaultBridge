@@ -6,9 +6,14 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
+
 export default defineConfig({
   plugins: [
     react(),
+    wasm(),
+    topLevelAwait()
   ],
   resolve: {
     alias: {

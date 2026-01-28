@@ -5,24 +5,16 @@ import viteConfig from "../vite.config";
 import fs from "fs";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-import { nanoid } from "nanoid";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const viteLogger = createLogger();
 
-export async function setupVite(server: Server, app: Express) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: {
-      server,
-      path: "/vite-hmr",
-      clientPort: parseInt(process.env.PORT || "5000"),
-    },
-    allowedHosts: true as const,
-  };
+// Generate a stable version ID once at server startup
+const SERVER_START_TIME = Date.now().toString(36);
 
+export async function setupVite(server: Server, app: Express) {
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
@@ -30,10 +22,17 @@ export async function setupVite(server: Server, app: Express) {
       ...viteLogger,
       error: (msg, options) => {
         viteLogger.error(msg, options);
-        process.exit(1);
+        // Don't exit on error, just log it
+        console.error("[vite error]", msg);
       },
     },
-    server: serverOptions,
+    server: {
+      middlewareMode: true,
+      // DISABLE HMR completely to prevent the infinite refresh loop
+      // You will need to manually refresh the page when making changes
+      hmr: false,
+      allowedHosts: true as const,
+    },
     appType: "custom",
   });
 
@@ -50,12 +49,14 @@ export async function setupVite(server: Server, app: Express) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
+
+      // Use stable version ID
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/src/main.tsx?v=${SERVER_START_TIME}"`,
       );
+
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {

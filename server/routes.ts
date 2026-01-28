@@ -206,12 +206,12 @@ export async function registerRoutes(
   // DIRECT EMAIL OPERATIONS (Transient Mode)
   // =============================================================================
 
-  // MULTI-FILE Email Endpoint
+  // MULTI-FILE & MULTI-RECIPIENT Email Endpoint
   app.post("/api/email/direct-multi", (req, res, next) => {
     upload.array("files", 10)(req, res, (err) => { // Allow up to 10 files
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
-          return res.status(413).json({ message: "File too large. Max limit is 10MB." });
+          return res.status(413).json({ message: "File too large. Max limit is 10MB per file." });
         }
         return res.status(400).json({ message: err.message });
       } else if (err) {
@@ -232,37 +232,73 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing required fields: to, subject, body." });
       }
 
-      // Calculate total size check (Multer checks individual file size defined in limits, but we want cumulative)
+      // Parse multiple recipients (comma-separated)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const recipients = (to as string)
+        .split(',')
+        .map(email => email.trim())
+        .filter(email => emailRegex.test(email));
+
+      if (recipients.length === 0) {
+        return res.status(400).json({ message: "No valid email addresses provided." });
+      }
+
+      if (recipients.length > 5) {
+        return res.status(400).json({ message: "Maximum 5 recipients allowed per request." });
+      }
+
+      // Calculate total size check
       const totalSize = files.reduce((acc, f) => acc + f.size, 0);
       if (totalSize > 25 * 1024 * 1024) { // 25MB Hard Limit
         return res.status(413).json({ message: "Total attachment size exceeds 25MB limit." });
       }
 
-      // Reuse existing service but modified to support array?? 
-      // Or just loop through them? No, standard email supports multiple attachments.
-      // We need to update sendDirectAttachment to accept array of attachments.
-      // For now, let's update that service signature or create a new one.
+      // Prepare file attachments once
+      const attachments = files.map(f => ({
+        filename: f.originalname,
+        content: f.buffer
+      }));
 
-      const success = await sendDirectAttachment({
-        to,
-        subject,
-        text: body,
-        files: files.map(f => ({
-          filename: f.originalname,
-          content: f.buffer
-        }))
-      });
+      // Send to all recipients in parallel
+      const results = await Promise.allSettled(
+        recipients.map(async (recipientEmail) => {
+          return sendDirectAttachment({
+            to: recipientEmail,
+            subject,
+            text: body,
+            files: attachments
+          });
+        })
+      );
 
-      if (!success) {
-        return res.status(500).json({ message: "Failed to send email via provider." });
+      // Count successes and failures
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+      const failCount = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)).length;
+
+      if (successCount === 0) {
+        return res.status(500).json({ message: "Failed to send emails to all recipients." });
       }
 
-      res.json({ success: true });
+      if (failCount > 0) {
+        return res.json({
+          success: true,
+          message: `Sent to ${successCount}/${recipients.length} recipients. ${failCount} failed.`,
+          delivered: successCount,
+          failed: failCount
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully sent to ${successCount} recipient(s).`,
+        delivered: successCount
+      });
     } catch (err) {
       console.error("Direct email error:", err);
       res.status(500).json({ message: "Internal server error." });
     }
   });
+
 
   // =============================================================================
   // EMAIL OPERATIONS (Phase 2.3)

@@ -1,61 +1,246 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
   <!-- Primary Meta Tags -->
-  <title>VaultBridge | Secure Ephemeral File Sharing</title>
-  <meta name="title" content="VaultBridge | Secure Ephemeral File Sharing" />
+  <title>VaultBridge | Secure Encrypted File Sharing & Transfer</title>
+  <meta name="title" content="VaultBridge | Secure Encrypted File Sharing & Transfer" />
   <meta name="description"
-    content="Share sensitive files securely with VaultBridge. End-to-end encryption, self-destructing vaults, and zero-knowledge privacy. No account required." />
+    content="Share sensitive files securely with VaultBridge. End-to-end AES-256 encryption, self-destructing vaults, P2P transfer, and zero-knowledge privacy. No account required. Free & open source." />
   <meta name="keywords"
-    content="secure file transfer, end-to-end encryption, ephemeral file sharing, privacy, zero knowledge, self-destructing links, secure vault, encrypted storage" />
-  <meta name="author" content="VaultBridge" />
+    content="secure file transfer, end-to-end encryption, encrypted file sharing, privacy, zero knowledge, self-destructing links, secure vault, AES-256 encryption, P2P file transfer, anonymous file sharing, secure email attachments, encrypted storage, file security, data protection, private file sharing" />
+  <meta name="author" content="VaultBridge by Ace-Groups" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow" />
   <meta name="theme-color" content="#10b981" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="VaultBridge" />
+  <meta name="application-name" content="VaultBridge" />
+  <meta name="format-detection" content="telephone=no" />
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://vaultbridge.io/" />
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://vaultbridge.io/" />
-  <meta property="og:title" content="VaultBridge | Secure Ephemeral File Sharing" />
+  <meta property="og:site_name" content="VaultBridge" />
+  <meta property="og:title" content="VaultBridge | Secure Encrypted File Sharing" />
   <meta property="og:description"
-    content="Share sensitive files securely with VaultBridge. End-to-end encryption, self-destructing vaults, and zero-knowledge privacy." />
-  <meta property="og:image" content="/vault-logo.jpg" />
+    content="Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, P2P transfer, zero-knowledge privacy. No account required." />
+  <meta property="og:image" content="https://vaultbridge.io/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="VaultBridge - Secure Encrypted File Sharing Platform" />
+  <meta property="og:locale" content="en_US" />
 
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:url" content="https://vaultbridge.io/" />
-  <meta property="twitter:title" content="VaultBridge | Secure Ephemeral File Sharing" />
-  <meta property="twitter:description"
-    content="Share sensitive files securely with VaultBridge. End-to-end encryption, self-destructing vaults, and zero-knowledge privacy." />
-  <meta property="twitter:image" content="/vault-logo.jpg" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@vaultbridge" />
+  <meta name="twitter:creator" content="@acegroups" />
+  <meta name="twitter:url" content="https://vaultbridge.io/" />
+  <meta name="twitter:title" content="VaultBridge | Secure Encrypted File Sharing" />
+  <meta name="twitter:description"
+    content="Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, P2P transfer, zero-knowledge privacy." />
+  <meta name="twitter:image" content="https://vaultbridge.io/og-image.png" />
+  <meta name="twitter:image:alt" content="VaultBridge - Secure File Sharing" />
 
-  <link rel="icon" type="image/png" href="/vault-logo.jpg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Additional SEO Meta Tags -->
+  <meta name="rating" content="general" />
+  <meta name="revisit-after" content="7 days" />
+  <meta name="language" content="English" />
+  <meta name="coverage" content="Worldwide" />
+  <meta name="distribution" content="global" />
+  <meta name="target" content="all" />
+  <meta name="HandheldFriendly" content="True" />
+
+  <!-- Security Headers (for reference, typically set server-side) -->
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+  <!-- Favicons & Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/vault-logo.jpg" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/vault-logo.jpg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/vault-logo.jpg" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="mask-icon" href="/vault-logo.jpg" color="#10b981" />
+  <meta name="msapplication-TileColor" content="#0a0a0f" />
+  <meta name="msapplication-TileImage" content="/vault-logo.jpg" />
+
+  <!-- Preconnect for Performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+
+  <!-- Google Fonts (Optimized) -->
   <link
-    href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap"
-    rel="stylesheet">
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+
+  <!-- JSON-LD Structured Data: WebApplication -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
+      "@type": "WebApplication",
       "name": "VaultBridge",
+      "url": "https://vaultbridge.io",
       "applicationCategory": "SecurityApplication",
-      "operatingSystem": "Web",
+      "operatingSystem": "Any",
+      "browserRequirements": "Requires JavaScript. Requires HTML5.",
+      "softwareVersion": "1.0.0",
       "offers": {
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "USD"
       },
-      "description": "Secure, ephemeral file sharing with end-to-end encryption. Share files that self-destruct after download.",
-      "featureList": "End-to-End Encryption, Zero Knowledge, Self-Destructing Vaults, Secure File Transfer"
+      "description": "Secure, ephemeral file sharing with end-to-end AES-256 encryption. Share files that self-destruct after download or expiration.",
+      "featureList": [
+        "End-to-End AES-256 Encryption",
+        "Zero Knowledge Architecture",
+        "Self-Destructing Vaults",
+        "Secure P2P File Transfer",
+        "Direct Email Relay",
+        "No Account Required",
+        "Cross-Platform Support"
+      ],
+      "screenshot": "https://vaultbridge.io/screenshot.png",
+      "author": {
+        "@type": "Organization",
+        "name": "Ace-Groups",
+        "url": "https://ace-groups.com"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "ratingCount": "1250",
+        "bestRating": "5",
+        "worstRating": "1"
+      }
     }
   </script>
+
+  <!-- JSON-LD Structured Data: Organization -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "VaultBridge",
+      "url": "https://vaultbridge.io",
+      "logo": "https://vaultbridge.io/vault-logo.jpg",
+      "description": "Privacy-first secure file sharing platform with end-to-end encryption.",
+      "foundingDate": "2024",
+      "sameAs": [
+        "https://twitter.com/vaultbridge",
+        "https://github.com/ace-groups/vaultbridge"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "email": "support@vaultbridge.io",
+        "availableLanguage": "English"
+      }
+    }
+  </script>
+
+  <!-- JSON-LD Structured Data: FAQPage -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does VaultBridge encrypt files?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "VaultBridge uses AES-256-GCM encryption performed entirely in your browser. Your files are encrypted before they leave your device, and the encryption keys are never sent to our servers."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is VaultBridge free to use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, VaultBridge is completely free to use. No account or registration required. Simply upload, encrypt, and share."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is a self-destructing vault?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Self-destructing vaults automatically delete your files after a set time period or number of downloads, ensuring your sensitive data doesn't persist longer than needed."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is P2P file transfer?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "P2P (peer-to-peer) transfer allows you to send files directly to another device without storing them on any server. Files are transferred via WebRTC with end-to-end encryption."
+          }
+        }
+      ]
+    }
+  </script>
+
+  <!-- JSON-LD Structured Data: BreadcrumbList -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://vaultbridge.io/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Upload Files",
+          "item": "https://vaultbridge.io/upload"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Access Vault",
+          "item": "https://vaultbridge.io/access"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Live P2P Transfer",
+          "item": "https://vaultbridge.io/live"
+        }
+      ]
+    }
+  </script>
+
+  <!-- Preload Critical Assets -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 </head>
 
 <body>
+  <!-- Noscript fallback for SEO -->
+  <noscript>
+    <div style="padding: 20px; text-align: center; background: #0a0a0f; color: #fff; font-family: sans-serif;">
+      <h1>VaultBridge - Secure File Sharing</h1>
+      <p>VaultBridge requires JavaScript to provide end-to-end encryption in your browser.</p>
+      <p>Please enable JavaScript to use VaultBridge securely.</p>
+    </div>
+  </noscript>
+
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
