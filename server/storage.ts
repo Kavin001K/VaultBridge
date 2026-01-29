@@ -36,9 +36,9 @@ export class DatabaseStorage {
             isDeleted: false
         }).returning();
 
-        // Create file records (simplified without isCompressed/originalSize for DB compatibility)
+        // Create file records
         for (const f of data.files) {
-            await this.createFile(vault.id, f.fileId, f.chunks, f.size);
+            await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize);
         }
 
         return vault;
@@ -59,10 +59,15 @@ export class DatabaseStorage {
         return vault;
     }
 
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, _isCompressed?: boolean, _originalSize?: number) {
-        // Note: isCompressed and originalSize columns may not exist in production DB yet
-        // We just ignore those fields for now to maintain compatibility
-        const [file] = await db.insert(files).values({ vaultId, fileId, chunkCount, totalSize }).returning();
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number) {
+        const [file] = await db.insert(files).values({
+            vaultId,
+            fileId,
+            chunkCount,
+            totalSize,
+            isCompressed,
+            originalSize
+        }).returning();
         return file;
     }
 
