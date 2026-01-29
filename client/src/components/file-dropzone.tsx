@@ -183,7 +183,7 @@ export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: F
           or click to browse from your device
         </p>
         <p className="text-xs text-muted-foreground mt-4 font-mono">
-          Max file size: Unlimited (Chunked Upload)
+          Max file size: 500 MB
         </p>
       </div>
 

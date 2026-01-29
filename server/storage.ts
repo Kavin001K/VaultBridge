@@ -36,7 +36,7 @@ export class DatabaseStorage {
             isDeleted: false
         }).returning();
 
-        // Create file records
+        // Create file records (simplified without isCompressed/originalSize for DB compatibility)
         for (const f of data.files) {
             await this.createFile(vault.id, f.fileId, f.chunks, f.size);
         }
@@ -59,7 +59,9 @@ export class DatabaseStorage {
         return vault;
     }
 
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number) {
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, _isCompressed?: boolean, _originalSize?: number) {
+        // Note: isCompressed and originalSize columns may not exist in production DB yet
+        // We just ignore those fields for now to maintain compatibility
         const [file] = await db.insert(files).values({ vaultId, fileId, chunkCount, totalSize }).returning();
         return file;
     }
@@ -198,4 +200,59 @@ export class DatabaseStorage {
     }
 }
 
-export const storage = new DatabaseStorage();
+import { MemoryStorage } from "./memory_storage";
+
+// --- PROXY STORAGE (Auto-Switching) ---
+
+class FallbackStorage {
+    private primary: DatabaseStorage;
+    private memory: MemoryStorage;
+    private usingMemory: boolean = false;
+
+    constructor() {
+        this.primary = new DatabaseStorage();
+        this.memory = new MemoryStorage();
+    }
+
+    private async execute<T>(operation: (s: any) => Promise<T>): Promise<T> {
+        if (this.usingMemory) {
+            return operation(this.memory);
+        }
+
+        try {
+            return await operation(this.primary);
+        } catch (err: any) {
+            // Detect Connection Refused or other fatal DB errors
+            if (err.code === 'ECONNREFUSED' || err.code === '57P03' || err.message?.includes('connect')) {
+                console.error("===============================================================");
+                console.error("❌ DATABASE UNAVAILABLE - SWITCHING TO MEMORY STORAGE");
+                console.error("   Reason:", err.message);
+                console.error("   Note: Data will be lost when server restarts.");
+                console.error("===============================================================");
+                this.usingMemory = true;
+                return operation(this.memory);
+            }
+            throw err;
+        }
+    }
+
+    async createVault(data: CreateVaultRequest) { return this.execute(s => s.createVault(data)); }
+    async getVault(id: string) { return this.execute(s => s.getVault(id)); }
+    async getVaultByShortCode(code: string) { return this.execute(s => s.getVaultByShortCode(code)); }
+    async getVaultByLookupId(lookupId: string) { return this.execute(s => s.getVaultByLookupId(lookupId)); }
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number) { return this.execute(s => s.createFile(vaultId, fileId, chunkCount, totalSize)); }
+    async getFiles(vaultId: string) { return this.execute(s => s.getFiles(vaultId)); }
+    async createChunk(fileId: string, chunkIndex: number, size: number) { return this.execute(s => s.createChunk(fileId, chunkIndex, size)); }
+    async getChunk(fileId: string, chunkIndex: number) { return this.execute(s => s.getChunk(fileId, chunkIndex)); }
+    async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) { return this.execute(s => s.updateChunkStatus(fileId, chunkIndex, storagePath)); }
+    async incrementDownloadCount(vaultId: string) { return this.execute(s => s.incrementDownloadCount(vaultId)); }
+    async deleteVault(id: string) { return this.execute(s => s.deleteVault(id)); }
+    async cleanupExpiredVaults() { return this.execute(s => s.cleanupExpiredVaults()); }
+
+    // These methods don't use DB, but are part of the interface. 
+    // They are stateless in DatabaseStorage, but we can just use the primary one or delegate.
+    async getUploadUrl(path: string) { return this.primary.getUploadUrl(path); }
+    async getDownloadUrl(path: string) { return this.primary.getDownloadUrl(path); }
+}
+
+export const storage = new FallbackStorage();

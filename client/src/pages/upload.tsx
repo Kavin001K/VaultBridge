@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Lock, Upload, ArrowLeft, Shield, Timer, Zap, AlertTriangle, Play, X
+    Lock, Upload, ArrowLeft, Shield, Timer, Zap, AlertTriangle, X
 } from "lucide-react";
 import { FileDropzone } from "@/components/file-dropzone";
 import { EncryptionProgress } from "@/components/encryption-progress";
@@ -10,24 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateVault, useGetChunkUploadUrl, useMarkChunkUploaded } from "@/hooks/use-vaults";
-import { generateKey, exportKey, encryptMetadata, generateUUID, generateSplitCode, wrapFileKey } from "@/lib/crypto";
+import { generateKey, exportKey, encryptMetadata, generateUUID, generateSplitCode, wrapFileKey, encryptData } from "@/lib/crypto";
+import { getUploadConfig, formatBytes, MAX_FILE_SIZE } from "@/lib/uploadConfig";
 
-// Advanced Features
-import { getOptimalChunkConfig, ChunkConfig, NO_CHUNK_THRESHOLD, MIN_CHUNK_SIZE } from "@/lib/adaptiveChunk";
-import {
-    createUploadSession, markChunkUploaded as markLocalChunk,
-    getPendingUploads, deleteUploadSession, UploadProgress,
-    initResumableUploads, getUploadSession
-} from "@/lib/resumableUpload";
-
-// Compressible types for intelligent decision making
-const COMPRESSIBLE_TYPES = [
-    'text/', 'application/json', 'application/javascript', 'application/x-javascript',
-    'application/xml', 'application/x-yaml', 'image/svg+xml', 'application/sql',
-    'application/graphql', 'application/ld+json'
-];
-
-type UploadStage = "idle" | "encrypting" | "uploading" | "success" | "resuming";
+type UploadStage = "idle" | "encrypting" | "uploading" | "success";
 type ProgressStep = "keys" | "metadata" | "transfer" | "done";
 
 export default function UploadPage() {
@@ -39,7 +25,7 @@ export default function UploadPage() {
     const [progress, setProgress] = useState(0);
     const [statusText, setStatusText] = useState("");
     const [isDragActive, setIsDragActive] = useState(false);
-    const [pendingUploads, setPendingUploads] = useState<UploadProgress[]>([]);
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     const [, setLocation] = useLocation();
     const { toast } = useToast();
@@ -48,20 +34,6 @@ export default function UploadPage() {
     const createVault = useCreateVault();
     const getChunkUrl = useGetChunkUploadUrl();
     const markUploaded = useMarkChunkUploaded();
-
-    // Initialize Resumable System
-    useEffect(() => {
-        const init = async () => {
-            const { pendingUploads } = await initResumableUploads();
-            setPendingUploads(pendingUploads);
-        };
-        init();
-
-        return () => {
-            // Cleanup active uploads if component unmounts?
-            // Actually no, we want them to persist for resume.
-        };
-    }, []);
 
     const truncateName = (name: string, maxLength: number = 20) => {
         if (name.length <= maxLength) return name;
@@ -76,32 +48,38 @@ export default function UploadPage() {
         return name.substring(0, maxLength - 3) + '...';
     };
 
-    const isCompressible = (file: File) => {
-        return COMPRESSIBLE_TYPES.some(t => file.type.startsWith(t)) ||
-            ['.ts', '.tsx', '.js', '.jsx', '.json', '.txt', '.md', '.css', '.html'].some(ext => file.name.endsWith(ext));
-    };
+    const handleFilesSelected = (newFiles: File[]) => {
+        setUploadError(null);
 
-    const handleResume = async (upload: UploadProgress) => {
-        // Logic to resume would go here. 
-        // For now, simpler to just clean up stale ones if user wants to start over.
-        // True resume requires re-selecting the file handle in browser (security restriction).
-        // Or we implement the File System Access API for persistent handles (advanced).
+        // Validate files
+        const config = getUploadConfig(newFiles);
+        if (!config.isValid) {
+            setUploadError(config.errorMessage || "Invalid files");
+            toast({
+                variant: "destructive",
+                title: "Upload Limit Exceeded",
+                description: config.errorMessage,
+            });
+            return;
+        }
 
-        // MVP: We detect them and offer to "Clear" to avoid clutter, 
-        // as re-selecting precise files matching ID is complex UI.
-        // Advanced: We could prompt user to "Select file [Name] to resume".
-
-        // For this iteration, we focus on NEW uploads being robust.
-        alert("To resume, please re-select the file matching: " + upload.fileName);
-    };
-
-    const clearPending = async (uploadId: string) => {
-        await deleteUploadSession(uploadId);
-        setPendingUploads(prev => prev.filter(p => p.uploadId !== uploadId));
+        setFiles(newFiles);
     };
 
     const handleUpload = async () => {
         if (files.length === 0) return;
+
+        // Final validation
+        const config = getUploadConfig(files);
+        if (!config.isValid) {
+            toast({
+                variant: "destructive",
+                title: "Upload Error",
+                description: config.errorMessage,
+            });
+            return;
+        }
+
         setStage("encrypting");
         setProgress(0);
         abortControllerRef.current = new AbortController();
@@ -110,21 +88,18 @@ export default function UploadPage() {
             // Step 1: Generate Keys
             setCurrentStep("keys");
             setStatusText("Generating military-grade AES-256 keys...");
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 300));
             const key = await generateKey();
 
             // Generate Split-Code
             const splitCode = generateSplitCode();
             setStatusText("Deriving PIN-protective wrapper...");
             const wrappedKey = await wrapFileKey(key, splitCode.pin);
-
-            // Export key for local persistence (resumability)
-            const exportedKey = await exportKey(key);
             setProgress(10);
 
-            // Step 2: Encrypt Metadata & Calculate Chunks
+            // Step 2: Encrypt Metadata
             setCurrentStep("metadata");
-            setStatusText("Analyzing files & encrypting metadata...");
+            setStatusText("Encrypting metadata...");
 
             const fileMetadata = files.map(f => ({
                 name: f.name,
@@ -136,28 +111,14 @@ export default function UploadPage() {
 
             const encryptedMetadata = await encryptMetadata(fileMetadata, key);
 
-            // Adaptive Chunking Calculation
-            const filesPayload = [];
-            const chunkConfigs: ChunkConfig[] = [];
-
-            for (let i = 0; i < files.length; i++) {
-                const f = files[i];
-                setStatusText(`Optimizing chunk size for ${truncateName(f.name)}...`);
-
-                // Use our new Adaptive System
-                const config = await getOptimalChunkConfig(f.size);
-                chunkConfigs.push(config);
-
-                const isSmallAndCompressible = isCompressible(f) && f.size < NO_CHUNK_THRESHOLD;
-
-                filesPayload.push({
-                    fileId: fileMetadata[i].fileId,
-                    chunks: config.estimatedChunks,
-                    size: f.size,
-                    isCompressed: isSmallAndCompressible,
-                    originalSize: f.size
-                });
-            }
+            // Prepare files payload - 1 chunk per file (no chunking)
+            const filesPayload = fileMetadata.map(fm => ({
+                fileId: fm.fileId,
+                chunks: 1,
+                size: fm.size,
+                isCompressed: false,
+                originalSize: fm.size
+            }));
             setProgress(20);
 
             // Step 3: Register Vault
@@ -170,124 +131,70 @@ export default function UploadPage() {
                 wrappedKey,
                 files: filesPayload
             });
-
-            // Initialize Resume Sessions
-            setStatusText("Initializing resilient upload sessions...");
-            const uploadIds: string[] = [];
-            for (let i = 0; i < files.length; i++) {
-                const f = files[i];
-                const id = await createUploadSession({
-                    vaultId: vault.id,
-                    fileId: filesPayload[i].fileId,
-                    fileName: f.name,
-                    fileSize: f.size,
-                    fileType: f.type,
-                    totalChunks: filesPayload[i].chunks,
-                    chunkSize: chunkConfigs[i].chunkSize,
-                    cryptoKeyExported: exportedKey,
-                    isCompressed: filesPayload[i].isCompressed,
-                    vaultConfig: {
-                        expiresIn: expiresIn[0],
-                        maxDownloads: maxDownloads[0],
-                        lookupId: splitCode.lookupId
-                    }
-                });
-                uploadIds.push(id);
-            }
             setProgress(30);
 
-            // Step 4: Upload Loop
+            // Step 4: Encrypt & Upload Each File (No Chunking - Single Blob)
             setStage("uploading");
             setCurrentStep("transfer");
 
-            const totalChunksAllFiles = filesPayload.reduce((acc, f) => acc + f.chunks, 0);
-            let globalChunkCount = 0;
-
-            // Worker for heavy lifting
-            const worker = new Worker(new URL('../encryption.worker.ts', import.meta.url), { type: 'module' });
-
-            const encryptWithWorker = (data: ArrayBuffer, key: CryptoKey, mode: 'encrypt' | 'compress_and_encrypt') => {
-                return new Promise<{ iv: Uint8Array, encryptedData: ArrayBuffer }>((resolve, reject) => {
-                    const id = Math.random();
-                    const handler = (e: MessageEvent) => {
-                        if (e.data.id === id) {
-                            worker.removeEventListener('message', handler);
-                            if (e.data.type === 'error') reject(e.data.error);
-                            else resolve(e.data);
-                        }
-                    };
-                    worker.addEventListener('message', handler);
-                    worker.postMessage({ type: mode, data, key, id }, [data]);
-                });
-            };
+            const totalFiles = files.length;
 
             for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const fileId = filesPayload[i].fileId;
-                const config = chunkConfigs[i];
-                const uploadId = uploadIds[i];
-                const displayName = truncateName(file.name);
-                const isCompressed = filesPayload[i].isCompressed;
-
-                const session = await getUploadSession(uploadId);
-                const uploadedSet = new Set(session?.uploadedChunks || []);
-
-                for (let chunkIndex = 0; chunkIndex < config.estimatedChunks; chunkIndex++) {
-                    // Check abort
-                    if (abortControllerRef.current.signal.aborted) throw new Error("Upload cancelled");
-
-                    // Resume Logic: Skip if already uploaded
-                    if (uploadedSet.has(chunkIndex)) {
-                        globalChunkCount++;
-                        // Update progress purely visual
-                        const perc = 30 + (globalChunkCount / totalChunksAllFiles) * 65;
-                        setProgress(perc);
-                        continue;
-                    }
-
-                    // Prepare Chunk
-                    const start = chunkIndex * config.chunkSize;
-                    const end = Math.min(start + config.chunkSize, file.size);
-                    const chunkBlob = file.slice(start, end);
-                    const chunkBuffer = await chunkBlob.arrayBuffer();
-
-                    // Encrypt
-                    const chunkLabel = config.estimatedChunks > 1 ? ` (part ${chunkIndex + 1}/${config.estimatedChunks})` : "";
-                    setStatusText(`Encrypting ${displayName}${chunkLabel}...`);
-
-                    const mode = (isCompressed && config.estimatedChunks === 1) ? 'compress_and_encrypt' : 'encrypt';
-                    const { iv, encryptedData } = await encryptWithWorker(chunkBuffer, key, mode);
-
-                    // Combine IV + Data
-                    const combined = new Uint8Array(iv.byteLength + encryptedData.byteLength);
-                    combined.set(iv, 0);
-                    combined.set(new Uint8Array(encryptedData), iv.byteLength);
-
-                    // Upload
-                    setStatusText(`Sending ${displayName}${chunkLabel}...`);
-                    const { uploadUrl, storagePath } = await getChunkUrl.mutateAsync({
-                        vaultId: vault.id,
-                        fileId,
-                        chunkIndex,
-                        size: combined.byteLength
-                    });
-
-                    await fetch(uploadUrl, { method: 'PUT', body: combined });
-
-                    // Persistence Updates
-                    await markUploaded.mutateAsync({ vaultId: vault.id, fileId, chunkIndex, storagePath });
-                    await markLocalChunk(uploadId, chunkIndex);
-
-                    globalChunkCount++;
-                    const perc = 30 + (globalChunkCount / totalChunksAllFiles) * 65;
-                    setProgress(perc);
+                // Check abort
+                if (abortControllerRef.current.signal.aborted) {
+                    throw new Error("Upload cancelled");
                 }
 
-                // File Complete - cleanup local session
-                await deleteUploadSession(uploadId);
+                const file = files[i];
+                const fileId = filesPayload[i].fileId;
+                const displayName = truncateName(file.name);
+
+                // Read entire file
+                setStatusText(`Reading ${displayName}...`);
+                const fileBuffer = await file.arrayBuffer();
+
+                // Encrypt entire file
+                setStatusText(`Encrypting ${displayName}...`);
+                const { iv, encryptedData } = await encryptData(fileBuffer, key);
+
+                // Combine IV + encrypted data
+                const combined = new Uint8Array(iv.byteLength + encryptedData.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encryptedData), iv.byteLength);
+
+                // Get upload URL
+                setStatusText(`Uploading ${displayName}...`);
+                const { uploadUrl, storagePath } = await getChunkUrl.mutateAsync({
+                    vaultId: vault.id,
+                    fileId,
+                    chunkIndex: 0,
+                    size: combined.byteLength
+                });
+
+                // Upload to Supabase
+                const response = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    body: combined,
+                    signal: abortControllerRef.current.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed for ${file.name}: ${response.statusText}`);
+                }
+
+                // Mark as uploaded
+                await markUploaded.mutateAsync({
+                    vaultId: vault.id,
+                    fileId,
+                    chunkIndex: 0,
+                    storagePath
+                });
+
+                // Update progress
+                const perc = 30 + ((i + 1) / totalFiles) * 65;
+                setProgress(perc);
             }
 
-            worker.terminate();
             setCurrentStep("done");
             setProgress(100);
             setStatusText("Finalizing secure vault...");
@@ -311,6 +218,9 @@ export default function UploadPage() {
             }
         }
     };
+
+    // Calculate total size for display
+    const totalSize = files.reduce((acc, f) => acc + f.size, 0);
 
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-zinc-950">
@@ -347,40 +257,6 @@ export default function UploadPage() {
 
             {/* Main Content */}
             <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-6 py-12">
-
-                {/* Pending Uploads Alert */}
-                {pendingUploads.length > 0 && stage === 'idle' && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mb-8 p-4 bg-zinc-900/80 border border-zinc-800 rounded-xl backdrop-blur-md"
-                    >
-                        <div className="flex items-start gap-4">
-                            <div className="p-2 bg-amber-500/20 rounded-lg">
-                                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-sm mb-1">Interrupted Uploads Detected</h3>
-                                <p className="text-xs text-zinc-400 mb-3">
-                                    We found {pendingUploads.length} incomplete upload sessions from a previous visit.
-                                </p>
-                                <div className="space-y-2">
-                                    {pendingUploads.map(p => (
-                                        <div key={p.uploadId} className="flex items-center justify-between text-xs bg-zinc-950 p-2 rounded border border-zinc-800">
-                                            <span className="truncate max-w-[200px]">{p.fileName}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-zinc-500">{p.progress}%</span>
-                                                <button onClick={() => clearPending(p.uploadId)} className="text-zinc-500 hover:text-red-400">
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
 
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -431,20 +307,25 @@ export default function UploadPage() {
 
                     <div className="space-y-6">
                         <FileDropzone
-                            onFilesSelected={(newFiles) => {
-                                const oversized = newFiles.some(f => f.size > 2 * 1024 * 1024 * 1024); // 2GB warning
-                                if (oversized) {
-                                    toast({
-                                        variant: "destructive",
-                                        title: "Large File Warning",
-                                        description: "Files over 2GB may take longer to encrypt.",
-                                    });
-                                }
-                                setFiles(newFiles);
-                            }}
+                            onFilesSelected={handleFilesSelected}
                             disabled={stage !== "idle"}
                             onDragStateChange={setIsDragActive}
                         />
+
+                        {/* Error Display */}
+                        {uploadError && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3"
+                            >
+                                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm text-red-400">{uploadError}</p>
+                                    <p className="text-xs text-zinc-500 mt-1">Maximum file size: 500 MB</p>
+                                </div>
+                            </motion.div>
+                        )}
 
                         <div className="flex flex-wrap gap-2 justify-center">
                             <div className="px-3 py-1.5 rounded-full bg-zinc-800 border border-zinc-700 text-[10px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
@@ -452,10 +333,21 @@ export default function UploadPage() {
                                 AES-256-GCM
                             </div>
                             <div className="px-3 py-1.5 rounded-full bg-zinc-800 border border-zinc-700 text-[10px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                                <Zap className="w-3 h-3 text-amber-500" />
-                                Adaptive Chunking
+                                <Lock className="w-3 h-3 text-amber-500" />
+                                Lossless Transfer
+                            </div>
+                            <div className="px-3 py-1.5 rounded-full bg-zinc-800 border border-zinc-700 text-[10px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                <Zap className="w-3 h-3 text-blue-500" />
+                                Max 500MB
                             </div>
                         </div>
+
+                        {/* Size Display */}
+                        {files.length > 0 && (
+                            <div className="text-center text-sm text-zinc-400">
+                                {files.length} file{files.length > 1 ? 's' : ''} selected • {formatBytes(totalSize)} total
+                            </div>
+                        )}
                     </div>
 
                     {/* Settings */}
@@ -501,8 +393,8 @@ export default function UploadPage() {
                                 <div
                                     onClick={() => setMaxDownloads(maxDownloads[0] === 1 ? [5] : [1])}
                                     className={`text-xs cursor-pointer select-none transition-colors text-center py-2 rounded border ${maxDownloads[0] === 1
-                                            ? "bg-red-500/10 border-red-500/20 text-red-500"
-                                            : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white"
+                                        ? "bg-red-500/10 border-red-500/20 text-red-500"
+                                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white"
                                         }`}
                                 >
                                     {maxDownloads[0] === 1 ? "🔥 Burn-on-read Active (Auto-delete after 1 view)" : "Click to enable Burn-on-read"}
@@ -512,8 +404,8 @@ export default function UploadPage() {
 
                         <Button
                             onClick={handleUpload}
-                            disabled={files.length === 0 || stage !== "idle"}
-                            className="w-full h-14 text-base font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            disabled={files.length === 0 || stage !== "idle" || !!uploadError}
+                            className="w-full h-14 text-base font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {stage !== "idle" ? "Processing..." : (
                                 <>
@@ -534,7 +426,7 @@ export default function UploadPage() {
                 >
                     <p className="text-xs text-zinc-500">
                         Zero-Knowledge Architecture: Encryption happens entirely in your browser.
-                        We never do not see your files, keys, or data.
+                        We never see your files, keys, or data.
                     </p>
                 </motion.div>
             </main>

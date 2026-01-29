@@ -17,8 +17,8 @@ COPY . .
 # This compiles the React frontend and the Node backend
 RUN npm run build
 
-# The app listens on port 5000 by default
-EXPOSE 5000
+# The app listens on port 5001 by default
+EXPOSE 5001
 
 # Set production environment
 ENV NODE_ENV=production

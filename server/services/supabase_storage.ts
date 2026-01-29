@@ -55,9 +55,10 @@ export class SupabaseStorageService {
     }
 
     /**
-     * Construct a storage path for a chunk
+     * Construct a storage path for a file (single encrypted blob)
+     * Uses chunkIndex 0 for all files (no chunking)
      */
-    getStoragePath(vaultId: string, fileId: string, chunkIndex: number): string {
+    getStoragePath(vaultId: string, fileId: string, chunkIndex: number = 0): string {
         return `${vaultId}/${fileId}/${chunkIndex}.enc`;
     }
 
