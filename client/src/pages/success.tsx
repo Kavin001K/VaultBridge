@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Sparkles, AlertTriangle, Copy, Check, Key,
@@ -50,14 +50,45 @@ function CountdownTimer({ expiresAt }: { expiresAt: string }) {
 }
 
 export default function Success() {
+  const [, setLocation] = useLocation();
   const [, params] = useRoute("/success/:id");
   const [splitCode, setSplitCode] = useState("");
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'link' | 'email' | 'burn'>('link');
   const [email, setEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isBurning, setIsBurning] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleBurn = async () => {
+    if (!params?.id) return;
+
+    setIsBurning(true);
+    try {
+      const res = await fetch(`/api/vaults/${params.id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || "Failed to delete");
+
+      toast({
+        title: "Vault Destroyed",
+        description: "The vault has been securely erased.",
+        className: "bg-emerald-950/50 border-emerald-500 text-emerald-400",
+      });
+
+      // Give user a moment to see the success message
+      setTimeout(() => setLocation("/"), 1500);
+
+    } catch (error) {
+      toast({
+        title: "Deletion Failed",
+        description: "Could not destroy the vault. It may have already been deleted.",
+        variant: "destructive"
+      });
+      setIsBurning(false);
+    }
+  };
 
   const vaultId = params?.id || "";
   const { data: vault } = useGetVault(vaultId);
@@ -427,9 +458,16 @@ export default function Success() {
                         size="lg"
                         variant="destructive"
                         className="w-full h-14 text-base bg-rose-600 hover:bg-rose-700 font-bold tracking-wider"
-                        onClick={() => toast({ title: "Simulation Mode", description: "Backend integration pending for deletion." })}
+                        onClick={handleBurn}
+                        disabled={isBurning}
                       >
-                        CONFIRM DESTRUCTION
+                        {isBurning ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            DESTROYING...
+                          </>
+                        ) : "CONFIRM DESTRUCTION"}
+
                       </Button>
                     </motion.div>
                   )}
