@@ -161,6 +161,24 @@ export async function registerRoutes(
     }
   });
 
+  // Burn/Delete Vault
+  app.delete('/api/vaults/:id', async (req, res) => {
+    try {
+      const id = req.params.id;
+      const vault = await storage.getVault(id);
+
+      if (!vault) {
+        return res.status(404).json({ message: "Vault not found" });
+      }
+
+      await storage.deleteVault(id);
+      res.json({ success: true, message: "Vault burned successfully" });
+    } catch (err) {
+      console.error("Delete failed:", err);
+      res.status(500).json({ message: "Failed to delete vault" });
+    }
+  });
+
   // =============================================================================
   // SPLIT-CODE ZERO-KNOWLEDGE LOOKUP (Air-Gapped Transfer)
   // =============================================================================
