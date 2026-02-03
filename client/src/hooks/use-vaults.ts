@@ -191,3 +191,48 @@ export function useCodeLookup() {
     }
   });
 }
+
+// Update clipboard content
+export function useUpdateClipboard() {
+  return useMutation({
+    mutationFn: async ({
+      lookupId,
+      encryptedClipboardText,
+      wrappedKey
+    }: {
+      lookupId: string,
+      encryptedClipboardText: string,
+      wrappedKey: string
+    }) => {
+      const url = buildUrl(api.vaults.updateClipboard.path, { lookupId });
+      const res = await fetch(url, {
+        method: api.vaults.updateClipboard.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ encryptedClipboardText, wrappedKey })
+      });
+
+      if (!res.ok) throw new Error("Failed to update clipboard");
+      return api.vaults.updateClipboard.responses[200].parse(await res.json());
+    }
+  });
+}
+
+// Sync clipboard content (Poll)
+export function useClipboardSync(lookupId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [api.vaults.getClipboard.path, lookupId],
+    queryFn: async () => {
+      const url = buildUrl(api.vaults.getClipboard.path, { lookupId });
+      const res = await fetch(url);
+
+      if (res.status === 404) return null;
+      if (res.status === 410) throw new Error("Vault expired");
+      if (!res.ok) throw new Error("Sync failed");
+
+      return api.vaults.getClipboard.responses[200].parse(await res.json());
+    },
+    enabled: enabled && !!lookupId,
+    refetchInterval: 3000, // Poll every 3s
+    retry: false
+  });
+}

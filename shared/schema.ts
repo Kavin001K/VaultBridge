@@ -15,6 +15,7 @@ export const vaults = pgTable("vaults", {
   maxDownloads: integer("max_downloads").default(1).notNull(),
   downloadCount: integer("download_count").default(0).notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),
+  encryptedClipboardText: text("encrypted_clipboard_text"), // Optional encrypted clipboard text
 });
 
 export const files = pgTable("files", {
@@ -34,6 +35,13 @@ export const chunks = pgTable("chunks", {
   storagePath: text("storage_path"), // Path in Object Storage
   size: integer("size").notNull(),
   isUploaded: boolean("is_uploaded").default(false).notNull(),
+});
+
+export const emailUsage = pgTable("email_usage", {
+  date: text("date").primaryKey(), // YYYY-MM-DD
+  resendCount: integer("resend_count").default(0).notNull(),
+  brevoCount: integer("brevo_count").default(0).notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
 // === SCHEMAS ===
@@ -71,6 +79,7 @@ export const createVaultRequestSchema = z.object({
     isCompressed: z.boolean().default(false),
     originalSize: z.number().optional(),
   })),
+  encryptedClipboardText: z.string().optional(), // Encrypted clipboard text
 });
 
 export type CreateVaultRequest = z.infer<typeof createVaultRequestSchema>;
@@ -83,4 +92,5 @@ export type VaultResponse = Vault & {
     isCompressed: boolean;
     originalSize: number | null;
   }[];
+  encryptedClipboardText?: string; // Optional encrypted clipboard text
 };

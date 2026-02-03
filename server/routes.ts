@@ -209,6 +209,7 @@ export async function registerRoutes(
       id: vault.id,
       wrappedKey: vault.wrappedKey,
       encryptedMetadata: vault.encryptedMetadata,
+      encryptedClipboardText: vault.encryptedClipboardText, // Include clipboard text if present
       expiresAt: vault.expiresAt.toISOString(),
       maxDownloads: vault.maxDownloads,
       downloadCount: vault.downloadCount,
@@ -218,6 +219,69 @@ export async function registerRoutes(
         totalSize: f.totalSize,
       })),
     });
+  });
+
+  // Update clipboard content (Live Sync)
+  app.put(api.vaults.updateClipboard.path, async (req, res) => {
+    try {
+      const lookupId = req.params.lookupId as string;
+      const { encryptedClipboardText, wrappedKey } = api.vaults.updateClipboard.input.parse(req.body);
+
+      const vault = await storage.getVaultByLookupId(lookupId);
+
+      if (!vault) {
+        return res.status(404).json({ message: "Vault not found" });
+      }
+
+      // Check if expired
+      if (new Date() > vault.expiresAt) {
+        return res.status(410).json({ message: "Vault expired" });
+      }
+
+      // Security check: Ensure the client providing the update actually has the correct wrappedKey
+      // This prevents someone who just guessed the 3-digit lookupId from overwriting the clipboard
+      // (The wrappedKey acts as a "session token" here since it requires the PIN to be useful, 
+      // but simplistic verification is just matching what's in DB)
+      if (vault.wrappedKey !== wrappedKey) {
+        return res.status(403).json({ message: "Invalid access verification" });
+      }
+
+      const updatedAt = await storage.updateClipboard(lookupId, encryptedClipboardText);
+
+      res.json({
+        success: true,
+        updatedAt: updatedAt.toISOString()
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+      console.error("Clipboard update failed:", err);
+      res.status(500).json({ message: "Failed to update clipboard" });
+    }
+  });
+
+  // Get clipboard content (Live Poll)
+  app.get(api.vaults.getClipboard.path, async (req, res) => {
+    try {
+      const lookupId = req.params.lookupId as string;
+      const vault = await storage.getVaultByLookupId(lookupId);
+
+      if (!vault) {
+        return res.status(404).json({ message: "Vault not found" });
+      }
+      if (new Date() > vault.expiresAt) {
+        return res.status(410).json({ message: "Vault expired" });
+      }
+
+      res.json({
+        encryptedClipboardText: vault.encryptedClipboardText || undefined,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Clipboard poll failed:", err);
+      res.status(500).json({ message: "Failed to get clipboard" });
+    }
   });
 
   // =============================================================================

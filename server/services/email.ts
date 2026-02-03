@@ -427,6 +427,68 @@ export interface SendDirectEmailInput {
 // VAULT ACCESS EMAIL
 // ============================================
 
+// ... imports
+import { getEmailProvider, incrementEmailUsage } from "./emailQuota";
+
+// ... existing code ...
+
+// ============================================
+// BREVO (BRAVO) API CLIENT
+// ============================================
+
+interface BrevoEmailInput {
+  to: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+  senderName?: string;
+  replyTo?: string;
+  attachments?: { name: string; content: string }[]; // Base64 content
+}
+
+async function sendViaBrevo(input: BrevoEmailInput): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const apiKey = process.env.BRAVO_API_KEY;
+  if (!apiKey) return { success: false, error: "Brevo API Key missing" };
+
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": apiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: {
+          name: input.senderName || "VaultBridge",
+          email: process.env.SMTP_FROM_EMAIL || "delivery@acedigital.space" // Extract email from "Name <email>" if needed, but Brevo prefers strict struct. 
+          // Note: SMTP_FROM usually is "Name <email>". Let's handle clean extraction or fallback.
+        },
+        to: [{ email: input.to }],
+        replyTo: input.replyTo ? { email: input.replyTo } : undefined,
+        subject: input.subject,
+        htmlContent: input.htmlContent,
+        textContent: input.textContent,
+        attachment: input.attachments // Brevo expects {name, content(base64)}
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      return { success: false, error: JSON.stringify(err) };
+    }
+
+    const data = await response.json();
+    return { success: true, messageId: data.messageId };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Unknown Brevo error" };
+  }
+}
+
+// ============================================
+// VAULT ACCESS EMAIL
+// ============================================
+
 export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEmailResult> {
   try {
     const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
@@ -437,6 +499,12 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(input.to)) {
       return { success: false, error: "Invalid email address." };
+    }
+
+    // Determine Provider
+    const provider = await getEmailProvider();
+    if (!provider) {
+      return { success: false, error: "Daily email limit reached. Please try again tomorrow." };
     }
 
     const baseUrl = process.env.APP_URL || "https://vaultbridge.io";
@@ -452,10 +520,6 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="dark">
-  <title>Secure Files Shared with You</title>
   <style>${getEmailStyles()}</style>
 </head>
 <body>
@@ -478,34 +542,9 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
         <a href="${accessLink}" class="btn">🔓 Access Your Files</a>
       </div>
       
-      <div class="feature-list">
-        <div class="feature-item">
-          <span class="feature-icon">🛡️</span> End-to-End Encrypted
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🚫</span> No Logs Kept
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">💨</span> Auto-Deletes
-        </div>
-      </div>
-      
       <div class="warning-box">
-        <div class="warning-title">
-          ⏱️ Time Sensitive
-        </div>
-        <div class="warning-text">
-          This vault expires on <strong>${expiryFormatted}</strong>. 
-          Files will be permanently and irreversibly deleted after expiration or download limit is reached.
-        </div>
-      </div>
-      
-      <div class="security-badge">
-        <div class="security-title">🛡️ Security Notice</div>
-        <div class="security-text">
-          This email contains NO file attachments. Your files are stored encrypted on our servers 
-          and can only be decrypted with your access code in your browser.
-        </div>
+        <div class="warning-title">⏱️ Time Sensitive</div>
+        <div class="warning-text">Expires on <strong>${expiryFormatted}</strong>.</div>
       </div>
       
       ${getEmailFooter()}
@@ -515,41 +554,58 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
 </html>
     `;
 
-    const { data, error } = await resend.emails.send({
-      from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-      to: [input.to],
-      replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
-      subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
-      text: `
+    const textContent = `
 VAULTBRIDGE - Secure File Transfer
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${input.senderName || "Someone"} shared encrypted files with you.
-
 ACCESS CODE: ${displayCode}
 ACCESS LINK: ${accessLink}
+Expires: ${expiryFormatted}
+    `;
 
-⏱️ Expires: ${expiryFormatted}
+    // SEND LOGIC
+    let result: SendEmailResult;
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ SECURITY NOTICE
-This email contains NO attachments.
-Files are end-to-end encrypted.
+    if (provider === "RESEND") {
+      const { data, error } = await resend.emails.send({
+        from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
+        to: [input.to],
+        replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
+        subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
+        text: textContent,
+        html,
+      });
 
-Need help? Reply to this email.
-      `,
-      html,
-    });
+      if (error) {
+        log(`Resend Error: ${error.message}`, "email");
+        // Failover to Brevo immediately if Resend fails? 
+        // The prompt says switch on LIMIT. But error handling is good.
+        // Let's strictly follow quota logic first to avoid double counting if error is not quota related.
+        return { success: false, error: error.message };
+      }
+      result = { success: true, messageId: data?.id };
+    } else {
+      // BREVO
+      const res = await sendViaBrevo({
+        to: input.to,
+        subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
+        htmlContent: html,
+        textContent: textContent,
+        senderName: "VaultBridge",
+        replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com'
+      });
 
-    if (error) {
-      log(`Resend Error (Vault): ${error.message}`, "email");
-      return { success: false, error: error.message };
+      if (!res.success) {
+        return { success: false, error: res.error };
+      }
+      result = { success: true, messageId: res.messageId };
     }
 
+    // Update Quota and Limit
+    await incrementEmailUsage(provider);
     emailsSentPerVault.set(input.vaultId, sentCount + 1);
-    log(`Vault email sent to ${input.to} for code ${displayCode}`, "email");
+    log(`Vault email sent to ${input.to} via ${provider}`, "email");
 
-    return { success: true, messageId: data?.id };
+    return result;
+
   } catch (error) {
     log(`Failed to send vault email: ${error}`, "email");
     return { success: false, error: error instanceof Error ? error.message : "Failed to send email" };
@@ -564,7 +620,13 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
   try {
     const { to, subject, text, files } = input;
 
-    // Calculate total size
+    // Determine Provider
+    const provider = await getEmailProvider();
+    if (!provider) {
+      log(`Direct email blocked: Quota exceeded`, "email");
+      return false;
+    }
+
     const totalSize = files.reduce((acc, f) => acc + f.content.length, 0);
     const formatSize = (bytes: number) => {
       if (bytes < 1024) return `${bytes} B`;
@@ -584,10 +646,6 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="dark">
-  <title>Files Received via VaultBridge</title>
   <style>${getEmailStyles()}</style>
 </head>
 <body>
@@ -596,43 +654,13 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       ${getEmailHeader()}
       
       <h1 class="title">📬 Files Delivered to You</h1>
-      <p class="subtitle">
-        You've received files through VaultBridge's Zero-Knowledge Relay. 
-        Files flow directly through server memory and are never stored.
-      </p>
+      <p class="subtitle">Zero-Knowledge Relay Transfer</p>
       
-      ${text ? `
-      <div style="background: rgba(255,255,255,0.02); border-radius: 12px; padding: 20px; margin: 24px 0; border-left: 3px solid #10b981;">
-        <div style="font-size: 12px; color: #71717a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Message from sender</div>
-        <div style="color: #e4e4e7; font-size: 15px; line-height: 1.6;">${text}</div>
-      </div>
-      ` : ''}
+      ${text ? `<div style="background:rgba(255,255,255,0.05);padding:15px;border-radius:8px;margin:20px 0;">${text}</div>` : ''}
       
       <div class="attachment-list">
-        <div class="attachment-header">
-          📎 ${files.length} Attachment${files.length > 1 ? 's' : ''} (${formatSize(totalSize)} total)
-        </div>
+        <div class="attachment-header">📎 ${files.length} Attachments</div>
         ${attachmentListHtml}
-      </div>
-      
-      <div class="feature-list">
-        <div class="feature-item">
-          <span class="feature-icon">⚡</span> Direct Relay
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🚫</span> Zero Storage
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🔒</span> Secure Transit
-        </div>
-      </div>
-      
-      <div class="security-badge">
-        <div class="security-title">🛡️ Zero-Knowledge Relay</div>
-        <div class="security-text">
-          These files were transmitted directly from the sender's browser through our secure memory relay.
-          VaultBridge did not store, log, or retain any file data. This is completely ephemeral transfer.
-        </div>
       </div>
       
       ${getEmailFooter()}
@@ -642,39 +670,54 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
 </html>
     `;
 
-    const data = await resend.emails.send({
-      from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-      to: [to],
-      replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
-      subject: `📬 ${subject}`,
-      text: `
-VAULTBRIDGE - Zero-Knowledge Relay
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-You received ${files.length} file(s) via direct relay.
-
-${text ? `MESSAGE:\n${text}\n` : ''}
-
+    const textPayload = `
+VAULTBRIDGE - Direct Relay
+You received ${files.length} file(s).
+${text ? `\nMESSAGE: ${text}\n` : ''}
 ATTACHMENTS:
-${files.map(f => `• ${f.filename} (${formatSize(f.content.length)})`).join('\n')}
+${files.map(f => `• ${f.filename}`).join('\n')}
+    `;
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ SECURITY NOTICE
-Files were relayed through secure memory.
-VaultBridge never stored these files.
+    if (provider === "RESEND") {
+      const data = await resend.emails.send({
+        from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
+        to: [to],
+        replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
+        subject: `📬 ${subject}`,
+        text: textPayload,
+        html,
+        attachments: files,
+      });
 
-Need help? Reply to this email.
-      `,
-      html,
-      attachments: files,
-    });
+      if (data.error) {
+        log(`Resend Error (Direct): ${data.error.message}`, "email");
+        return false;
+      }
+    } else {
+      // BREVO
+      // Prepare attachments for Brevo (Base64)
+      const brevoAttachments = files.map(f => ({
+        name: f.filename,
+        content: f.content.toString('base64')
+      }));
 
-    if (data.error) {
-      log(`Resend Error (Direct): ${data.error.message}`, "email");
-      return false;
+      const res = await sendViaBrevo({
+        to,
+        subject: `📬 ${subject}`,
+        htmlContent: html,
+        textContent: textPayload,
+        senderName: "VaultBridge",
+        attachments: brevoAttachments
+      });
+
+      if (!res.success) {
+        log(`Brevo Error (Direct): ${res.error}`, "email");
+        return false;
+      }
     }
 
-    log(`Direct email sent to ${to} with ${files.length} attachment(s)`, "email");
+    await incrementEmailUsage(provider);
+    log(`Direct email sent to ${to} via ${provider}`, "email");
     return true;
   } catch (error) {
     log(`Failed to send direct email: ${error}`, "email");

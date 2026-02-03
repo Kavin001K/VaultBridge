@@ -18,7 +18,6 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 const HowItWorks = lazy(() => import("@/pages/how-it-works"));
 const Terms = lazy(() => import("@/pages/terms"));
 const Privacy = lazy(() => import("@/pages/privacy"));
-const LivePage = lazy(() => import("@/pages/live"));
 
 function LoadingFallback() {
   return (
@@ -42,8 +41,6 @@ function Router() {
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
-      <Route path="/live" component={LivePage} />
-      <Route path="/live/:code" component={LivePage} />
       <Route component={NotFound} />
     </Switch>
   );

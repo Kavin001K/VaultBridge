@@ -1,7 +1,8 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, File as FileIcon, X, AlertCircle, FolderArchive, Loader2 } from "lucide-react";
+import { UploadCloud, File as FileIcon, X, AlertCircle, FolderArchive, Loader2, CheckCircle2, CloudOff, HardDrive } from "lucide-react";
 import { zip, type Zippable } from "fflate";
+import { saveFilesToStorage, loadFilesFromStorage, clearStoredFiles } from "@/lib/fileStorage";
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -12,6 +13,67 @@ interface FileDropzoneProps {
 export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [persistenceStatus, setPersistenceStatus] = useState<'idle' | 'saving' | 'saved' | 'restored' | 'error'>('idle');
+  const isInitialMount = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load persisted files on mount
+  useEffect(() => {
+    const loadPersistedFiles = async () => {
+      try {
+        const storedFiles = await loadFilesFromStorage();
+        if (storedFiles.length > 0) {
+          setSelectedFiles(storedFiles);
+          onFilesSelected(storedFiles);
+          setPersistenceStatus('restored');
+
+          // Clear the 'restored' status after 3 seconds
+          setTimeout(() => setPersistenceStatus('idle'), 3000);
+        }
+      } catch (error) {
+        console.warn('[FileDropzone] Failed to load persisted files:', error);
+      }
+    };
+
+    loadPersistedFiles();
+  }, []); // Empty deps - only run on mount
+
+  // Save files to IndexedDB when they change (debounced)
+  useEffect(() => {
+    // Skip initial mount to avoid clearing storage
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce save to avoid excessive writes
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setPersistenceStatus('saving');
+        await saveFilesToStorage(selectedFiles);
+        setPersistenceStatus(selectedFiles.length > 0 ? 'saved' : 'idle');
+
+        // Auto-clear 'saved' status after 2 seconds
+        if (selectedFiles.length > 0) {
+          setTimeout(() => setPersistenceStatus('idle'), 2000);
+        }
+      } catch (error) {
+        console.warn('[FileDropzone] Failed to persist files:', error);
+        setPersistenceStatus('error');
+      }
+    }, 500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [selectedFiles]);
 
   // Notify parent of drag state changes
   useEffect(() => {
@@ -193,13 +255,103 @@ export function FileDropzone({ onFilesSelected, disabled, onDragStateChange }: F
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="space-y-2"
+            className="space-y-3"
           >
-            <div className="flex justify-between items-center text-xs uppercase tracking-wider font-mono text-muted-foreground mb-2">
-              <span>Selected Files ({selectedFiles.length})</span>
-              <span>{(totalSize / (1024 * 1024)).toFixed(2)} MB Total</span>
+            {/* Header Row */}
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-xs uppercase tracking-wider font-mono text-muted-foreground">
+                  Selected Files ({selectedFiles.length})
+                </span>
+
+                {/* Persistence Status Indicator */}
+                <AnimatePresence mode="wait">
+                  {persistenceStatus === 'restored' && (
+                    <motion.div
+                      key="restored"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20"
+                    >
+                      <HardDrive className="w-3 h-3 text-blue-400" />
+                      <span className="text-[10px] font-mono text-blue-400">Restored</span>
+                    </motion.div>
+                  )}
+                  {persistenceStatus === 'saving' && (
+                    <motion.div
+                      key="saving"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20"
+                    >
+                      <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                      <span className="text-[10px] font-mono text-amber-400">Saving...</span>
+                    </motion.div>
+                  )}
+                  {persistenceStatus === 'saved' && (
+                    <motion.div
+                      key="saved"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20"
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span className="text-[10px] font-mono text-emerald-400">Saved</span>
+                    </motion.div>
+                  )}
+                  {persistenceStatus === 'error' && (
+                    <motion.div
+                      key="error"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20"
+                    >
+                      <CloudOff className="w-3 h-3 text-red-400" />
+                      <span className="text-[10px] font-mono text-red-400">Error</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-muted-foreground">
+                  {(totalSize / (1024 * 1024)).toFixed(2)} MB
+                </span>
+                {!disabled && selectedFiles.length > 1 && (
+                  <button
+                    onClick={async () => {
+                      setSelectedFiles([]);
+                      onFilesSelected([]);
+                      await clearStoredFiles();
+                    }}
+                    className="text-[10px] font-mono uppercase tracking-wider text-red-400/70 hover:text-red-400 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
 
+            {/* Info Banner for Restored Files */}
+            {persistenceStatus === 'restored' && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-center gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10"
+              >
+                <HardDrive className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <p className="text-xs text-blue-300">
+                  Files restored from your last session. Ready to encrypt!
+                </p>
+              </motion.div>
+            )}
+
+            {/* File List */}
             {selectedFiles.map((file, idx) => (
               <motion.div
                 key={`${file.name}-${idx}`}

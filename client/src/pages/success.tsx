@@ -4,13 +4,41 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Sparkles, AlertTriangle, Copy, Check, Key,
   Share2, Mail, Trash2, Smartphone, Monitor, Shield, ExternalLink, Loader2,
-  Clock, Download, HardDrive
+  Clock, Download, HardDrive, Timer, Zap
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetVault } from "@/hooks/use-vaults";
 import { useToast } from "@/hooks/use-toast";
+
+// SVG Filter for Heat Distortion
+const BurnFilter = () => (
+  <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+    <defs>
+      <filter id="heat-wave">
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.01"
+          numOctaves="3"
+          result="noise"
+        >
+          <animate
+            attributeName="baseFrequency"
+            dur="2s"
+            values="0.01;0.05;0.2"
+            repeatCount="1"
+          />
+        </feTurbulence>
+        <feDisplacementMap
+          in="SourceGraphic"
+          in2="noise"
+          scale="20"
+        />
+      </filter>
+    </defs>
+  </svg>
+);
 
 function CountdownTimer({ expiresAt }: { expiresAt: string }) {
   const [timeLeft, setTimeLeft] = useState<{ h: number, m: number, s: number } | null>(null);
@@ -57,14 +85,16 @@ export default function Success() {
   const [activeTab, setActiveTab] = useState<'link' | 'email' | 'burn'>('link');
   const [email, setEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [isBurning, setIsBurning] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isBurned, setIsBurned] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [uploadStats, setUploadStats] = useState<{ time: number, speed: number } | null>(null);
 
   const handleBurn = async () => {
     if (!params?.id) return;
 
-    setIsBurning(true);
+    setIsDeleting(true);
     try {
       const res = await fetch(`/api/vaults/${params.id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -72,13 +102,16 @@ export default function Success() {
       if (!res.ok) throw new Error(data.message || "Failed to delete");
 
       toast({
-        title: "Vault Destroyed",
-        description: "The vault has been securely erased.",
-        className: "bg-emerald-950/50 border-emerald-500 text-emerald-400",
+        title: "Initiating Self-Destruct",
+        description: "Protocol activated. Vaporizing data...",
+        className: "bg-rose-950/50 border-rose-500 text-rose-400 font-mono",
       });
 
-      // Give user a moment to see the success message
-      setTimeout(() => setLocation("/"), 1500);
+      // Trigger Animation
+      setIsBurned(true);
+
+      // Redirect after animation
+      setTimeout(() => setLocation("/"), 2500);
 
     } catch (error) {
       toast({
@@ -86,7 +119,7 @@ export default function Success() {
         description: "Could not destroy the vault. It may have already been deleted.",
         variant: "destructive"
       });
-      setIsBurning(false);
+      setIsDeleting(false);
     }
   };
 
@@ -99,9 +132,26 @@ export default function Success() {
     if (codeMatch) {
       setSplitCode(codeMatch[1]);
     }
+
+    // Parse Stats
+    const params = new URLSearchParams(hash.replace("#", "?")); // Hacky but works for hash params styled as queries
+    const time = params.get("time");
+    const speed = params.get("speed");
+
+    if (time && speed) {
+      setUploadStats({
+        time: parseInt(time),
+        speed: parseInt(speed)
+      });
+    }
   }, []);
 
-  const shareLink = `${window.location.origin}/v/${vaultId}#key=${vault?.wrappedKey || ''}`;
+  // Share Link logic
+  // User Requested: "give only the link to pave for entering the pin"
+  // So we just link to /access. The user must communicate the PIN separately (or we provide it).
+  // The "Split Code" (e.g. 123-456) IS the PIN + Lookup.
+  // So we can just give them the link to the site/access.
+  const shareLink = `${window.location.origin}/access`;
 
   const handleCopy = async (text: string, type: 'link' | 'code') => {
     await navigator.clipboard.writeText(text);
@@ -114,7 +164,7 @@ export default function Success() {
     }
     toast({
       title: "Copied to clipboard",
-      description: type === 'link' ? "Secure link ready to share." : "Access code ready to share.",
+      description: type === 'link' ? "Access link ready to share." : "Access code ready to share.",
     });
   };
 
@@ -153,10 +203,11 @@ export default function Success() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col bg-background text-foreground selection:bg-primary/30">
+    <div className={`min-h-screen relative overflow-hidden flex flex-col transition-colors duration-1000 ${isBurned ? 'bg-black' : 'bg-background'} text-foreground selection:bg-primary/30`}>
+      <BurnFilter />
 
       {/* Background Ambience */}
-      <div className="fixed inset-0 grid-bg opacity-30 pointer-events-none" />
+      <div className={`fixed inset-0 grid-bg opacity-30 pointer-events-none transition-opacity duration-1000 ${isBurned ? 'opacity-0' : ''}`} />
       <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
@@ -182,7 +233,14 @@ export default function Success() {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 w-full max-w-5xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-8">
+      <main
+        className="relative z-10 flex-1 w-full max-w-5xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-8 transition-all duration-1000 origin-center"
+        style={{
+          filter: isBurned ? 'url(#heat-wave) grayscale(100%) contrast(150%)' : 'none',
+          transform: isBurned ? 'scale(0.95)' : 'none',
+          opacity: isBurned ? 0 : 1
+        }}
+      >
 
         {/* Hero Section: PIN & Insights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
@@ -278,6 +336,42 @@ export default function Success() {
                 </span>
               </div>
 
+              {/* Upload Stats (If Available) */}
+              {uploadStats && (
+                <>
+                  <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
+                    <div className="flex items-center gap-3 text-zinc-400">
+                      <div className="p-2 bg-zinc-900 rounded-lg">
+                        <Timer className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider">Transfer Time</p>
+                        <p className="text-[10px] text-zinc-500">Encryption & Upload</p>
+                      </div>
+                    </div>
+                    <span className="font-mono text-base font-bold text-zinc-300">
+                      {uploadStats.time < 1000 ? `${uploadStats.time}ms` : `${(uploadStats.time / 1000).toFixed(1)}s`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
+                    <div className="flex items-center gap-3 text-zinc-400">
+                      <div className="p-2 bg-zinc-900 rounded-lg">
+                        <Zap className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider">Speed</p>
+                        <p className="text-[10px] text-zinc-500">Avg. Throughput</p>
+                      </div>
+                    </div>
+                    <span className="font-mono text-base font-bold text-zinc-300">
+                      {uploadStats.speed < 1024 * 1024
+                        ? `${(uploadStats.speed / 1024).toFixed(1)} KB/s`
+                        : `${(uploadStats.speed / (1024 * 1024)).toFixed(1)} MB/s`}
+                    </span>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
         </div>
@@ -459,9 +553,9 @@ export default function Success() {
                         variant="destructive"
                         className="w-full h-14 text-base bg-rose-600 hover:bg-rose-700 font-bold tracking-wider"
                         onClick={handleBurn}
-                        disabled={isBurning}
+                        disabled={isDeleting}
                       >
-                        {isBurning ? (
+                        {isDeleting ? (
                           <>
                             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                             DESTROYING...

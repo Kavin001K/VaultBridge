@@ -1,25 +1,65 @@
 import { useState, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Upload, KeyRound, Shield, Zap, Eye,
   ArrowRight, Sparkles, Mail, Send, Paperclip, FileText, CheckCircle2, AlertCircle, X,
-  Users, AtSign, Plus, Trash2
+  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard, Copy, Timer, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { useSounds } from "@/hooks/useSounds";
+import { useCreateVault } from "@/hooks/use-vaults";
+import { generateKey, generateSplitCode, wrapFileKey, encryptMetadata, encryptClipboardText } from "@/lib/crypto";
+
+// Enhanced spring animation configs
+const springConfig = { type: "spring", stiffness: 400, damping: 25 };
+const hoverSpring = { type: "spring", stiffness: 300, damping: 20 };
+
+// Stagger animation for children
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: springConfig
+  }
+};
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"vault" | "email" | "live">("vault");
+  const [activeTab, setActiveTab] = useState<"vault" | "email" | "clipboard">("vault");
   const [emailFiles, setEmailFiles] = useState<File[]>([]);
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
+  const { play: playSound, isEnabled: isSoundEnabled, toggle: toggleSound } = useSounds();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [, setLocation] = useLocation();
 
-  // Email form state - now supports multiple recipients
-  const [recipients, setRecipients] = useState<string[]>([""]);
+  // Clipboard state
+  const [clipboardText, setClipboardText] = useState("");
+  const [clipboardExpiresIn, setClipboardExpiresIn] = useState([24]);
+  const [clipboardMaxDownloads, setClipboardMaxDownloads] = useState([1]);
+  const [isCreatingClipboard, setIsCreatingClipboard] = useState(false);
+  const createVault = useCreateVault();
+
+  // Email form state
+  const [recipients, setRecipients] = useState<string[]>([]);
+  const [recipientInput, setRecipientInput] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
 
@@ -55,42 +95,52 @@ export default function Home() {
     }
   };
 
-  const addRecipient = () => {
-    if (recipients.length < MAX_RECIPIENTS) {
-      setRecipients(prev => [...prev, ""]);
+  const handleAddRecipient = () => {
+    if (!recipientInput.trim()) return;
+
+    // Allow comma separation in input for power users, but convert to chips
+    const inputs = recipientInput.split(',').map(e => e.trim()).filter(e => e);
+    const validToAdd: string[] = [];
+    let errorMsg = "";
+
+    inputs.forEach(email => {
+      if (!isValidEmail(email)) {
+        errorMsg = `Invalid email: ${email}`;
+      } else if (recipients.includes(email)) {
+        errorMsg = `Duplicate email: ${email}`;
+      } else if (recipients.length + validToAdd.length >= MAX_RECIPIENTS) {
+        errorMsg = `Max ${MAX_RECIPIENTS} recipients allowed`;
+      } else {
+        validToAdd.push(email);
+      }
+    });
+
+    if (validToAdd.length > 0) {
+      setRecipients(prev => [...prev, ...validToAdd]);
+      setRecipientInput("");
+    } else if (errorMsg) {
+      toast({
+        variant: "destructive",
+        title: "Action skipped",
+        description: errorMsg,
+      });
     }
   };
 
   const removeRecipient = (index: number) => {
-    if (recipients.length > 1) {
-      setRecipients(prev => prev.filter((_, i) => i !== index));
+    setRecipients(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddRecipient();
     }
   };
 
-  const updateRecipient = (index: number, value: string) => {
-    setRecipients(prev => {
-      const updated = [...prev];
-      updated[index] = value;
-      return updated;
-    });
-  };
-
-  // Parse comma-separated emails
-  const parseEmails = (input: string): string[] => {
-    return input.split(',').map(e => e.trim()).filter(e => e.length > 0);
-  };
-
+  // Clean valid recipients for submission
   const getValidRecipients = (): string[] => {
-    const allEmails: string[] = [];
-    recipients.forEach(r => {
-      const parsed = parseEmails(r);
-      parsed.forEach(email => {
-        if (isValidEmail(email) && !allEmails.includes(email)) {
-          allEmails.push(email);
-        }
-      });
-    });
-    return allEmails.slice(0, MAX_RECIPIENTS);
+    return recipients;
   };
 
   const handleSendEmail = async () => {
@@ -134,7 +184,7 @@ export default function Home() {
 
       // Reset form
       setEmailFiles([]);
-      setRecipients([""]);
+      setRecipients([]);
       setEmailSubject("");
       setEmailBody("");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -150,7 +200,7 @@ export default function Home() {
     }
   };
 
-  const validRecipientCount = getValidRecipients().length;
+  const validRecipientCount = recipients.length;
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col">
@@ -204,9 +254,15 @@ export default function Home() {
           className="flex items-center justify-center mb-8 md:mb-12 w-full"
         >
           <div className="bg-zinc-900/50 p-1 rounded-xl border border-zinc-800 flex items-center w-full max-w-[300px] md:max-w-fit justify-between">
-            <button
-              onClick={() => setActiveTab("vault")}
-              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${activeTab === "vault"
+            <motion.button
+              onClick={() => {
+                playSound('click');
+                setActiveTab("vault");
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={springConfig}
+              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-medium transition-all press-effect ${activeTab === "vault"
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -215,10 +271,16 @@ export default function Home() {
                 <Lock className="w-3 h-3 md:w-4 md:h-4" />
                 Secure Vault
               </div>
-            </button>
-            <button
-              onClick={() => setActiveTab("email")}
-              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${activeTab === "email"
+            </motion.button>
+            <motion.button
+              onClick={() => {
+                playSound('click');
+                setActiveTab("email");
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={springConfig}
+              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-medium transition-all press-effect ${activeTab === "email"
                 ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -227,20 +289,45 @@ export default function Home() {
                 <Mail className="w-3 h-3 md:w-4 md:h-4" />
                 Direct Email
               </div>
-            </button>
-            <button
-              onClick={() => setActiveTab("live")}
-              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${activeTab === "live"
-                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+            </motion.button>
+            <motion.button
+              onClick={() => {
+                playSound('click');
+                setActiveTab("clipboard");
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={springConfig}
+              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-medium transition-all press-effect ${activeTab === "clipboard"
+                ? "bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg shadow-cyan-500/25"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <Zap className="w-3 h-3 md:w-4 md:h-4" />
-                Live Share
+                <Clipboard className="w-3 h-3 md:w-4 md:h-4" />
+                Clipboard
               </div>
-            </button>
+            </motion.button>
           </div>
+
+          {/* Sound Toggle Button */}
+          <motion.button
+            onClick={() => {
+              const newState = toggleSound();
+              setSoundEnabled(newState);
+              if (newState) playSound('click');
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="ml-3 p-2 rounded-lg bg-zinc-800/50 border border-zinc-700 hover:border-primary/50 transition-all"
+            title={soundEnabled ? "Mute sounds" : "Enable sounds"}
+          >
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-primary" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-muted-foreground" />
+            )}
+          </motion.button>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -253,83 +340,139 @@ export default function Home() {
               transition={{ duration: 0.3 }}
               className="w-full"
             >
-              {/* Hero */}
-              <div className="text-center mb-10 md:mb-16 px-2">
-                <h2 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-4 md:mb-6 leading-[1.1]">
-                  Share files <span className="text-gradient">secretly</span>.
-                </h2>
-                <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-4 leading-relaxed">
+              {/* Hero with stagger animation */}
+              <motion.div
+                className="text-center mb-10 md:mb-16 px-2"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <motion.h2
+                  className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-4 md:mb-6 leading-[1.1]"
+                  variants={itemVariants}
+                >
+                  Share files <motion.span
+                    className="text-gradient inline-block"
+                    animate={{
+                      backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+                    }}
+                    transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                    style={{ backgroundSize: "200% 100%" }}
+                  >secretly</motion.span>.
+                </motion.h2>
+                <motion.p
+                  className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-4 leading-relaxed"
+                  variants={itemVariants}
+                >
                   End-to-end encrypted. Ephemeral. Anonymous.
-                </p>
-                <p className="text-sm md:text-lg text-muted-foreground/70 max-w-xl mx-auto">
+                </motion.p>
+                <motion.p
+                  className="text-sm md:text-lg text-muted-foreground/70 max-w-xl mx-auto"
+                  variants={itemVariants}
+                >
                   Your files are encrypted in your browser before they ever leave your device.
-                </p>
-              </div>
+                </motion.p>
+              </motion.div>
 
-              {/* Action Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full max-w-4xl mx-auto px-2">
+              {/* Action Cards with enhanced animations */}
+              <motion.div
+                className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full max-w-4xl mx-auto px-2"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
                 {/* Upload Card */}
-                <Link href="/upload">
-                  <motion.div
-                    whileHover={{ scale: 1.02, y: -5 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="glass-card p-6 md:p-8 cursor-pointer group h-full flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center gap-4 mb-4 md:mb-6">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 group-hover:animate-pulse-glow transition-all shrink-0">
-                          <Upload className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+                <motion.div variants={itemVariants}>
+                  <Link href="/upload">
+                    <motion.div
+                      whileHover={{ scale: 1.02, y: -8, boxShadow: "0 25px 50px -12px rgba(16, 185, 129, 0.25)" }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={hoverSpring}
+                      onClick={() => playSound('click')}
+                      className="glass-card p-6 md:p-8 cursor-pointer group h-full flex flex-col justify-between card-hover-glow"
+                    >
+                      <div>
+                        <div className="flex items-center gap-4 mb-4 md:mb-6">
+                          <motion.div
+                            className="w-12 h-12 md:w-14 md:h-14 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 shrink-0"
+                            whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.05 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <Upload className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+                          </motion.div>
+                          <div>
+                            <h3 className="text-xl md:text-2xl font-bold">Upload Files</h3>
+                            <p className="text-xs md:text-sm text-muted-foreground">Create a secure vault</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-xl md:text-2xl font-bold">Upload Files</h3>
-                          <p className="text-xs md:text-sm text-muted-foreground">Create a secure vault</p>
-                        </div>
+
+                        <p className="text-sm md:text-base text-muted-foreground mb-6 leading-relaxed">
+                          Drag & drop files, set expiration and download limits,
+                          then share the encrypted link.
+                        </p>
                       </div>
 
-                      <p className="text-sm md:text-base text-muted-foreground mb-6 leading-relaxed">
-                        Drag & drop files, set expiration and download limits,
-                        then share the encrypted link.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-primary font-mono font-bold uppercase tracking-wider group-hover:gap-4 transition-all text-sm md:text-base mt-2">
-                      <span>Get Started</span>
-                      <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
-                    </div>
-                  </motion.div>
-                </Link>
+                      <motion.div
+                        className="flex items-center gap-2 text-primary font-mono font-bold uppercase tracking-wider transition-all text-sm md:text-base mt-2"
+                      >
+                        <span>Get Started</span>
+                        <motion.div
+                          animate={{ x: [0, 5, 0] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                        </motion.div>
+                      </motion.div>
+                    </motion.div>
+                  </Link>
+                </motion.div>
 
                 {/* Access Card */}
-                <Link href="/access">
-                  <motion.div
-                    whileHover={{ scale: 1.02, y: -5 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="glass-card p-6 md:p-8 cursor-pointer group h-full border-zinc-700 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center gap-4 mb-4 md:mb-6">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 group-hover:border-primary/50 transition-all shrink-0">
-                          <KeyRound className="w-6 h-6 md:w-7 md:h-7 text-zinc-400 group-hover:text-primary transition-colors" />
+                <motion.div variants={itemVariants}>
+                  <Link href="/access">
+                    <motion.div
+                      whileHover={{ scale: 1.02, y: -8, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)" }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={hoverSpring}
+                      onClick={() => playSound('click')}
+                      className="glass-card p-6 md:p-8 cursor-pointer group h-full border-zinc-700 flex flex-col justify-between card-hover-glow"
+                    >
+                      <div>
+                        <div className="flex items-center gap-4 mb-4 md:mb-6">
+                          <motion.div
+                            className="w-12 h-12 md:w-14 md:h-14 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 group-hover:border-primary/50 transition-all shrink-0"
+                            whileHover={{ rotate: [0, 15, -15, 0], scale: 1.05 }}
+                            transition={{ duration: 0.4 }}
+                          >
+                            <KeyRound className="w-6 h-6 md:w-7 md:h-7 text-zinc-400 group-hover:text-primary transition-colors" />
+                          </motion.div>
+                          <div>
+                            <h3 className="text-xl md:text-2xl font-bold">Access Vault</h3>
+                            <p className="text-xs md:text-sm text-muted-foreground">Enter your 6-digit code</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-xl md:text-2xl font-bold">Access Vault</h3>
-                          <p className="text-xs md:text-sm text-muted-foreground">Enter your 6-digit code</p>
-                        </div>
+
+                        <p className="text-sm md:text-base text-muted-foreground mb-6 leading-relaxed">
+                          Have an access code? Enter it to unlock and download
+                          encrypted files securely.
+                        </p>
                       </div>
 
-                      <p className="text-sm md:text-base text-muted-foreground mb-6 leading-relaxed">
-                        Have an access code? Enter it to unlock and download
-                        encrypted files securely.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-zinc-400 font-mono font-bold uppercase tracking-wider group-hover:text-primary group-hover:gap-4 transition-all text-sm md:text-base mt-2">
-                      <span>Unlock Vault</span>
-                      <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
-                    </div>
-                  </motion.div>
-                </Link>
-              </div>
+                      <motion.div
+                        className="flex items-center gap-2 text-zinc-400 font-mono font-bold uppercase tracking-wider group-hover:text-primary transition-all text-sm md:text-base mt-2"
+                      >
+                        <span>Unlock Vault</span>
+                        <motion.div
+                          animate={{ x: [0, 5, 0] }}
+                          transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
+                        >
+                          <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                        </motion.div>
+                      </motion.div>
+                    </motion.div>
+                  </Link>
+                </motion.div>
+              </motion.div>
             </motion.div>
           ) : activeTab === "email" ? (
             <motion.div
@@ -372,8 +515,8 @@ export default function Home() {
                     {/* File Upload Zone */}
                     <div
                       className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer group ${emailFiles.length > 0
-                          ? "border-violet-500/50 bg-violet-500/5"
-                          : "border-zinc-700 hover:border-violet-500/50 hover:bg-violet-500/5"
+                        ? "border-violet-500/50 bg-violet-500/5"
+                        : "border-zinc-700 hover:border-violet-500/50 hover:bg-violet-500/5"
                         }`}
                       onClick={() => fileInputRef.current?.click()}
                     >
@@ -444,56 +587,58 @@ export default function Home() {
                       )}
                     </AnimatePresence>
 
-                    {/* Recipients Section - REDESIGNED */}
+                    {/* Recipients Section - REDESIGNED (Chips) */}
                     <div className="space-y-3 pt-4 border-t border-white/5">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-2">
                           <Users className="w-3.5 h-3.5 text-violet-400" />
-                          Recipients ({validRecipientCount}/{MAX_RECIPIENTS})
+                          Recipients ({recipients.length}/{MAX_RECIPIENTS})
                         </label>
-                        {recipients.length < MAX_RECIPIENTS && (
-                          <button
-                            onClick={addRecipient}
-                            className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            Add recipient
-                          </button>
-                        )}
                       </div>
 
-                      <div className="space-y-2">
-                        {recipients.map((recipient, idx) => (
-                          <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center gap-2"
-                          >
-                            <div className="relative flex-1">
-                              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                              <Input
-                                placeholder={idx === 0 ? "email@example.com (comma-separate for multiple)" : "another@example.com"}
-                                value={recipient}
-                                onChange={(e) => updateRecipient(idx, e.target.value)}
-                                className="pl-10 h-11 bg-zinc-900/50 border-zinc-800 focus:border-violet-500/50 text-base rounded-xl"
-                              />
-                            </div>
-                            {recipients.length > 1 && (
+                      <div className="bg-zinc-900/50 border border-zinc-800 focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20 rounded-xl min-h-[56px] p-2 flex flex-wrap gap-2 transition-all">
+                        <AnimatePresence mode="popLayout">
+                          {recipients.map((recipient, idx) => (
+                            <motion.div
+                              key={recipient}
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.8 }}
+                              className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 bg-violet-500/10 border border-violet-500/20 rounded-lg group"
+                            >
+                              <span className="text-sm font-medium text-violet-100">{recipient}</span>
                               <button
                                 onClick={() => removeRecipient(idx)}
-                                className="p-2.5 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg transition-colors border border-zinc-800"
+                                className="p-0.5 hover:bg-violet-500/20 rounded-md text-violet-400 hover:text-rose-400 transition-colors"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <X className="w-3 h-3" />
                               </button>
-                            )}
-                          </motion.div>
-                        ))}
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+
+                        <div className="flex-1 min-w-[200px] flex items-center relative">
+                          <Input
+                            placeholder={recipients.length === 0 ? "Enter email address..." : "Add another..."}
+                            value={recipientInput}
+                            onChange={(e) => setRecipientInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            disabled={recipients.length >= MAX_RECIPIENTS}
+                            className="bg-transparent border-none h-9 p-0 focus-visible:ring-0 placeholder:text-zinc-600 text-base w-full"
+                          />
+                          {recipientInput && (
+                            <button
+                              onClick={handleAddRecipient}
+                              className="absolute right-0 p-1.5 bg-violet-500/20 hover:bg-violet-500 text-violet-300 hover:text-white rounded-lg transition-all"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <p className="text-xs text-zinc-600 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        You can enter multiple emails separated by commas
+                      <p className="text-[10px] text-zinc-600 pl-1">
+                        Press <kbd className="font-mono bg-zinc-800 px-1 rounded text-zinc-400">Enter</kbd> to add
                       </p>
                     </div>
 
@@ -554,6 +699,187 @@ export default function Home() {
                 </div>
               </div>
             </motion.div>
+          ) : activeTab === "clipboard" ? (
+            <motion.div
+              key="clipboard"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="w-full max-w-2xl mx-auto px-2"
+            >
+              {/* Clipboard Card */}
+              <div className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-zinc-900/90 via-zinc-900/95 to-cyan-950/30 shadow-2xl shadow-cyan-500/10">
+                {/* Decorative gradient orbs */}
+                <div className="absolute -top-20 -right-20 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl" />
+                <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-teal-500/20 rounded-full blur-3xl" />
+
+                <div className="relative p-6 md:p-8">
+                  {/* Header */}
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="relative">
+                      <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                        <Clipboard className="w-7 h-7 md:w-8 md:h-8 text-white" />
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-zinc-900">
+                        <Lock className="w-3 h-3 text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
+                        Secure Clipboard
+                      </h3>
+                      <p className="text-sm text-zinc-400 flex items-center gap-2 mt-1">
+                        <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                        End-to-End Encrypted Text Sharing
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Text Input */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                        Paste Your Text
+                      </label>
+                      <Textarea
+                        placeholder="Paste password, code snippet, or any secret text here..."
+                        className="min-h-[200px] bg-zinc-900/50 border-zinc-800 focus:border-cyan-500/50 resize-none text-base rounded-xl font-mono"
+                        value={clipboardText}
+                        onChange={(e) => setClipboardText(e.target.value)}
+                        maxLength={50000}
+                      />
+                      <p className="text-xs text-zinc-500 text-right">
+                        {clipboardText.length.toLocaleString()} / 50,000 characters
+                      </p>
+                    </div>
+
+                    {/* Settings */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-medium text-zinc-400 flex items-center gap-2">
+                            <Timer className="w-3.5 h-3.5 text-cyan-400" />
+                            Expires In
+                          </label>
+                          <span className="text-xs font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded">
+                            {clipboardExpiresIn[0]}h
+                          </span>
+                        </div>
+                        <Slider
+                          value={clipboardExpiresIn}
+                          onValueChange={setClipboardExpiresIn}
+                          min={1}
+                          max={168}
+                          step={1}
+                          className="py-1"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-medium text-zinc-400 flex items-center gap-2">
+                            <Zap className="w-3.5 h-3.5 text-teal-400" />
+                            Access Limit
+                          </label>
+                          <span className="text-xs font-mono text-teal-400 font-bold bg-teal-500/10 px-2 py-0.5 rounded">
+                            {clipboardMaxDownloads[0] === 1 ? "1x (Burn)" : `${clipboardMaxDownloads[0]}x`}
+                          </span>
+                        </div>
+                        <Slider
+                          value={clipboardMaxDownloads}
+                          onValueChange={setClipboardMaxDownloads}
+                          min={1}
+                          max={100}
+                          step={1}
+                          className="py-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Create Button */}
+                    <Button
+                      className="w-full h-14 text-base font-bold tracking-wide uppercase bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white shadow-lg shadow-cyan-500/20 rounded-xl transition-all hover:shadow-xl hover:shadow-cyan-500/30"
+                      size="lg"
+                      onClick={async () => {
+                        if (!clipboardText.trim()) {
+                          toast({
+                            variant: "destructive",
+                            title: "No text entered",
+                            description: "Please paste some text to share.",
+                          });
+                          return;
+                        }
+
+                        setIsCreatingClipboard(true);
+                        try {
+                          // Generate encryption key
+                          const key = await generateKey();
+                          const splitCode = generateSplitCode();
+                          const wrappedKey = await wrapFileKey(key, splitCode.pin);
+
+                          // Encrypt clipboard text
+                          const encryptedClipboard = await encryptClipboardText(clipboardText, key);
+
+                          // Encrypt empty metadata (no files)
+                          const encryptedMetadataStr = await encryptMetadata([], key);
+
+                          // Create vault with clipboard only
+                          const vault = await createVault.mutateAsync({
+                            expiresIn: clipboardExpiresIn[0],
+                            maxDownloads: clipboardMaxDownloads[0],
+                            encryptedMetadata: encryptedMetadataStr,
+                            lookupId: splitCode.lookupId,
+                            wrappedKey,
+                            files: [],
+                            encryptedClipboardText: encryptedClipboard,
+                          });
+
+                          playSound('success');
+
+                          // Navigate to success page
+                          setLocation(`/success/${vault.id}#code=${splitCode.fullCode}`);
+                        } catch (err: any) {
+                          playSound('error');
+                          toast({
+                            variant: "destructive",
+                            title: "Failed to create clipboard vault",
+                            description: err.message || "Something went wrong.",
+                          });
+                        } finally {
+                          setIsCreatingClipboard(false);
+                        }
+                      }}
+                      disabled={isCreatingClipboard || !clipboardText.trim()}
+                    >
+                      {isCreatingClipboard ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Encrypting...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-5 h-5 mr-2" />
+                          Create Secure Clipboard
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Security Notice */}
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-cyan-500/5 to-teal-500/5 border border-cyan-500/10">
+                      <div className="p-2 bg-cyan-500/10 rounded-lg flex-shrink-0">
+                        <Shield className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div className="text-xs text-zinc-400 leading-relaxed">
+                        <p className="font-semibold text-zinc-300 mb-1">Universal Clipboard</p>
+                        Text is encrypted in your browser before upload. Access it from any device using the 6-digit code. Self-destructs after use.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           ) : (
             <motion.div
               key="live"
@@ -563,76 +889,51 @@ export default function Home() {
               transition={{ duration: 0.3 }}
               className="w-full max-w-2xl mx-auto px-2"
             >
-              <div className="glass-card p-8 border-amber-500/20">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-14 h-14 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/30 shrink-0 animate-pulse-glow">
-                    <Zap className="w-7 h-7 text-amber-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold">Live P2P Link</h3>
-                    <p className="text-sm text-muted-foreground">Serverless WebRTC Transfer</p>
-                  </div>
-                </div>
-
-                <div className="space-y-6 text-center py-8">
-                  <p className="text-lg text-zinc-300">
-                    Establish a direct encrypted tunnel between devices.
-                  </p>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Files are transferred directly via WebRTC. Maximum privacy, no server storage involved.
-                    Requires both parties to be online.
-                  </p>
-
-                  <Link href="/live">
-                    <Button className="w-full max-w-xs h-14 text-base font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-500/20 mt-6 uppercase tracking-widest">
-                      Start Live Session
-                    </Button>
-                  </Link>
-                </div>
-              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Features Footer (Only on Vault Tab) */}
-        {activeTab === "vault" && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 md:mt-24 w-full max-w-4xl px-4"
-          >
-            {[
-              {
-                icon: Shield,
-                title: "Client-Side Encryption",
-                desc: "AES-256-GCM encryption entirely in your browser."
-              },
-              {
-                icon: Zap,
-                title: "Auto-Destruct",
-                desc: "Vaults self-destruct after expiration or download limit."
-              },
-              {
-                icon: Eye,
-                title: "Zero Knowledge",
-                desc: "We never see your files. Keys stay with you."
-              }
-            ].map((feature, i) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 + i * 0.1 }}
-                className="text-center p-4 md:p-6 bg-zinc-900/20 rounded-xl md:bg-transparent border border-white/5 md:border-transparent"
-              >
-                <feature.icon className="w-6 h-6 md:w-8 md:h-8 text-primary mx-auto mb-3 md:mb-4" />
-                <h4 className="font-semibold mb-2 text-sm md:text-base">{feature.title}</h4>
-                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
+        {
+          activeTab === "vault" && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 md:mt-24 w-full max-w-4xl px-4"
+            >
+              {[
+                {
+                  icon: Shield,
+                  title: "Client-Side Encryption",
+                  desc: "AES-256-GCM encryption entirely in your browser."
+                },
+                {
+                  icon: Zap,
+                  title: "Auto-Destruct",
+                  desc: "Vaults self-destruct after expiration or download limit."
+                },
+                {
+                  icon: Eye,
+                  title: "Zero Knowledge",
+                  desc: "We never see your files. Keys stay with you."
+                }
+              ].map((feature, i) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 + i * 0.1 }}
+                  className="text-center p-4 md:p-6 bg-zinc-900/20 rounded-xl md:bg-transparent border border-white/5 md:border-transparent"
+                >
+                  <feature.icon className="w-6 h-6 md:w-8 md:h-8 text-primary mx-auto mb-3 md:mb-4" />
+                  <h4 className="font-semibold mb-2 text-sm md:text-base">{feature.title}</h4>
+                  <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+          )
+        }
       </main>
 
       {/* Footer */}
@@ -646,6 +947,6 @@ export default function Home() {
           © 2025 Ace-Groups. All rights reserved.
         </p>
       </footer>
-    </div>
+    </div >
   );
 }

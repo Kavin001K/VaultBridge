@@ -9,9 +9,11 @@ import { EncryptionProgress } from "@/components/encryption-progress";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { useSounds } from "@/hooks/useSounds";
 import { useCreateVault, useGetChunkUploadUrl, useMarkChunkUploaded } from "@/hooks/use-vaults";
 import { generateKey, exportKey, encryptMetadata, generateUUID, generateSplitCode, wrapFileKey, encryptData } from "@/lib/crypto";
 import { getUploadConfig, formatBytes, MAX_FILE_SIZE } from "@/lib/uploadConfig";
+import { clearStoredFiles, saveUploadSettings, loadUploadSettings } from "@/lib/fileStorage";
 
 type UploadStage = "idle" | "encrypting" | "uploading" | "success";
 type ProgressStep = "keys" | "metadata" | "transfer" | "done";
@@ -29,11 +31,29 @@ export default function UploadPage() {
 
     const [, setLocation] = useLocation();
     const { toast } = useToast();
+    const { play: playSound } = useSounds();
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const createVault = useCreateVault();
     const getChunkUrl = useGetChunkUploadUrl();
     const markUploaded = useMarkChunkUploaded();
+
+    // Load persisted settings on mount
+    useEffect(() => {
+        const loadSettings = async () => {
+            const settings = await loadUploadSettings();
+            if (settings) {
+                setExpiresIn([settings.expiresIn]);
+                setMaxDownloads([settings.maxDownloads]);
+            }
+        };
+        loadSettings();
+    }, []);
+
+    // Save settings when they change
+    useEffect(() => {
+        saveUploadSettings(expiresIn[0], maxDownloads[0]);
+    }, [expiresIn, maxDownloads]);
 
     const truncateName = (name: string, maxLength: number = 20) => {
         if (name.length <= maxLength) return name;
@@ -54,6 +74,7 @@ export default function UploadPage() {
         // Validate files
         const config = getUploadConfig(newFiles);
         if (!config.isValid) {
+            playSound('error');
             setUploadError(config.errorMessage || "Invalid files");
             toast({
                 variant: "destructive",
@@ -63,6 +84,7 @@ export default function UploadPage() {
             return;
         }
 
+        playSound('drop');
         setFiles(newFiles);
     };
 
@@ -85,6 +107,8 @@ export default function UploadPage() {
         abortControllerRef.current = new AbortController();
 
         try {
+            const startTime = Date.now();
+
             // Step 1: Generate Keys
             setCurrentStep("keys");
             setStatusText("Generating military-grade AES-256 keys...");
@@ -199,13 +223,23 @@ export default function UploadPage() {
             setProgress(100);
             setStatusText("Finalizing secure vault...");
             setStage("success");
+            playSound('success');
+
+            // Clear persisted files after successful upload
+            await clearStoredFiles();
+
+            // Stats Calculation
+            const endTime = Date.now();
+            const duration = endTime - startTime; // ms
+            const speed = totalSize / (duration / 1000); // Bytes/sec
 
             setTimeout(() => {
-                setLocation(`/success/${vault.id}#code=${splitCode.fullCode}`);
+                setLocation(`/success/${vault.id}#code=${splitCode.fullCode}&time=${duration}&speed=${Math.floor(speed)}`);
             }, 800);
 
         } catch (err) {
             console.error(err);
+            playSound('error');
             setStage("idle");
             if (err instanceof Error && err.message === "Upload cancelled") {
                 toast({ title: "Upload Cancelled", variant: "default" });
