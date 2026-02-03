@@ -30,6 +30,7 @@ export class MemoryStorage {
             lookupId: data.lookupId || null,
             wrappedKey: data.wrappedKey || null,
             encryptedMetadata: data.encryptedMetadata,
+            encryptedClipboardText: data.encryptedClipboardText || null, // Store encrypted clipboard text
             createdAt: new Date(),
             expiresAt,
             maxDownloads: data.maxDownloads,
@@ -173,6 +174,17 @@ export class MemoryStorage {
             return v.downloadCount;
         }
         return 0;
+    }
+
+    async updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date> {
+        for (const v of Array.from(this.vaults.values())) {
+            if (v.lookupId === lookupId && !v.isDeleted) {
+                v.encryptedClipboardText = encryptedClipboardText;
+                this.vaults.set(v.id, v);
+                return new Date();
+            }
+        }
+        throw new Error("Vault not found");
     }
 
     async deleteVault(id: string) {

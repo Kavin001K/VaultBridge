@@ -93,6 +93,34 @@ export async function decryptMetadata(encryptedMetadataStr: string, key: CryptoK
   }
 }
 
+// ============================================================================
+// CLIPBOARD TEXT ENCRYPTION (Universal Clipboard Feature)
+// ============================================================================
+
+/**
+ * Encrypt clipboard text using the file key.
+ * Uses the same AES-GCM encryption as file metadata.
+ * 
+ * @param text - Plain text to encrypt
+ * @param key - CryptoKey for encryption (same key used for files)
+ * @returns Promise<string> - Encrypted text as base64 JSON string
+ */
+export async function encryptClipboardText(text: string, key: CryptoKey): Promise<string> {
+  return encryptMetadata({ clipboardText: text, timestamp: Date.now() }, key);
+}
+
+/**
+ * Decrypt clipboard text using the file key.
+ * 
+ * @param encrypted - Encrypted base64 JSON string
+ * @param key - CryptoKey for decryption
+ * @returns Promise<string> - Decrypted plain text
+ */
+export async function decryptClipboardText(encrypted: string, key: CryptoKey): Promise<string> {
+  const result = await decryptMetadata(encrypted, key);
+  return result.clipboardText;
+}
+
 // Utility: ArrayBuffer to Base64
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = "";

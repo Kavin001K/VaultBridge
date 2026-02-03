@@ -64,6 +64,7 @@ export const api = {
           id: z.string(),
           wrappedKey: z.string(),
           encryptedMetadata: z.string(),
+          encryptedClipboardText: z.string().optional(), // Encrypted clipboard text
           expiresAt: z.string(),
           maxDownloads: z.number(),
           downloadCount: z.number(),
@@ -93,6 +94,37 @@ export const api = {
         400: errorSchemas.validation,
         404: errorSchemas.notFound,
         429: z.object({ message: z.string() }),
+      },
+    },
+    // Live clipboard update (encrypted content sync)
+    updateClipboard: {
+      method: 'PUT' as const,
+      path: '/api/vault/code/:lookupId/clipboard',
+      input: z.object({
+        encryptedClipboardText: z.string(),
+        wrappedKey: z.string(), // For verification
+      }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          updatedAt: z.string(),
+        }),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+        410: z.object({ message: z.string() }),
+      },
+    },
+    // Live clipboard poll
+    getClipboard: {
+      method: 'GET' as const,
+      path: '/api/vault/code/:lookupId/clipboard',
+      responses: {
+        200: z.object({
+          encryptedClipboardText: z.string().optional(),
+          updatedAt: z.string().optional(),
+        }),
+        404: errorSchemas.notFound,
+        410: z.object({ message: z.string() }),
       },
     },
   },

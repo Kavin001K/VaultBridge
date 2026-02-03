@@ -2,14 +2,24 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Lock, KeyRound, ArrowLeft, Shield, AlertTriangle, Download, Loader2, Clock, HardDrive, FileText
+    Lock, KeyRound, ArrowLeft, Shield, AlertTriangle, Download, Loader2, Clock, HardDrive, FileText,
+    Clipboard, Copy, Check, Save, RefreshCw, FileType, Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload } from "@/hooks/use-vaults";
-import { unwrapFileKey, decryptMetadata, decryptData } from "@/lib/crypto";
+import { useSounds } from "@/hooks/useSounds";
+import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload, useUpdateClipboard, useClipboardSync } from "@/hooks/use-vaults";
+import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardText, encryptClipboardText } from "@/lib/crypto";
 import { initiateStreamDownload } from "@/lib/downloadStream";
+import { jsPDF } from "jspdf";
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
@@ -95,9 +105,94 @@ export default function AccessPage() {
     const [vaultData, setVaultData] = useState<any>(null);
     const [fileKey, setFileKey] = useState<CryptoKey | null>(null);
     const [isBurned, setIsBurned] = useState(false);
+    const [clipboardContent, setClipboardContent] = useState<string | null>(null);
+    const [clipboardCopied, setClipboardCopied] = useState(false);
+
+    // Live Clipboard State
+    const [isEditing, setIsEditing] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const updateClipboard = useUpdateClipboard();
+
+    // Derived lookupId for sync
+    const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
+
+    // Sync hook
+    const { data: syncData } = useClipboardSync(lookupId, stage === "ready" && !!fileKey);
+
+    // Sync Effect
+    useEffect(() => {
+        if (syncData?.encryptedClipboardText && fileKey && !isEditing) {
+            const decryptSync = async () => {
+                try {
+                    const decrypted = await decryptClipboardText(syncData.encryptedClipboardText!, fileKey);
+                    // Only update if difference is meaningful
+                    if (decrypted !== clipboardContent) {
+                        setClipboardContent(decrypted);
+                        if (syncData.updatedAt) {
+                            setLastSaved(new Date(syncData.updatedAt));
+                        }
+                    }
+                } catch (e) {
+                    console.error("Sync decryption failed", e);
+                }
+            };
+            decryptSync();
+        }
+    }, [syncData, fileKey, isEditing, clipboardContent]);
+
+    const handleSaveClipboard = async (text: string) => {
+        if (!fileKey || !lookupId || !vaultData?.wrappedKey) return;
+        try {
+            const encrypted = await encryptClipboardText(text, fileKey);
+            await updateClipboard.mutateAsync({
+                lookupId,
+                encryptedClipboardText: encrypted,
+                wrappedKey: vaultData.wrappedKey
+            });
+            setLastSaved(new Date());
+        } catch (e) {
+            console.error("Save failed", e);
+            toast({ variant: "destructive", title: "Failed to save clipboard" });
+        }
+    };
+
+    const handleExport = (format: 'txt' | 'pdf' | 'doc') => {
+        if (!clipboardContent) return;
+
+        switch (format) {
+            case 'txt':
+                const blob = new Blob([clipboardContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `clipboard-${lookupId}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+                break;
+            case 'pdf':
+                const doc = new jsPDF();
+                const splitText = doc.splitTextToSize(clipboardContent, 180);
+                doc.text(splitText, 10, 10);
+                doc.save(`clipboard-${lookupId}.pdf`);
+                break;
+            case 'doc':
+                // Simple HTML blob for DOC
+                const html = `<html><body><pre style="white-space: pre-wrap; font-family: monospace;">${clipboardContent}</pre></body></html>`;
+                const docBlob = new Blob([html], { type: 'application/msword' });
+                const docUrl = URL.createObjectURL(docBlob);
+                const docLink = document.createElement('a');
+                docLink.href = docUrl;
+                docLink.download = `clipboard-${lookupId}.doc`;
+                docLink.click();
+                URL.revokeObjectURL(docUrl);
+                break;
+        }
+        toast({ title: `Exported as ${format.toUpperCase()}` });
+    };
 
     const [, setLocation] = useLocation();
     const { toast } = useToast();
+    const { play: playSound } = useSounds();
     const codeLookup = useCodeLookup();
     const getChunkUrl = useGetChunkDownloadUrl();
     const trackDownload = useTrackDownload();
@@ -146,15 +241,34 @@ export default function AccessPage() {
             const metadata = await decryptMetadata(vault.encryptedMetadata, key);
             setFileMetadata(metadata);
 
+            // Decrypt clipboard content if present
+            if (vault.encryptedClipboardText) {
+                setStatusText("Decrypting clipboard content...");
+                try {
+                    const clipText = await decryptClipboardText(vault.encryptedClipboardText, key);
+                    setClipboardContent(clipText);
+                } catch (clipErr) {
+                    console.error("Failed to decrypt clipboard:", clipErr);
+                }
+            }
+
             setStage("ready");
-            setStatusText("Files ready for download!");
+            const hasFiles = metadata.length > 0;
+            const hasClipboard = vault.encryptedClipboardText;
+            setStatusText(hasFiles ? "Files ready for download!" : (hasClipboard ? "Clipboard content ready!" : "Vault unlocked!"));
+            playSound('unlock');
 
             toast({
                 title: "Vault Unlocked!",
-                description: `${metadata.length} file(s) ready for download.`,
+                description: hasFiles
+                    ? `${metadata.length} file(s) ready for download.`
+                    : hasClipboard
+                        ? "Secure clipboard content available."
+                        : "Vault accessed successfully.",
             });
 
         } catch (err) {
+            playSound('error');
             setStage("input");
             console.error("Access error:", err);
 
@@ -720,13 +834,98 @@ export default function AccessPage() {
                                         <div className="flex items-center justify-between mb-6">
                                             <div className="flex items-center gap-3">
                                                 <span className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 text-xs font-bold text-white border border-zinc-700">
-                                                    {fileMetadata.length}
+                                                    {fileMetadata.length + (clipboardContent ? 1 : 0)}
                                                 </span>
-                                                <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Available Files</h4>
+                                                <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+                                                    {fileMetadata.length > 0 ? "Available Content" : "Secure Clipboard"}
+                                                </h4>
                                             </div>
 
                                             {/* Desktop actions could go here */}
                                         </div>
+
+                                        {/* Live Universal Clipboard */}
+                                        {clipboardContent !== null && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="mb-6 bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden shadow-sm"
+                                            >
+                                                {/* Header */}
+                                                <div className="flex items-center justify-between p-3 border-b border-zinc-800 bg-zinc-900/80">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-900/20">
+                                                            <Clipboard className="w-4 h-4 text-white" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-sm font-bold text-cyan-100">Live Clipboard</p>
+                                                                {updateClipboard.isPending && <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin" />}
+                                                            </div>
+                                                            <p className="text-[10px] text-cyan-400/60 font-mono">
+                                                                {lastSaved ? `Synced ${lastSaved.toLocaleTimeString()}` : 'Ready to sync'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-zinc-400 hover:text-white">
+                                                                    <Share2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800">
+                                                                <DropdownMenuItem onClick={() => handleExport('txt')} className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
+                                                                    <FileText className="w-4 h-4 mr-2" /> Export to TXT
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleExport('pdf')} className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
+                                                                    <FileType className="w-4 h-4 mr-2" /> Export to PDF
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleExport('doc')} className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
+                                                                    <FileText className="w-4 h-4 mr-2" /> Export to DOC
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-8 text-zinc-400 hover:text-cyan-400"
+                                                            onClick={async () => {
+                                                                await navigator.clipboard.writeText(clipboardContent || "");
+                                                                toast({ title: "Copied!" });
+                                                            }}
+                                                        >
+                                                            <Copy className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Live Editor */}
+                                                <div className="relative">
+                                                    <Textarea
+                                                        value={clipboardContent || ""}
+                                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                                                            setClipboardContent(e.target.value);
+                                                            setIsEditing(true);
+                                                        }}
+                                                        onBlur={() => {
+                                                            setIsEditing(false);
+                                                            if (clipboardContent) handleSaveClipboard(clipboardContent);
+                                                        }}
+                                                        className="min-h-[120px] bg-transparent border-0 resize-none focus-visible:ring-0 text-zinc-300 font-mono text-sm leading-relaxed p-4 custom-scrollbar"
+                                                        placeholder="Type shared content here..."
+                                                    />
+                                                    {isEditing && (
+                                                        <div className="absolute bottom-2 right-2 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+                                                            <span className="text-[10px] text-zinc-500 font-mono bg-black/50 px-2 py-1 rounded-full border border-zinc-800">
+                                                                Editing...
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
 
                                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 mb-6 min-h-[300px] max-h-[500px]">
                                             {fileMetadata.map((file, index) => (

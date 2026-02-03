@@ -30,6 +30,7 @@ export class DatabaseStorage {
             lookupId: data.lookupId,
             wrappedKey: data.wrappedKey,
             encryptedMetadata: data.encryptedMetadata,
+            encryptedClipboardText: data.encryptedClipboardText, // Store encrypted clipboard
             expiresAt,
             maxDownloads: data.maxDownloads,
             downloadCount: 0,
@@ -135,7 +136,15 @@ export class DatabaseStorage {
         return updated?.downloadCount || 0;
     }
 
+    async updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date> {
+        const [updated] = await db.update(vaults)
+            .set({ encryptedClipboardText })
+            .where(eq(vaults.lookupId, lookupId))
+            .returning();
 
+        if (!updated) throw new Error("Vault not found");
+        return new Date();
+    }
 
     async deleteVault(id: string) {
         // 1. Gather all file paths for this vault
@@ -251,6 +260,7 @@ class FallbackStorage {
     async getChunk(fileId: string, chunkIndex: number) { return this.execute(s => s.getChunk(fileId, chunkIndex)); }
     async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) { return this.execute(s => s.updateChunkStatus(fileId, chunkIndex, storagePath)); }
     async incrementDownloadCount(vaultId: string) { return this.execute(s => s.incrementDownloadCount(vaultId)); }
+    async updateClipboard(lookupId: string, encryptedClipboardText: string) { return this.execute(s => s.updateClipboard(lookupId, encryptedClipboardText)); }
     async deleteVault(id: string) { return this.execute(s => s.deleteVault(id)); }
     async cleanupExpiredVaults() { return this.execute(s => s.cleanupExpiredVaults()); }
 
