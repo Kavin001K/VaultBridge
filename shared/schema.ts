@@ -41,6 +41,7 @@ export const emailUsage = pgTable("email_usage", {
   date: text("date").primaryKey(), // YYYY-MM-DD
   resendCount: integer("resend_count").default(0).notNull(),
   brevoCount: integer("brevo_count").default(0).notNull(),
+  msg91Count: integer("msg91_count").default(0).notNull(),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
