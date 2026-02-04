@@ -892,8 +892,8 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
             </div>
           </div>
         </div>
-        <div style="width: 40px; height: 40px; background: #10b981; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);">
-          <span style="color: #000000; font-size: 18px; font-weight: bold;">⬇</span>
+        <div style="padding: 10px 18px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 24px; color: #022c1e; font-weight: 800; font-size: 12px; display: flex; align-items: center; gap: 6px; flex-shrink: 0; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+           Download <span style="font-size: 14px;">→</span>
         </div>
       </div>
       <!--<![endif]-->`
@@ -912,7 +912,8 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
     <div class="container">
       ${getEmailHeader()}
       
-      <h1 class="title">📬 Files Delivered to You</h1>
+      <img src="https://vault.kavin.cyou/vault-icon.png" style="width: 120px; height: 120px; display: block; margin: -10px auto 24px auto; object-fit: contain; filter: drop-shadow(0 0 40px rgba(16,185,129,0.25));" alt="Secure Assets" />
+      <h1 class="title">Your Secure Files are Ready!</h1>
       <p class="subtitle">Zero-Knowledge Relay • End-to-End Encrypted</p>
       
       ${text ? `

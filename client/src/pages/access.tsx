@@ -423,23 +423,26 @@ export default function AccessPage() {
                 <header className="border-b border-zinc-800/50 backdrop-blur-xl bg-black/50">
                     <div className="container max-w-6xl mx-auto px-4 py-4">
                         <div className="flex items-center justify-between">
-                            <Link href="/">
-                                <motion.div
-                                    className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
-                                    whileHover={!isMobile ? { scale: 1.02 } : {}}
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
-                                        <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
-                                    </div>
-                                    <div>
-                                        <h1 className="font-bold text-base sm:text-lg tracking-tight">
-                                            VAULT<span className="text-cyan-400">BRIDGE</span>
-                                        </h1>
-                                        {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">ACCESS VAULT</p>}
-                                    </div>
-                                </motion.div>
-                            </Link>
+
+                            <div className="flex items-center gap-3">
+                                <Link href="/">
+                                    <motion.div
+                                        className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
+                                        whileHover={!isMobile ? { scale: 1.02 } : {}}
+                                        whileTap={{ scale: 0.98 }}
+                                    >
+                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
+                                            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+                                        </div>
+                                        <div>
+                                            <h1 className="font-bold text-base sm:text-lg tracking-tight">
+                                                VAULT<span className="text-cyan-400">BRIDGE</span>
+                                            </h1>
+                                            {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">ACCESS VAULT</p>}
+                                        </div>
+                                    </motion.div>
+                                </Link>
+                            </div>
 
                             <div className="flex items-center gap-3">
                                 <Link href="/clipboard">
@@ -447,6 +450,13 @@ export default function AccessPage() {
                                         <Clipboard className="w-4 h-4" />
                                         <span className="hidden sm:inline">Create Clipboard</span>
                                         <span className="inline sm:hidden">Clipboard</span>
+                                    </Button>
+                                </Link>
+
+                                <Link href="/">
+                                    <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors h-9 sm:h-10">
+                                        <ArrowLeft className="w-4 h-4" />
+                                        <span className="hidden sm:inline">Return</span>
                                     </Button>
                                 </Link>
                             </div>
@@ -802,15 +812,13 @@ export default function AccessPage() {
                                                                 ))}
                                                             </div>
 
-                                                            <div className="pt-6 border-t border-zinc-800">
-                                                                <Button
-                                                                    onClick={handleDownload}
-                                                                    className="w-full h-12 sm:h-14 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-sm sm:text-base uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40"
-                                                                >
-                                                                    <Download className="w-5 h-5 mr-3" />
-                                                                    Download All Files
-                                                                </Button>
-                                                            </div>
+                                                            <Button
+                                                                size="lg"
+                                                                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold h-12"
+                                                                onClick={handleDownload}
+                                                            >
+                                                                Download All Files
+                                                            </Button>
                                                         </>
                                                     )}
                                                 </div>
@@ -818,83 +826,29 @@ export default function AccessPage() {
                                         </div>
                                     </div>
                                 )}
-
-                                {/* Downloading Stage */}
-                                {stage === "downloading" && (
-                                    <div className="max-w-md mx-auto w-full px-4">
-                                        <div className="relative">
-                                            {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-3xl blur-xl opacity-50" />}
-                                            <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8 text-center">
-                                                <div className="w-20 h-20 mx-auto mb-6 relative">
-                                                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 animate-pulse" />
-                                                    <div className="absolute inset-2 rounded-full bg-zinc-900 flex items-center justify-center">
-                                                        <Download className="w-8 h-8 text-cyan-400 animate-bounce" />
-                                                    </div>
-                                                </div>
-                                                <h3 className="text-xl font-bold text-white mb-2">Downloading Files</h3>
-                                                <p className="text-zinc-400 text-sm">{statusText}</p>
-                                                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
-                                                    <Shield className="w-3 h-3" />
-                                                    <span>Files are being decrypted in your browser</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </motion.div>
                         ) : (
-                            // Burned State
+                            // Burned State (Simplified)
                             <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: 2 }}
-                                className="max-w-lg mx-auto text-center w-full px-4"
+                                key="burned"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="w-full max-w-md mx-auto text-center"
                             >
-                                <div className="relative">
-                                    <div className="absolute -inset-1 bg-gradient-to-r from-red-500/30 to-orange-500/30 rounded-3xl blur-xl opacity-50" />
-                                    <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-red-900/50 rounded-3xl p-8">
-                                        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
-                                            <AlertTriangle className="w-10 h-10 text-red-500 animate-pulse" />
-                                        </div>
-                                        <h1 className="text-2xl sm:text-3xl font-black tracking-[0.15em] uppercase text-red-500 mb-4">
-                                            Vault Incinerated
-                                        </h1>
-                                        <div className="space-y-2 font-mono text-xs sm:text-sm text-zinc-500">
-                                            <p>&gt; SYSTEM_PURGE_COMPLETE</p>
-                                            <p>&gt; FILES_OVERWRITTEN</p>
-                                            <p className="text-red-700">&gt; LINK_TERMINATED</p>
-                                        </div>
-                                        <div className="mt-8">
-                                            <Link href="/">
-                                                <Button variant="outline" className="border-red-900/50 hover:bg-red-500/10 w-full sm:w-auto h-12 sm:h-10">
-                                                    <ArrowLeft className="w-4 h-4 mr-2" />
-                                                    Return Home
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </div>
+                                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                                    <Zap className="w-10 h-10 text-red-500" />
                                 </div>
+                                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-widest">Vault Incinerated</h2>
+                                <p className="text-zinc-500 mb-8">All contents have been permanently purged from existence.</p>
+                                <Link href="/">
+                                    <Button variant="outline" className="border-zinc-800 text-zinc-400 hover:text-white">
+                                        Return Home
+                                    </Button>
+                                </Link>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </main>
-
-                {/* Footer */}
-                <footer className="border-t border-zinc-800/50 py-6 mt-auto">
-                    <div className="container max-w-6xl mx-auto px-4">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-sm text-zinc-500 text-center md:text-left">
-                            <div className="flex items-center gap-2 justify-center md:justify-start">
-                                <Lock className="w-4 h-4 text-cyan-500" />
-                                <span>End-to-end encrypted • Your data never leaves your device unencrypted</span>
-                            </div>
-                            <div className="flex items-center gap-4 justify-center md:justify-start">
-                                <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-                                <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-                                <Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link>
-                            </div>
-                        </div>
-                    </div>
-                </footer>
             </div>
         </div>
     );

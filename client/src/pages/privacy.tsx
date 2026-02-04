@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowLeft, Shield, Lock, Eye, ChevronUp, ShieldCheck, FileKey } from "lucide-react";
+import { ArrowLeft, Shield, Lock, ChevronUp, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
@@ -19,1051 +19,196 @@ export default function PrivacyPage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const renderContent = (text: string) => {
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        return parts.map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={index} className="text-emerald-400 font-bold">{part.slice(2, -2)}</strong>;
+            }
+            return part;
+        });
+    };
+
     const sections = [
         {
-            id: "introduction",
-            title: "1. Introduction and Scope",
+            id: "core-axiom",
+            title: "1. The Core Axiom",
             content: `
-### About This Policy
+### We cannot disclose what we do not know.
 
-This Privacy Policy describes how VaultBridge ("Company," "we," "us," or "our") collects, uses, discloses, and protects information in connection with the VaultBridge platform, website, applications, and services (collectively, the "Service").
-
-This Policy applies to:
-- The VaultBridge website (vaultbridge.app and related domains)
-- The VaultBridge web application
-- Any mobile or desktop applications we may offer
-- APIs and developer tools
-- Customer support communications
-- Marketing communications (if you opt in)
-
-### Who We Are
-
-VaultBridge is a privacy-focused technology company dedicated to providing secure, encrypted file transfer services. Our mission is to give individuals and organizations the tools they need to share sensitive information without sacrificing privacy or security.
-
-We are data controllers for information processed through the Service, meaning we determine the purposes and means of processing personal data collected through VaultBridge.
-
-### Agreement to This Policy
-
-By accessing or using the Service, you acknowledge that you have read, understood, and agree to the practices described in this Privacy Policy. If you do not agree with our practices, you should not use the Service.
+VaultBridge is architected to be "blind." We strictly limit our technical capability to collect data. If a government agency, hacker, or alien civilization demanded your data, we could only offer them encrypted static—mathematical noise that is useless without the keys held exclusively in your volatile memory.
             `
         },
         {
-            id: "philosophy",
-            title: "2. Our Privacy Philosophy",
+            id: "live-clipboard",
+            title: "2. Live Clipboard Specifics",
             content: `
-### Privacy by Design
+When utilizing the Universal Live Clipboard feature:
 
-VaultBridge embodies the principle of "privacy by design," meaning that privacy considerations are integrated into every aspect of our system architecture, not added as an afterthought. Key elements of our privacy-first approach include:
-
-**Zero-Knowledge Encryption**: All file encryption and decryption occurs in your browser. We never receive, process, or store encryption keys. We literally cannot access your file contents.
-
-**Minimal Data Collection**: We collect only the information strictly necessary to provide the Service. We do not collect data for advertising, profiling, or purposes unrelated to core functionality.
-
-**Data Minimization**: We retain data only for the minimum time necessary. Vaults are automatically deleted upon expiration or download limit fulfillment.
-
-**No Tracking**: We do not use advertising trackers, social media pixels, or other surveillance technologies designed to profile users across the web.
-
-**Transparency**: We are committed to being completely transparent about our data practices.
-
-### What Makes Us Different
-
-Unlike many cloud storage and file sharing services, VaultBridge:
-
-- **Does Not Scan Your Files**: Many services scan uploaded files for "content moderation," advertising, or other purposes. We cannot scan your files because we cannot decrypt them.
-- **Does Not Build Profiles**: We do not create user profiles based on uploaded content, file types, or sharing patterns.
-- **Does Not Sell Data**: We do not sell, rent, or trade your personal information or any data derived from your use of the Service.
-- **Does Not Require Accounts**: You can use VaultBridge without creating an account, eliminating the need for email verification, password storage, and account-related data collection.
-- **Does Not Retain After Deletion**: When your Vault expires or reaches its download limit, all associated data is permanently deleted with no backups.
+1.  **Transient State**: Data is treated as a WebSocket "stream." It flows through our volatile memory (RAM) only to route it to your other devices.
+2.  **Encryption Layer**: Content is wrapped in AES-256-GCM client-side. The server sees only the encrypted blob and the routing metadata.
+3.  **Persistence**: Unlike Vault files, Clipboard data is NEVER written to disk. It vanishes instantly upon session termination or server restart.
+4.  **Termination**: The "Burn" or "Terminate" command executes a cryptographic erase of your session keys locally and force-closes the server connection.
             `
         },
         {
-            id: "collect",
-            title: "3. Information We Collect",
+            id: "data-collection",
+            title: "3. Data Collection Manifesto",
             content: `
-### Categories of Information
+### What We Collect (The Minimum Viable)
+* **Encrypted Blobs**: The AES-256 encrypted binary data.
+* **Routing IDs (Partial Keys)**: We see the first 3 digits of your Access Code to route traffic. We DO NOT see the full 6-digit PIN used for decryption.
+* **Ephemeral Metadata**: File size, upload timestamp, and expiration timer (TTL).
+* **Access Logs**: IP addresses are logged for 24 hours strictly for DDoS mitigation and abuse prevention, then sanitized.
 
-We collect information in three ways:
-1. Information you provide directly
-2. Information collected automatically
-3. Information from third parties
-
-### Information You Provide
-
-**Encrypted File Data**
-When you upload files to VaultBridge, your browser:
-- Generates a random encryption key
-- Encrypts your files using AES-256-GCM
-- Encrypts file metadata (names, types, sizes)
-- Transmits only encrypted data to our servers
-
-We receive and store:
-- Encrypted file chunks (which we cannot decrypt)
-- Encrypted metadata (which we cannot decrypt)
-
-We do NOT receive or store:
-- Unencrypted file contents
-- Unencrypted file names, types, or other metadata
-- Encryption keys
-
-**Vault Configuration**
-When creating a Vault, you select configuration options:
-- Expiration time (1 hour to 7 days)
-- Download limit (1 to 100 downloads)
-- Access mode (Split Code or Direct Link)
-
-We store these configuration settings to enforce your preferences.
-
-**Access Code Lookup IDs**
-When using Split-Code access:
-- The full 6-digit code is split into Lookup ID (first 3 digits) and PIN (last 3 digits)
-- Only the Lookup ID is transmitted to our servers
-- The PIN never leaves your browser
-
-**Email Addresses (Optional Feature)**
-If you choose to use our "Email Link" feature:
-- We collect the recipient's email address
-- We use it only to send the access information
-- We delete the email address after sending
-
-### Information Collected Automatically
-
-**Server Logs**
-When you access the Service, our servers may log:
-- IP address
-- Request URL
-- HTTP method
-- Response status code
-- User agent string
-- Timestamp
-
-We use server logs for:
-- Security and abuse prevention
-- Rate limiting
-- Debugging and troubleshooting
-- Aggregate analytics
-
-Server logs are retained for a limited period (typically 7-30 days) and then deleted.
-
-**Performance and Error Data**
-We may collect anonymous performance and error data:
-- Page load times
-- API response times
-- Error messages and stack traces
-- Resource utilization metrics
-
-**Device and Browser Information**
-We may collect:
-- Browser type and version
-- Operating system
-- Device type (desktop, mobile, tablet)
-- Screen resolution
-- Language preferences
+### What We DO NOT Collect
+* **Your Decryption Keys**: The full 6-digit PIN never leaves your device.
+* **Your Content**: Streaming decryption ensures even large files are never realized on our server's disk in plaintext.
+* **Your Identity**: No accounts. No emails.
+* **Analytics**: No Google Analytics. No Facebook Pixels. No tracking cookies.
             `
         },
         {
-            id: "not-collect",
-            title: "4. Information We Do NOT Collect",
+            id: "infrastructure",
+            title: "4. Infrastructure",
             content: `
-### What We Cannot Access
-
-Due to our zero-knowledge architecture, VaultBridge cannot access, collect, store, or process:
-
-**File Contents**
-- We cannot see what files you upload
-- We cannot read documents, view images, or play media
-- We cannot scan files for any purpose
-- All file data we store is encrypted with keys we don't have
-
-**File Names and Metadata**
-- Original file names are encrypted before upload
-- File types (MIME types) are encrypted
-- File creation dates and other metadata are encrypted
-- We cannot identify files by name, type, or content
-
-**Complete Access Codes**
-- We only receive the Lookup ID (first 3 digits)
-- The PIN (last 3 digits) never reaches our servers
-- We cannot derive the encryption key without the PIN
-
-**Encryption Keys**
-- Keys are generated in your browser
-- Keys are never transmitted to our servers
-- We cannot decrypt your files under any circumstances
-
-**Passwords**
-- Optional vault passwords are used locally
-- Password-derived keys never leave your browser
-- We cannot recover or reset passwords
-
-### What We Choose Not To Collect
-
-In addition to what we cannot technically access, we also choose not to collect:
-
-- **Advertising Data**: We do not use advertising networks or display ads
-- **Social Media Integration**: We do not integrate social media tracking pixels
-- **Extensive Usage Tracking**: We do not track detailed user journeys or click behavior
-- **Location Data**: We do not request device location or use GPS
-- **Contact Lists**: We do not request access to contacts or import address books
+Our servers act as a blind courier. They take a locked briefcase (your encrypted data) from Point A and hand it to Point B. They do not have the key to the briefcase, nor do they care what is inside. Large file transfers use **Adaptive Streaming** to pipe data directly to your browser without caching it fully on our side.
             `
         },
         {
-            id: "use",
-            title: "5. How We Use Information",
+            id: "legal-compliance",
+            title: "5. Legal Compliance & Disclosure",
             content: `
-### Primary Purposes
-
-We use collected information for the following primary purposes:
-
-**Providing the Service**
-- Storing and delivering encrypted files
-- Processing Vault configurations (expiration, download limits)
-- Enabling access through codes and links
-- Deleting Vaults upon expiration or limit fulfillment
-
-**Security and Abuse Prevention**
-- Preventing and detecting fraud and abuse
-- Protecting against security threats
-- Rate limiting to prevent brute-force attacks
-- Identifying and blocking malicious actors
-
-**Service Improvement**
-- Analyzing aggregate usage patterns
-- Identifying and fixing bugs
-- Optimizing performance
-- Developing new features
-
-**Communication**
-- Responding to support inquiries
-- Sending security notifications
-- Providing service announcements
-- Delivering transactional emails (access links)
-
-### Legal Bases (GDPR)
-
-For users in the European Economic Area (EEA), we rely on:
-
-- **Contractual Necessity**: Processing necessary to provide the Service
-- **Legitimate Interests**: Processing for security, fraud prevention, and service improvement
-- **Legal Obligations**: Processing required to comply with applicable laws
-- **Consent**: Where we rely on consent, you may withdraw it at any time
-
-### What We Do NOT Use Information For
-
-We do not use collected information for:
-- Advertising or marketing to third parties
-- Selling or renting to data brokers
-- Building user profiles for commercial purposes
-- Political targeting or manipulation
-- Discriminatory pricing or treatment
-- Any purpose inconsistent with this Privacy Policy
-            `
-        },
-        {
-            id: "share",
-            title: "6. How We Share Information",
-            content: `
-### General Principle: Minimal Sharing
-
-We do not sell, rent, trade, or otherwise share your personal information with third parties for their commercial purposes. We share information only in the limited circumstances described below.
-
-### Service Providers
-
-We may share information with third-party service providers who assist us in operating the Service:
-
-**Cloud Infrastructure**
-- Encrypted file storage
-- Content delivery
-- Database hosting
-
-Our infrastructure providers store only encrypted data and cannot decrypt your files.
-
-**Email Delivery**
-If you use the email feature, we share recipient email addresses with:
-- Email delivery services
-- Used only to deliver your message
-- Deleted after delivery
-
-**Security Services**
-We may share IP addresses and usage patterns with:
-- DDoS protection services
-- Security monitoring tools
-- Used only for security purposes
-
-### Legal Requirements
-
-We may disclose information if required by law, regulation, legal process, or governmental request:
-
-**Scope of Potential Disclosure**
-Due to our zero-knowledge architecture, we can only provide:
-- Server logs (IP addresses, timestamps)
-- Encrypted data (which is useless without keys we don't have)
-- Vault metadata (encrypted, non-content information)
-
-**What We Cannot Disclose**
-We cannot provide:
-- Decrypted file contents
-- Encryption keys
-- Complete access codes
-- File names or types
-
-**Notification**
-Where legally permitted, we will attempt to notify affected users of legal demands for their information.
-
-### Business Transfers
-
-In the event of a merger, acquisition, or sale of assets:
-- User information may be transferred as part of the transaction
-- The acquiring entity would be bound by this Privacy Policy
-- We would notify users before information is transferred or becomes subject to a different privacy policy
-
-### Aggregated and De-Identified Data
-
-We may share aggregated, anonymized data that cannot identify individuals:
-- Service usage statistics
-- Security trends
-- Performance benchmarks
-
-This data contains no personal information or file-related details.
-            `
-        },
-        {
-            id: "zero-knowledge",
-            title: "7. Zero-Knowledge Architecture Explained",
-            content: `
-### What Zero-Knowledge Means
-
-"Zero-knowledge" in the context of VaultBridge means that we have zero knowledge of—and therefore cannot access—your encrypted file contents. This is not a policy choice but a technical reality built into our architecture.
-
-### How Zero-Knowledge Works
-
-**Client-Side Key Generation**
-When you create a Vault:
-1. Your browser generates a random 256-bit AES key
-2. This key exists only in your browser's memory
-3. The key is never transmitted to our servers
-4. Without this key, your files cannot be decrypted
-
-**Client-Side Encryption**
-Before any data leaves your browser:
-1. Files are encrypted using AES-256-GCM
-2. File names and metadata are encrypted
-3. Unique random IVs are generated for each chunk
-4. Only encrypted data is transmitted to our servers
-
-**Key Distribution**
-The encryption key is distributed only through:
-- **Direct Link Mode**: Key is embedded in the URL fragment (after #), which browsers never send to servers
-- **Split-Code Mode**: Key is derived from the PIN (last 3 digits), which never leaves your browser
-
-**Client-Side Decryption**
-When a recipient accesses a Vault:
-1. Their browser receives encrypted data
-2. The key is obtained from the URL fragment or derived from the PIN
-3. Decryption occurs entirely in their browser
-4. Decrypted files never exist on our servers
-
-### Mathematical Guarantee
-
-The zero-knowledge property is mathematically guaranteed:
-- AES-256 encryption is considered computationally unbreakable with current technology
-- Without the key, the encrypted data is indistinguishable from random noise
-- No amount of computing power can decrypt the data without the key
-- We do not possess the keys, so we cannot perform decryption
-
-### Practical Implications
-
-**What This Means for You:**
-- Your files are protected from VaultBridge, hackers, and anyone who might access our servers
-- Even if our servers were completely compromised, your files would remain encrypted
-- Law enforcement requests cannot compel us to decrypt files we cannot decrypt
-
-**What This Means for VaultBridge:**
-- We cannot help if you lose your access code or encryption key
-- We cannot scan files for prohibited content
-- We cannot perform data recovery for lost vaults
-- We rely on users to report abuse rather than proactive scanning
-            `
-        },
-        {
-            id: "security",
-            title: "8. Encryption and Security Measures",
-            content: `
-### Encryption Standards
-
-VaultBridge employs industry-leading encryption standards:
-
-**File Encryption: AES-256-GCM**
-- Algorithm: Advanced Encryption Standard (AES)
-- Key Size: 256 bits
-- Mode: Galois/Counter Mode (GCM)
-- Properties: Provides both confidentiality and integrity
-
-AES-256-GCM is approved by NIST and used by governments, financial institutions, and security-conscious organizations worldwide.
-
-**Key Derivation: PBKDF2**
-For deriving keys from PINs and passwords:
-- Algorithm: Password-Based Key Derivation Function 2 (PBKDF2)
-- Hash: HMAC-SHA256
-- Iterations: 100,000 (for PINs), 600,000 (for passwords)
-- Salt: Random, unique per vault
-
-**Random Number Generation**
-- Source: Web Crypto API (crypto.getRandomValues())
-- Quality: Cryptographically secure pseudorandom number generator (CSPRNG)
-
-### Infrastructure Security
-
-**Transport Security**
-- TLS 1.3 (or TLS 1.2 with strong cipher suites)
-- Certificate pinning where applicable
-- HSTS (HTTP Strict Transport Security)
-- Perfect forward secrecy
-
-**Application Security**
-- Content Security Policy (CSP)
-- X-Frame-Options: DENY
-- X-Content-Type-Options: nosniff
-- Referrer-Policy: no-referrer
-- Regular security updates and patches
-
-**Infrastructure Protection**
-- DDoS mitigation
-- Web application firewall (WAF)
-- Intrusion detection systems
-- Regular vulnerability scanning
-
-### Security Practices
-
-**Secure Development**
-- Security-focused code review
-- Automated security testing
-- Dependency vulnerability scanning
-- Security training for team members
-
-**Access Control**
-- Principle of least privilege
-- Multi-factor authentication for administrative access
-- Regular access reviews
-- Separation of duties
-
-### Limitations
-
-While we implement robust security measures:
-- No system is perfectly secure
-- Security depends partly on your practices (protecting access codes, using secure devices)
-- New vulnerabilities may be discovered
-- We commit to promptly addressing any security issues
-            `
-        },
-        {
-            id: "retention",
-            title: "9. Data Retention and Deletion",
-            content: `
-### Automatic Vault Deletion
-
-VaultBridge automatically and permanently deletes Vault data:
-
-**Expiration-Based Deletion:**
-- Vaults are deleted when the user-defined expiration time is reached
-- Expiration options range from 1 hour to 7 days
-- A background cleanup process runs regularly to process expirations
-
-**Download-Limit Deletion (Burn-on-Read):**
-- Vaults are deleted immediately when the download limit is reached
-- If set to 1 download, the vault is deleted after a single successful download
-- This deletion is synchronous and occurs before the download completes
-
-### What Gets Deleted
-
-Upon Vault deletion:
-
-**Permanently Deleted:**
-- All encrypted file chunks
-- Encrypted metadata
-- Vault configuration records
-- Chunk records and storage references
-
-**Not Retained:**
-- We do not maintain backups of deleted Vaults
-- We do not keep copies "just in case"
-- Deletion is immediate and irreversible
-
-### Server Log Retention
-
-**Access Logs:**
-- Retained for 7-30 days
-- Used for security and abuse prevention
-- Automatically purged after retention period
-
-**Error Logs:**
-- Retained for 30-90 days
-- Used for debugging and improvement
-- Automatically purged after retention period
-
-### Email Address Retention
-
-**Transactional Emails (Link Delivery):**
-- Recipient email addresses deleted immediately after sending
-- Sender email addresses retained only for delivery confirmation
-
-**Support Inquiries:**
-- Retained for the duration of the support relationship
-- Deleted upon request or after reasonable inactivity period
-
-### Your Deletion Rights
-
-You may request deletion of personal information we hold:
-- Email: privacy@vaultbridge.app
-- We will process requests within 30 days
-
-Note: We cannot delete what we don't have—encrypted file contents are deleted automatically, and we don't retain encryption keys.
-            `
-        },
-        {
-            id: "rights",
-            title: "10. Your Rights and Choices",
-            content: `
-### General Rights
-
-Depending on your jurisdiction, you may have the following rights:
-
-**Right to Access:**
-Request a copy of personal information we hold about you.
-
-**Right to Rectification:**
-Request correction of inaccurate personal information.
-
-**Right to Erasure:**
-Request deletion of personal information.
-
-**Right to Restriction:**
-Request limitation of processing of personal information.
-
-**Right to Portability:**
-Request a machine-readable copy of personal information.
-
-**Right to Object:**
-Object to certain processing of personal information.
-
-**Right to Withdraw Consent:**
-Withdraw consent where processing is based on consent.
-
-### Exercising Your Rights
-
-To exercise your rights:
-
-**Email:** privacy@vaultbridge.app
-**Subject Line:** Privacy Rights Request
-
-Please include:
-- Clear description of your request
-- Information to help us identify any data we hold
-- Proof of identity (to prevent unauthorized access)
-
-We will respond within 30 days (or sooner if required by applicable law).
-
-### Choices You Can Make
-
-**Vault Configuration**
-You control:
-- Expiration time
-- Download limit
-- Access mode (Split Code vs. Direct Link)
-- Optional password protection
-
-**Information Sharing**
-You control:
-- Whether to use the Email Link feature
-- Whether to contact support
-- Whether to provide feedback
-
-**Browser Settings**
-You control:
-- Cookie settings
-- JavaScript settings
-- Service Worker settings
-
-### Limitations
-
-Some rights may be limited:
-- We cannot delete encrypted files before expiration (we cannot identify your files)
-- We cannot provide file contents (we cannot decrypt them)
-- We cannot correct file metadata (we cannot read it)
-            `
-        },
-        {
-            id: "international",
-            title: "11. International Data Transfers",
-            content: `
-### Global Operations
-
-VaultBridge operates globally and may process information in multiple jurisdictions. By using the Service, you consent to the transfer of information to jurisdictions that may have different data protection laws than your own.
-
-### Transfer Mechanisms
-
-For transfers from the EEA, UK, or other regions requiring appropriate safeguards, we rely on:
-
-**Standard Contractual Clauses (SCCs):**
-We use EU-approved standard contractual clauses where required.
-
-**Adequacy Decisions:**
-We may transfer to countries deemed adequate by relevant authorities.
-
-**Other Mechanisms:**
-We comply with other legally recognized transfer mechanisms as applicable.
-
-### Protections
-
-Regardless of where information is processed:
-- We apply consistent security standards
-- We maintain the protections described in this Policy
-- Encryption protects your files regardless of geographic location
-
-### Important Note
-
-Even if data is transferred internationally:
-- Encrypted file data remains protected by encryption
-- We cannot decrypt files regardless of jurisdiction
-- Legal requests cannot compel decryption we cannot perform
-            `
-        },
-        {
-            id: "children",
-            title: "12. Children's Privacy",
-            content: `
-### Age Restriction
-
-VaultBridge is not intended for use by children under the age of 18 (or the age of legal majority in their jurisdiction).
-
-### No Knowing Collection
-
-We do not knowingly collect personal information from children. If we learn that we have collected personal information from a child, we will delete it promptly.
-
-### Parental Notification
-
-If you believe your child has provided personal information to VaultBridge, please contact us at privacy@vaultbridge.app, and we will take steps to delete such information.
-
-### COPPA Compliance
-
-VaultBridge complies with the Children's Online Privacy Protection Act (COPPA) and does not knowingly collect personal information from children under 13.
-            `
-        },
-        {
-            id: "cookies",
-            title: "13. Cookies and Tracking Technologies",
-            content: `
-### Our Minimal Approach
-
-VaultBridge minimizes the use of cookies and tracking technologies.
-
-### What We Do NOT Use
-
-We do NOT use:
-- Third-party advertising cookies
-- Social media tracking pixels
-- Cross-site tracking cookies
-- Fingerprinting technologies
-- Persistent identifiers for tracking
-
-### What We May Use
-
-**Essential Cookies:**
-We may use strictly necessary cookies for:
-- Security (CSRF protection)
-- Session management (if account features are introduced)
-- Preference storage
-
-**Local Storage (Limited):**
-We may use browser local storage for:
-- User preferences
-- Temporary state management
-
-These are not used for tracking and do not contain personal information.
-
-### IndexedDB for Resumable Uploads
-
-We use IndexedDB to store:
-- Encrypted upload progress data
-- Enabling resume of interrupted uploads
-- Automatically cleared after upload completion
-
-This data remains on your device and is not transmitted to our servers.
-
-### Service Workers
-
-We use Service Workers for:
-- Streaming large file downloads
-- Improving performance
-- No tracking functionality
-
-### Your Controls
-
-You can control cookies and storage through:
-- Browser settings
-- Private/incognito browsing
-- Clearing site data
-
-Note: Blocking essential cookies may impair functionality.
-            `
-        },
-        {
-            id: "gdpr",
-            title: "14. Legal Basis for Processing (GDPR)",
-            content: `
-### Applicability
-
-This section applies to users in the European Economic Area (EEA), United Kingdom, and other jurisdictions that require a legal basis for processing personal data.
-
-### Legal Bases We Rely On
-
-**Contractual Necessity (Article 6(1)(b))**
-Processing necessary to provide the Service:
-- Storing encrypted files
-- Processing vault configurations
-- Enabling access through codes and links
-- Deleting vaults as configured
-
-**Legitimate Interests (Article 6(1)(f))**
-Processing for our legitimate interests where not overridden by your rights:
-- Security and fraud prevention
-- Rate limiting and abuse prevention
-- Service maintenance and improvement
-- Investigating and responding to violations
-
-**Legal Obligation (Article 6(1)(c))**
-Processing required by law:
-- Responding to valid legal process
-- Compliance with regulatory requirements
-- Taxation and accounting obligations
-
-**Consent (Article 6(1)(a))**
-Processing based on your consent:
-- Marketing communications (if applicable)
-- Optional features requiring additional data
-- Research participation
-
-You may withdraw consent at any time by contacting privacy@vaultbridge.app.
-
-### Your GDPR Rights
-
-As an EEA resident, you have:
-- Right of Access (Article 15)
-- Right to Rectification (Article 16)
-- Right to Erasure (Article 17)
-- Right to Restriction (Article 18)
-- Right to Data Portability (Article 20)
-- Right to Object (Article 21)
-- Rights Related to Automated Decision-Making (Article 22)
-
-### Making a Complaint
-
-If you believe we have violated your rights, you may lodge a complaint with your local Data Protection Authority (DPA).
-            `
-        },
-        {
-            id: "ccpa",
-            title: "15. California Privacy Rights (CCPA)",
-            content: `
-### Applicability
-
-This section applies to California residents and supplements the information in this Privacy Policy.
-
-### Categories of Personal Information Collected
-
-In the preceding 12 months, we may have collected:
-- **Identifiers**: IP addresses, email addresses (limited)
-- **Personal Information**: Contact information (if provided)
-- **Internet Activity**: Browsing history on our site (server logs)
-- **Geolocation**: Approximate location from IP (limited)
-
-We do NOT collect:
-- Sensory Data (audio, video)
-- Professional Information
-- Protected Classifications
-- Commercial Information
-- Biometric Data
-- Inferences
-
-### Information Sharing
-
-In the preceding 12 months, we have:
-- **NOT sold** personal information
-- **NOT shared** personal information for cross-context behavioral advertising
-- Disclosed information to service providers as described in this Policy
-
-### Your CCPA Rights
-
-As a California resident, you have:
-
-**Right to Know:**
-Request disclosure of categories and specific pieces of personal information collected.
-
-**Right to Delete:**
-Request deletion of personal information.
-
-**Right to Correct:**
-Request correction of inaccurate personal information.
-
-**Right to Opt-Out:**
-Opt out of the sale or sharing of personal information. (We do not sell or share personal information.)
-
-**Right to Non-Discrimination:**
-You will not be discriminated against for exercising your rights.
-
-### Exercising Your Rights
-
-Submit requests to: privacy@vaultbridge.app
-
-We will verify your identity before processing requests.
-            `
-        },
-        {
-            id: "breach",
-            title: "16. Data Breach Response",
-            content: `
-### Our Commitment
-
-Despite our security measures, no system is immune to breaches. If a data breach occurs:
-
-### Our Response Process
-
-**Detection and Containment:**
-- Immediately identify and contain the breach
-- Preserve evidence for investigation
-- Assess scope and impact
-
-**Investigation:**
-- Determine what data was affected
-- Identify how the breach occurred
-- Assess risk to affected individuals
-
-**Notification:**
-- Notify affected individuals promptly
-- Notify regulatory authorities as required by law
-- Provide clear information about the breach and recommended actions
-
-**Remediation:**
-- Fix the vulnerability that caused the breach
-- Implement additional safeguards
-- Update policies and procedures as needed
-
-### Limitations on Impact
-
-Due to our zero-knowledge architecture:
-- Encrypted file contents cannot be compromised without encryption keys
-- A breach of our servers would not expose decrypted files
-- The impact of a breach is limited to non-encrypted data
-
-### Your Role
-
-To minimize breach impact:
-- Use strong, unique passwords (for optional password protection)
-- Do not share access codes unnecessarily
-- Monitor for suspicious activity
-- Report any security concerns promptly
-            `
-        },
-        {
-            id: "changes",
-            title: "17. Changes to This Policy",
-            content: `
-### Updates
-
-We may update this Privacy Policy from time to time. When we make changes:
-
-**Material Changes:**
-- Post prominent notice on the Service
-- Update the "Last Updated" date
-- Send email notification where possible and appropriate
-
-**Non-Material Changes:**
-- Update the "Last Updated" date
-- Post updated Policy on the Service
-
-### Review
-
-We encourage you to review this Privacy Policy periodically.
-
-### Continued Use
-
-Your continued use of the Service after changes constitutes acceptance of the updated Privacy Policy.
-            `
-        },
-        {
-            id: "contact",
-            title: "18. Contact Information",
-            content: `
-### Privacy-Related Inquiries
-
-For privacy-related questions, concerns, or requests:
-
-**Email:** privacy@vaultbridge.app
-**Subject Line:** Privacy Inquiry
-
-Please include:
-- Clear description of your inquiry
-- Contact information for our response
-- Any relevant details
-
-### Other Contacts
-
-**General Inquiries:** hello@vaultbridge.app
-**Security Issues:** security@vaultbridge.app
-**Abuse Reports:** abuse@vaultbridge.app
-**Legal:** legal@vaultbridge.app
-
-### Response Time
-
-We aim to respond to all inquiries within:
-- Privacy requests: 30 days (or sooner if required by law)
-- General inquiries: 5 business days
-- Security issues: 24-48 hours
-
----
-
-## Summary of Key Points
-
-1. **Zero-Knowledge**: We cannot access your encrypted files—ever.
-2. **Minimal Collection**: We collect only what's necessary to provide the Service.
-3. **No Selling**: We never sell your personal information.
-4. **No Advertising**: We don't use your data for advertising.
-5. **Automatic Deletion**: Vaults are permanently deleted upon expiration or download limit.
-6. **Strong Encryption**: AES-256-GCM encryption protects your files.
-7. **Your Control**: You control vault settings, access, and who receives access codes.
-8. **Your Rights**: You have rights to access, correct, delete, and port your data.
-9. **Transparency**: We're committed to clear, honest communication about our practices.
-10. **Security First**: We implement robust security measures to protect the Service.
+Because we possess zero knowledge of content:
+1.  We cannot comply with DMCA takedowns regarding specific content (we can't see it).
+2.  We cannot provide decrypted data to law enforcement.
+
+*Your privacy is not a policy. It is physics.*
             `
         }
     ];
 
     return (
-        <div className="min-h-screen relative overflow-hidden flex flex-col bg-background">
-            {/* Background Effects */}
-            <div className="fixed inset-0 grid-bg opacity-30" />
-
+        <div className="min-h-screen bg-black text-zinc-300 font-sans selection:bg-emerald-500/30">
             {/* Header */}
-            <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-white/5">
-                <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+            <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 backdrop-blur-xl">
+                <div className="container flex h-16 items-center justify-between px-4 max-w-5xl mx-auto">
                     <Link href="/">
-                        <div className="flex items-center gap-3 cursor-pointer">
-                            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30">
-                                <Shield className="w-5 h-5 text-primary" />
-                            </div>
-                            <h1 className="text-xl font-bold font-mono tracking-tight">
-                                VAULT<span className="text-primary">BRIDGE</span>
-                            </h1>
+                        <div className="flex items-center gap-2 cursor-pointer group">
+                            <Shield className="w-5 h-5 text-emerald-500 transition-colors group-hover:text-emerald-400" />
+                            <span className="text-lg font-bold tracking-tight text-white group-hover:text-emerald-50 transition-colors">
+                                VAULT<span className="text-emerald-500">BRIDGE</span>
+                            </span>
                         </div>
                     </Link>
                     <Link href="/">
-                        <Button variant="ghost" className="gap-2">
+                        <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5">
                             <ArrowLeft className="w-4 h-4" />
-                            Back Home
+                            <span className="hidden sm:inline">Return Home</span>
                         </Button>
                     </Link>
                 </div>
             </header>
 
-            <main className="relative z-10 flex-1 max-w-4xl mx-auto px-6 py-12">
-                {/* Title Section */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-12 text-center"
-                >
-                    <div className="inline-flex items-center gap-2 mb-6">
-                        <Lock className="w-8 h-8 text-primary" />
-                    </div>
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">Privacy Policy</h1>
-                    <p className="text-muted-foreground">Last Updated: January 28, 2026</p>
-                    <p className="text-sm text-muted-foreground mt-2">Version 2.0.0</p>
-                </motion.div>
+            <main className="container max-w-4xl mx-auto px-4 py-12 md:py-16">
 
-                {/* Commitment Box */}
-                <div className="glass-card p-6 mb-12 border border-emerald-500/30 bg-emerald-500/5">
-                    <div className="flex items-start gap-4">
-                        <ShieldCheck className="w-8 h-8 text-emerald-400 flex-shrink-0" />
-                        <div>
-                            <h2 className="text-lg font-bold text-emerald-400 mb-3">Our Commitment to Privacy</h2>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                VaultBridge is built on a fundamental respect for your privacy. Unlike many online services,
-                                we have designed VaultBridge from the ground up with privacy as the primary consideration,
-                                not an afterthought. Our zero-knowledge architecture means that we literally cannot access
-                                or view your files—not just that we choose not to, but that we are technically incapable of doing so.
-                            </p>
-                        </div>
-                    </div>
+                {/* Title Section */}
+                <div className="mb-12 md:mb-16 space-y-4">
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono uppercase tracking-wider"
+                    >
+                        <Lock className="w-3 h-3" />
+                        Effective Immediately
+                    </motion.div>
+
+                    <motion.h1
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="text-4xl md:text-5xl font-black text-white tracking-tight"
+                    >
+                        Privacy Protocol
+                    </motion.h1>
+
+                    <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="text-lg md:text-xl text-zinc-400 max-w-2xl leading-relaxed"
+                    >
+                        Security Level: <span className="text-emerald-400 font-bold">Zero-Knowledge</span>
+                    </motion.p>
                 </div>
 
-                {/* Table of Contents */}
-                <div className="glass-card p-6 mb-12">
-                    <h2 className="text-lg font-bold mb-4">Table of Contents</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid md:grid-cols-[240px_1fr] gap-12 items-start">
+                    {/* Table of Contents - Sticky Sidebar */}
+                    <div className="hidden md:block sticky top-24 space-y-1">
+                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 px-2">Contents</p>
                         {sections.map((section) => (
                             <a
                                 key={section.id}
                                 href={`#${section.id}`}
-                                className="text-sm text-muted-foreground hover:text-primary transition-colors py-1"
+                                className="block px-3 py-2 text-sm text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/5 rounded-lg transition-colors border-l-2 border-transparent hover:border-emerald-500"
                             >
-                                {section.title}
+                                {section.title.split('. ')[1]}
                             </a>
+                        ))}
+                    </div>
+
+                    {/* Content */}
+                    <div className="space-y-16">
+                        {sections.map((section, index) => (
+                            <motion.section
+                                key={section.id}
+                                id={section.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true, margin: "-50px" }}
+                                transition={{ duration: 0.5 }}
+                                className="scroll-mt-24"
+                            >
+                                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                                    {section.title}
+                                </h2>
+                                <div className="prose prose-invert prose-zinc max-w-none prose-emerald prose-headings:text-zinc-100 prose-p:text-zinc-400 prose-li:text-zinc-400 prose-strong:text-emerald-400">
+                                    {section.content.split('\n').map((line, i) => {
+                                        const trimmed = line.trim();
+                                        if (trimmed.startsWith('###')) return <h3 key={i} className="text-xl font-bold text-white mt-6 mb-3">{renderContent(trimmed.replace('###', '').trim())}</h3>;
+                                        if (trimmed.startsWith('* ')) return <li key={i} className="ml-4 list-disc pl-1">{renderContent(trimmed.replace('* ', '').trim())}</li>;
+                                        if (trimmed.match(/^\d+\./)) return <li key={i} className="ml-4 list-decimal pl-1">{renderContent(trimmed.replace(/^\d+\./, '').trim())}</li>;
+                                        if (trimmed === '') return <br key={i} />;
+
+                                        // Handle italic block at the end specially
+                                        if (trimmed.startsWith('*') && trimmed.endsWith('*') && trimmed.length > 2) {
+                                            return <p key={i} className="text-emerald-400/80 italic text-center mt-8 text-lg font-mono border-t border-emerald-500/20 pt-8">{trimmed.slice(1, -1)}</p>;
+                                        }
+
+                                        return <p key={i}>{renderContent(line)}</p>;
+                                    })}
+                                </div>
+                            </motion.section>
                         ))}
                     </div>
                 </div>
 
-                {/* Content Sections */}
-                <div className="space-y-12">
-                    {sections.map((section, index) => (
-                        <motion.section
-                            key={section.id}
-                            id={section.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 }}
-                            viewport={{ once: true }}
-                            className="scroll-mt-24"
-                        >
-                            <h2 className="text-2xl font-bold mb-6 text-primary">{section.title}</h2>
-                            <div className="prose prose-invert max-w-none">
-                                <div
-                                    className="text-muted-foreground leading-relaxed space-y-4"
-                                    dangerouslySetInnerHTML={{
-                                        __html: section.content
-                                            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>')
-                                            .replace(/### (.*?)$/gm, '<h3 class="text-lg font-semibold text-foreground mt-6 mb-3">$1</h3>')
-                                            .replace(/- (.*?)$/gm, '<li class="ml-4">$1</li>')
-                                            .split('\n\n').join('</p><p class="mt-4">')
-                                    }}
-                                />
-                            </div>
-                        </motion.section>
-                    ))}
-                </div>
-            </main>
-
-            {/* Back to Top Button */}
-            {showBackToTop && (
+                {/* Back to Top */}
                 <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: showBackToTop ? 1 : 0 }}
                     onClick={scrollToTop}
-                    className="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+                    className="fixed bottom-8 right-8 p-3 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-500 transition-colors z-50"
                 >
                     <ChevronUp className="w-5 h-5" />
                 </motion.button>
-            )}
+            </main>
 
-            {/* Footer */}
-            <footer className="relative z-10 py-8 border-t border-white/5">
-                <div className="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                        <Link href="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
-                        <Link href="/privacy" className="text-primary">Privacy Policy</Link>
-                        <Link href="/how-it-works" className="hover:text-foreground transition-colors">How It Works</Link>
-                    </div>
-                    <p className="text-xs text-muted-foreground/60">
-                        © 2026 VaultBridge. All rights reserved.
+            <footer className="border-t border-white/5 py-12 mt-24 bg-zinc-950">
+                <div className="container px-4 text-center max-w-4xl mx-auto">
+                    <ShieldCheck className="w-12 h-12 text-zinc-800 mx-auto mb-6" />
+                    <p className="text-zinc-500 text-sm">
+                        Last Updated: 2024 • VaultBridge Security Team
                     </p>
                 </div>
             </footer>

@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   Unlock, File, Download as DownloadIcon, Loader2, AlertTriangle,
-  ShieldCheck, Zap
+  ShieldCheck, Zap, ArrowLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -317,14 +317,23 @@ export default function DownloadPage() {
 
         {/* Header */}
         <header className="flex items-center justify-between mb-6 md:mb-8">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.href = '/'}>
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
-              <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+          <Link href="/">
+            <div className="flex items-center gap-3 cursor-pointer">
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
+                <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+              </div>
+              <div>
+                <h1 className="text-lg md:text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg md:text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
-            </div>
-          </div>
+          </Link>
+
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary/50">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Return</span>
+            </Button>
+          </Link>
         </header>
 
         {/* Vault Info */}
