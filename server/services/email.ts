@@ -61,86 +61,103 @@ const getEmailStyles = () => `
   
   body { 
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(180deg, #0a0a0f 0%, #0f0f15 100%);
-    color: #e4e4e7;
+    background: #0a0a0f;
+    color: #ffffff;
     padding: 40px 20px;
     margin: 0;
     min-height: 100vh;
   }
   
   .wrapper {
-    max-width: 600px;
+    max-width: 580px;
     margin: 0 auto;
   }
   
   .container {
-    background: linear-gradient(145deg, #18181b 0%, #1f1f23 100%);
-    border: 1px solid #27272a;
-    border-radius: 24px;
-    padding: 40px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(165deg, #1a1a1f 0%, #141417 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 48px 40px;
+    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.6);
   }
   
   .header {
     text-align: center;
-    margin-bottom: 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
   }
   
   .logo {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 700;
-    letter-spacing: -1px;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
   }
   
-  .logo-vault { color: #fafafa; }
+  .logo-vault { color: #ffffff; }
   .logo-bridge { color: #10b981; }
   
-  .logo-icon {
-    display: inline-block;
-    width: 48px;
-    height: 48px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    border-radius: 14px;
-    margin-bottom: 16px;
-    line-height: 48px;
-    font-size: 24px;
-    text-align: center;
-  }
-  
   .tagline {
-    font-size: 13px;
-    color: #71717a;
-    margin-top: 8px;
-    letter-spacing: 2px;
+    font-size: 12px;
+    color: #6b7280;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
+    font-weight: 500;
   }
   
   .title {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
-    color: #fafafa;
-    margin-bottom: 12px;
+    color: #ffffff;
+    margin-bottom: 10px;
     text-align: center;
+    letter-spacing: -0.3px;
   }
   
   .subtitle {
-    color: #a1a1aa;
+    color: #9ca3af;
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.7;
     text-align: center;
     margin-bottom: 32px;
   }
   
+  .message-box {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin: 24px 0 28px 0;
+  }
+  
+  .message-label {
+    font-size: 11px;
+    color: #10b981;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .message-text {
+    color: #e5e7eb;
+    font-size: 14px;
+    line-height: 1.65;
+    font-weight: 400;
+  }
+  
   .code-container {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
-    border: 2px solid rgba(16, 185, 129, 0.3);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%);
+    border: 2px solid rgba(16, 185, 129, 0.25);
     border-radius: 16px;
-    padding: 28px;
+    padding: 32px;
     text-align: center;
-    margin: 24px 0;
+    margin: 28px 0;
   }
   
   .code-label {
@@ -148,17 +165,17 @@ const getEmailStyles = () => `
     color: #10b981;
     text-transform: uppercase;
     letter-spacing: 3px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     font-weight: 600;
   }
   
   .code {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 42px;
+    font-size: 38px;
     font-weight: 700;
     color: #10b981;
-    letter-spacing: 8px;
-    text-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+    letter-spacing: 6px;
+    text-shadow: 0 0 40px rgba(16, 185, 129, 0.35);
   }
   
   .btn-container {
@@ -169,179 +186,69 @@ const getEmailStyles = () => `
   .btn {
     display: inline-block;
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: #052e16 !important;
+    color: #022c1e !important;
     text-decoration: none;
-    padding: 16px 40px;
+    padding: 16px 44px;
     border-radius: 12px;
     font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.5px;
-    box-shadow: 0 10px 30px -5px rgba(16, 185, 129, 0.4);
-    transition: transform 0.2s;
-  }
-  
-  .btn:hover {
-    transform: translateY(-2px);
-  }
-  
-  .info-grid {
-    display: flex;
-    gap: 16px;
-    margin: 24px 0;
-  }
-  
-  .info-card {
-    flex: 1;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid #27272a;
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
-  }
-  
-  .info-icon {
-    font-size: 20px;
-    margin-bottom: 8px;
-  }
-  
-  .info-label {
-    font-size: 11px;
-    color: #71717a;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 4px;
-  }
-  
-  .info-value {
     font-size: 14px;
-    font-weight: 600;
-    color: #fafafa;
+    letter-spacing: 0.3px;
+    box-shadow: 0 12px 35px -8px rgba(16, 185, 129, 0.5);
   }
   
   .warning-box {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
-    border: 1px solid rgba(245, 158, 11, 0.3);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.04) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.2);
     border-radius: 12px;
-    padding: 20px;
-    margin-top: 24px;
+    padding: 18px 22px;
+    margin-top: 28px;
   }
   
   .warning-title {
     color: #fbbf24;
     font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
     gap: 8px;
   }
   
   .warning-text {
-    color: #a1a1aa;
+    color: #d1d5db;
     font-size: 13px;
     line-height: 1.5;
-  }
-  
-  .security-badge {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-    border-radius: 12px;
-    padding: 20px;
-    margin-top: 24px;
-    text-align: center;
-  }
-  
-  .security-title {
-    color: #10b981;
-    font-weight: 600;
-    font-size: 13px;
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  
-  .security-text {
-    color: #71717a;
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, #27272a 50%, transparent 100%);
-    margin: 32px 0;
-  }
-  
-  .footer {
-    text-align: center;
-    padding-top: 24px;
-  }
-  
-  .footer-logo {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    font-weight: 600;
-    color: #52525b;
-    margin-bottom: 12px;
-  }
-  
-  .footer-text {
-    font-size: 12px;
-    color: #52525b;
-    line-height: 1.6;
-  }
-  
-  .footer-link {
-    color: #10b981;
-    text-decoration: none;
-    font-weight: 500;
-  }
-  
-  .feature-list {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    margin: 24px 0;
-    flex-wrap: wrap;
-  }
-  
-  .feature-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #a1a1aa;
-  }
-  
-  .feature-icon {
-    color: #10b981;
   }
   
   .attachment-list {
-    background: rgba(0,0,0,0.2);
-    border: 1px solid #27272a;
-    border-radius: 12px;
-    padding: 20px;
-    margin: 24px 0;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 24px;
+    margin: 28px 0;
   }
   
   .attachment-header {
     font-size: 12px;
-    color: #71717a;
+    color: #9ca3af;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 16px;
+    letter-spacing: 1.5px;
+    margin-bottom: 18px;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   
   .attachment-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: rgba(255,255,255,0.02);
-    border-radius: 8px;
-    margin-bottom: 8px;
+    gap: 16px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    margin-bottom: 10px;
   }
   
   .attachment-item:last-child {
@@ -349,32 +256,72 @@ const getEmailStyles = () => `
   }
   
   .attachment-icon {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  
+  .attachment-info {
+    flex: 1;
+    min-width: 0;
   }
   
   .attachment-name {
-    flex: 1;
     font-size: 14px;
-    font-weight: 500;
-    color: #fafafa;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 3px;
+    word-break: break-word;
   }
   
   .attachment-size {
     font-size: 12px;
-    color: #71717a;
+    color: #6b7280;
+    font-weight: 500;
+  }
+  
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+    margin: 36px 0;
+  }
+  
+  .footer {
+    text-align: center;
+    padding-top: 8px;
+  }
+  
+  .footer-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+  
+  .footer-text {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.7;
+  }
+  
+  .footer-link {
+    color: #10b981;
+    text-decoration: none;
+    font-weight: 600;
   }
 `;
 
 const getEmailHeader = () => `
   <div class="header">
-    <div class="logo-icon">🔐</div>
+    <img src="https://vault.kavin.cyou/vault-logo.jpg" alt="VaultBridge" style="width: 64px; height: 64px; border-radius: 16px; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;">
     <div class="logo">
       <span class="logo-vault">VAULT</span><span class="logo-bridge">BRIDGE</span>
     </div>
@@ -388,7 +335,7 @@ const getEmailFooter = () => `
     <div class="footer-logo">VAULTBRIDGE</div>
     <div class="footer-text">
       End-to-end encrypted file transfer<br>
-      <a href="https://vaultbridge.io" class="footer-link">vaultbridge.io</a>
+      <a href="https://vault.kavin.cyou" class="footer-link">vault.kavin.cyou</a>
     </div>
   </div>
 `;
@@ -486,6 +433,69 @@ async function sendViaBrevo(input: BrevoEmailInput): Promise<{ success: boolean;
 }
 
 // ============================================
+// MSG91 API CLIENT
+// ============================================
+
+interface Msg91EmailInput {
+  to: string;
+  subject: string;
+  htmlContent: string;
+  senderName?: string;
+  attachments?: { name: string; content: string }[]; // Base64 content
+}
+
+async function sendViaMsg91(input: Msg91EmailInput): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const authKey = process.env.MSG91_AUTH_KEY || "480091AbJuma92Ie692de24aP1";
+
+  try {
+    // Construct payload for MSG91
+    const body: any = {
+      recipients: [
+        {
+          to: [{ email: input.to, name: input.senderName || "User" }]
+        }
+      ],
+      from: {
+        email: "no-reply@acedigital.space",
+        name: input.senderName || "VaultBridge"
+      },
+      domain: "acedigital.space",
+      subject: input.subject,
+      html: input.htmlContent
+      // Note: If MSG91 strictly requires 'template_id', dynamic HTML might fail. 
+      // Assuming 'html' field is supported for custom content.
+    };
+
+    if (input.attachments && input.attachments.length > 0) {
+      body.attachments = input.attachments.map(a => ({
+        name: a.name,
+        file: a.content // Base64 string
+      }));
+    }
+
+    const response = await fetch("https://control.msg91.com/api/v5/email/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "authkey": authKey
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.status === "error") {
+      return { success: false, error: data.message || JSON.stringify(data) };
+    }
+
+    return { success: true, messageId: data.data };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Unknown MSG91 error" };
+  }
+}
+
+// ============================================
 // VAULT ACCESS EMAIL
 // ============================================
 
@@ -523,6 +533,8 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>${getEmailStyles()}</style>
 </head>
 <body>
@@ -530,7 +542,7 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
     <div class="container">
       ${getEmailHeader()}
       
-      <h1 class="title">Secure Files Shared With You</h1>
+      <h1 class="title">🔐 Secure Files Shared With You</h1>
       <p class="subtitle">
         ${input.senderName ? `<strong>${input.senderName}</strong> has sent you encrypted files via VaultBridge.` : `Someone has sent you encrypted files via VaultBridge.`}
         Use the access code below to decrypt and download.
@@ -585,7 +597,7 @@ Expires: ${expiryFormatted}
         return { success: false, error: error.message };
       }
       result = { success: true, messageId: data?.id };
-    } else {
+    } else if (provider === "BREVO") {
       // BREVO
       const res = await sendViaBrevo({
         to: normalizedTo, // Use normalized lowercase email
@@ -594,6 +606,19 @@ Expires: ${expiryFormatted}
         textContent: textContent,
         senderName: "VaultBridge",
         replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com'
+      });
+
+      if (!res.success) {
+        return { success: false, error: res.error };
+      }
+      result = { success: true, messageId: res.messageId };
+    } else {
+      // MSG91
+      const res = await sendViaMsg91({
+        to: normalizedTo,
+        subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
+        htmlContent: html, // Sending full HTML
+        senderName: "VaultBridge"
       });
 
       if (!res.success) {
@@ -642,8 +667,10 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
     const attachmentListHtml = files.map(f => `
       <div class="attachment-item">
         <div class="attachment-icon">📄</div>
-        <div class="attachment-name">${f.filename}</div>
-        <div class="attachment-size">${formatSize(f.content.length)}</div>
+        <div class="attachment-info">
+          <div class="attachment-name">${f.filename}</div>
+          <div class="attachment-size">${formatSize(f.content.length)}</div>
+        </div>
       </div>
     `).join('');
 
@@ -651,6 +678,8 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>${getEmailStyles()}</style>
 </head>
 <body>
@@ -661,10 +690,15 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       <h1 class="title">📬 Files Delivered to You</h1>
       <p class="subtitle">Zero-Knowledge Relay Transfer</p>
       
-      ${text ? `<div style="background:rgba(255,255,255,0.05);padding:15px;border-radius:8px;margin:20px 0;">${text}</div>` : ''}
+      ${text ? `
+      <div class="message-box">
+        <div class="message-label">💬 Message</div>
+        <div class="message-text">${text}</div>
+      </div>
+      ` : ''}
       
       <div class="attachment-list">
-        <div class="attachment-header">📎 ${files.length} Attachments</div>
+        <div class="attachment-header">📎 ${files.length} ${files.length === 1 ? 'Attachment' : 'Attachments'}</div>
         ${attachmentListHtml}
       </div>
       
@@ -698,8 +732,8 @@ ${files.map(f => `• ${f.filename}`).join('\n')}
         log(`Resend Error (Direct): ${data.error.message}`, "email");
         return false;
       }
-    } else {
-      // BREVO
+    } else if (provider === "BREVO") {
+      // PREVO
       // Prepare attachments for Brevo (Base64)
       const brevoAttachments = files.map(f => ({
         name: f.filename,
@@ -717,6 +751,25 @@ ${files.map(f => `• ${f.filename}`).join('\n')}
 
       if (!res.success) {
         log(`Brevo Error (Direct): ${res.error}`, "email");
+        return false;
+      }
+    } else {
+      // MSG91
+      const msg91Attachments = files.map(f => ({
+        name: f.filename,
+        content: f.content.toString('base64')
+      }));
+
+      const res = await sendViaMsg91({
+        to: normalizedTo,
+        subject: `📬 ${subject}`,
+        htmlContent: html,
+        senderName: "VaultBridge",
+        attachments: msg91Attachments
+      });
+
+      if (!res.success) {
+        log(`MSG91 Error (Direct): ${res.error}`, "email");
         return false;
       }
     }

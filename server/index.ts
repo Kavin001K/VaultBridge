@@ -188,15 +188,10 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   setupWebsocketSignaling(httpServer);
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`🔐 VaultBridge server running on port ${port}`);
-      log(`🧹 Cleanup worker active (10 min interval)`);
-    }
-  );
+  const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+
+  httpServer.listen(port, host, () => {
+    log(`🔐 VaultBridge server running on http://${host}:${port}`);
+    log(`🧹 Cleanup worker active (10 min interval)`);
+  });
 })();
