@@ -11,7 +11,8 @@ export type SoundType =
     | 'whoosh'
     | 'tick'
     | 'pop'
-    | 'chime';
+    | 'chime'
+    | 'off';
 
 // Web Audio API based synthesized sounds - no external files needed!
 const createAudioContext = () => {
@@ -177,6 +178,21 @@ const soundConfigs: Record<SoundType, (ctx: AudioContext, volume: number) => voi
             osc.start(ctx.currentTime);
             osc.stop(ctx.currentTime + 0.5);
         });
+    },
+
+    off: (ctx, volume) => {
+        // Power down sound
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(volume * 0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
     },
 };
 

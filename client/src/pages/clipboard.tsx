@@ -1,109 +1,100 @@
-import { useState, useEffect, useCallback } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Clipboard, Lock, Shield, Zap, Copy, ArrowRight, ArrowLeft,
-    CheckCircle2, AlertCircle, RefreshCw, Smartphone, Globe, Laptop,
-    Eye, EyeOff, Timer, Fingerprint, KeyRound, ShieldCheck, Sparkles
+    Lock, Zap, Copy, RefreshCw, Share2, Power,
+    Globe, Shield, Key, Eye, EyeOff, Wifi, Save,
+    Smartphone, QrCode, Trash2, AlertTriangle, Check, ArrowLeft
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
-import { useCreateVault } from "@/hooks/use-vaults";
-import { generateKey, generateSplitCode, wrapFileKey, encryptMetadata, encryptClipboardText } from "@/lib/crypto";
+import { useCreateVault, useClipboardSync, useUpdateClipboard } from "@/hooks/use-vaults";
+import { generateKey, generateSplitCode, wrapFileKey, encryptMetadata, encryptClipboardText, decryptClipboardText } from "@/lib/crypto";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 
-// Security strength indicator
-function SecurityMeter({ strength }: { strength: number }) {
-    const levels = [
-        { min: 0, label: "Weak", color: "bg-red-500" },
-        { min: 30, label: "Fair", color: "bg-amber-500" },
-        { min: 60, label: "Strong", color: "bg-emerald-500" },
-        { min: 90, label: "Military", color: "bg-cyan-500" },
-    ];
-    const current = levels.filter(l => strength >= l.min).pop()!;
+// --- Components ---
+
+const SecurityBadge = ({ active, icon: Icon, label }: { active: boolean, icon: any, label: string }) => (
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] uppercase tracking-wider font-mono transition-colors ${active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'}`}>
+        <Icon className="w-3 h-3" />
+        {label}
+    </div>
+);
+
+const PulseIndicator = ({ status }: { status: 'idle' | 'syncing' | 'live' }) => {
+    const colors = {
+        idle: 'bg-zinc-600',
+        syncing: 'bg-amber-400',
+        live: 'bg-emerald-500'
+    };
 
     return (
-        <div className="flex items-center gap-3">
-            <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <motion.div
-                    className={`h-full ${current.color}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${strength}%` }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                />
+        <div className="flex items-center gap-2">
+            <div className="relative flex h-2.5 w-2.5">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${colors[status]}`}></span>
+                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${colors[status]}`}></span>
             </div>
-            <span className={`text-xs font-mono uppercase tracking-wider ${current.color.replace('bg-', 'text-')}`}>
-                {current.label}
+            <span className={`text-xs font-mono uppercase ${status === 'syncing' ? 'text-amber-400' : 'text-zinc-500'}`}>
+                {status === 'idle' ? 'Offline' : status === 'syncing' ? 'Syncing...' : 'Live Link Active'}
             </span>
         </div>
     );
-}
+};
 
-// Animated security badge
-function SecurityBadge({ icon: Icon, label, active }: { icon: any; label: string; active: boolean }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: active ? 1 : 0.4, scale: active ? 1 : 0.95 }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${active
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                : 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
-                }`}
-        >
-            <Icon className="w-4 h-4" />
-            <span className="text-xs font-medium">{label}</span>
-            {active && <CheckCircle2 className="w-3 h-3 ml-auto" />}
-        </motion.div>
-    );
-}
-
-export default function ClipboardPage() {
-    const [, setLocation] = useLocation();
+export default function UniversalClipboard() {
     const { toast } = useToast();
     const { play } = useSounds();
-    const createVault = useCreateVault();
 
-    // Form state
-    const [clipboardText, setClipboardText] = useState("");
-    const [isCreating, setIsCreating] = useState(false);
+    // --- State ---
+    const [mode, setMode] = useState<'draft' | 'live'>('draft');
+    const [content, setContent] = useState("");
     const [showContent, setShowContent] = useState(true);
-    const [expiresIn, setExpiresIn] = useState([24]);
-    const [maxDownloads, setMaxDownloads] = useState([1]); // Default to single use for security
-    const [burnAfterRead, setBurnAfterRead] = useState(true);
+    const [isCreating, setIsCreating] = useState(false);
 
-    // Success state
-    const [createdData, setCreatedData] = useState<{
-        code: string;
+    // Config
+    const [expiresIn, setExpiresIn] = useState([24]);
+    const [burnAfterRead, setBurnAfterRead] = useState(false);
+
+    // Live Data
+    const [vaultData, setVaultData] = useState<{
+        pin: string;
         lookupId: string;
-        wrappedKey: string;
+        fullCode: string;
         key: CryptoKey;
+        wrappedKey: string;
     } | null>(null);
 
-    // Calculate security strength
-    const calculateSecurity = useCallback(() => {
-        let score = 40; // Base encryption score
-        if (clipboardText.length > 0) score += 10;
-        if (expiresIn[0] <= 24) score += 15;
-        if (expiresIn[0] <= 1) score += 10;
-        if (maxDownloads[0] === 1) score += 15;
-        if (burnAfterRead) score += 10;
-        return Math.min(100, score);
-    }, [clipboardText, expiresIn, maxDownloads, burnAfterRead]);
+    const [lastSynced, setLastSynced] = useState<Date | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const securityScore = calculateSecurity();
+    // --- Hooks ---
+    const createVault = useCreateVault();
+    const updateVault = useUpdateClipboard();
 
-    // Create secure clipboard
-    const handleCreate = async () => {
-        if (!clipboardText.trim()) {
-            toast({
-                variant: "destructive",
-                title: "Empty Content",
-                description: "Enter content to create a secure clipboard.",
-            });
-            play("error");
+    // Only fetch sync data if we are in live mode and have a lookup ID
+    const { data: remoteData, refetch: refreshRemote } = useClipboardSync(
+        vaultData?.lookupId || "",
+        mode === 'live' && !!vaultData?.lookupId
+    );
+
+    // --- Logic ---
+
+    // 1. Creation Handler
+    const handleGoLive = async () => {
+        if (!content.trim()) {
+            toast({ variant: "destructive", title: "Empty Protocol", description: "Input data before initializing uplink." });
             return;
         }
 
@@ -111,501 +102,359 @@ export default function ClipboardPage() {
         play("click");
 
         try {
-            // Generate cryptographic materials
+            // Crypto Gen
             const key = await generateKey();
-            const splitCode = generateSplitCode();
+            const splitCode = generateSplitCode(); // { lookupId, pin, fullCode }
             const wrappedKey = await wrapFileKey(key, splitCode.pin);
 
-            // Encrypt content client-side
-            const encryptedClipboard = await encryptClipboardText(clipboardText, key);
-            const encryptedMetadataStr = await encryptMetadata([], key);
+            const encryptedContent = await encryptClipboardText(content, key);
+            const encryptedMetadata = await encryptMetadata([], key);
 
-            // Create vault on server (server never sees plaintext)
+            // Server Mutation
             await createVault.mutateAsync({
                 expiresIn: expiresIn[0],
-                maxDownloads: burnAfterRead ? 1 : maxDownloads[0],
-                encryptedMetadata: encryptedMetadataStr,
+                maxDownloads: 100, // Clipboard allows multiple fetches for sync
+                encryptedMetadata,
                 lookupId: splitCode.lookupId,
                 wrappedKey,
                 files: [],
-                encryptedClipboardText: encryptedClipboard,
+                encryptedClipboardText: encryptedContent,
             });
 
+            // State Transition
+            setVaultData({
+                ...splitCode,
+                key,
+                wrappedKey
+            });
+            setMode('live');
+            setLastSynced(new Date());
             play("success");
-            setCreatedData({
-                code: splitCode.fullCode,
-                lookupId: splitCode.lookupId,
-                wrappedKey,
-                key
+
+            toast({
+                title: "Uplink Established",
+                description: "Secure channel is live. Share PIN to sync.",
+                className: "bg-emerald-950 border-emerald-500 text-emerald-400"
             });
 
-        } catch (err: any) {
-            console.error(err);
-            play("error");
-            toast({
-                variant: "destructive",
-                title: "Creation Failed",
-                description: err.message || "Could not create secure clipboard.",
-            });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Initialization Failed", description: "Could not establish secure link." });
         } finally {
             setIsCreating(false);
         }
     };
 
-    // Copy PIN to clipboard
-    const copyPin = () => {
-        if (createdData) {
-            navigator.clipboard.writeText(createdData.code);
-            toast({ title: "PIN Copied!", description: "Share this 6-digit code securely." });
-            play("click");
+    // 2. Incoming Sync Handler
+    useEffect(() => {
+        if (mode === 'live' && remoteData?.encryptedClipboardText && vaultData) {
+            const decrypt = async () => {
+                try {
+                    const decryptedText = await decryptClipboardText(remoteData.encryptedClipboardText!, vaultData.key);
+                    if (decryptedText !== content) {
+                        setContent(decryptedText);
+                        setLastSynced(new Date());
+                        play("pop"); // Subtle sound on incoming change
+                    }
+                } catch (e) {
+                    console.error("Decryption sync failed", e);
+                }
+            };
+            decrypt();
+        }
+    }, [remoteData, mode, vaultData]); // Intentionally omitting 'content' to avoid loops, only trigger on remote data change
+
+    // 3. Outgoing Sync Handler (Debounced)
+    const handleContentChange = (newText: string) => {
+        setContent(newText);
+
+        if (mode === 'live' && vaultData) {
+            setIsSyncing(true);
+
+            // Clear existing timeout
+            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+            // Set new timeout (500ms debounce)
+            syncTimeoutRef.current = setTimeout(async () => {
+                try {
+                    const encrypted = await encryptClipboardText(newText, vaultData.key);
+                    await updateVault.mutateAsync({
+                        lookupId: vaultData.lookupId,
+                        encryptedClipboardText: encrypted,
+                        wrappedKey: vaultData.wrappedKey
+                    });
+                    setLastSynced(new Date());
+                    setIsSyncing(false);
+                } catch (e) {
+                    console.error("Upload failed", e);
+                    setIsSyncing(false);
+                }
+            }, 500);
         }
     };
 
-    // Reset to create another
-    const handleReset = () => {
-        setCreatedData(null);
-        setClipboardText("");
-        play("click");
+    // 4. Utility Functions
+    const copyToClipboard = async (text: string) => {
+        await navigator.clipboard.writeText(text);
+        toast({ title: "Copied to local clipboard" });
+    };
+
+    const terminateSession = () => {
+        // In a real app we might send a DELETE request here
+        setMode('draft');
+        setVaultData(null);
+        setContent("");
+        play("off");
+        toast({ title: "Session Terminated", description: "Local keys purged." });
     };
 
     return (
-        <div className="min-h-screen bg-black text-zinc-100 selection:bg-cyan-500/30 overflow-hidden">
-            {/* Ambient Background */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                {/* Gradient orbs */}
-                <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/8 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-emerald-500/8 rounded-full blur-[120px]" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-violet-500/5 rounded-full blur-[150px]" />
+        <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 overflow-hidden flex flex-col">
 
-                {/* Grid pattern */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
-
-                {/* Noise texture */}
-                <div className="absolute inset-0 opacity-[0.015]" style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
-                }} />
+            {/* Background FX */}
+            <div className="fixed inset-0 pointer-events-none">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent opacity-20" />
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.03)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)]" />
             </div>
 
-            {/* Main Content */}
-            <div className="relative z-10 min-h-screen flex flex-col">
-                {/* Header */}
-                <header className="border-b border-zinc-800/50 backdrop-blur-xl bg-black/50">
-                    <div className="container max-w-6xl mx-auto px-4 py-4">
-                        <div className="flex items-center justify-between">
-                            <Link href="/">
+            {/* --- TOP NAV / LIVE HEADER --- */}
+            <motion.header
+                layout
+                className={`relative z-20 border-b transition-all duration-500 ${mode === 'live' ? 'bg-zinc-950/80 border-emerald-500/30 backdrop-blur-md' : 'bg-transparent border-transparent pt-6'}`}
+            >
+                <div className="container max-w-5xl mx-auto px-4 py-4">
+                    <div className="flex items-center justify-between">
+                        {/* Logo / Title Area */}
+
+                        <Link href="/">
+                            <div className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-500 ${mode === 'live' ? 'bg-emerald-500/10 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-zinc-900 border-zinc-800'}`}>
+                                    <Zap className={`w-5 h-5 ${mode === 'live' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                                </div>
+                                <div className="hidden sm:block">
+                                    <h1 className="font-bold tracking-tight text-lg">Universal<span className={mode === 'live' ? 'text-emerald-400' : 'text-zinc-400'}>Clipboard</span></h1>
+                                    <p className="text-[10px] text-zinc-500 font-mono tracking-widest uppercase">
+                                        {mode === 'live' ? 'Quantum Sync Active' : 'Secure Text Bridge'}
+                                    </p>
+                                </div>
+                            </div>
+                        </Link>
+
+                        {/* LIVE CONTROLS (Only visible when Live) */}
+                        <AnimatePresence>
+                            {mode === 'live' && vaultData && (
                                 <motion.div
-                                    className="flex items-center gap-3 cursor-pointer group"
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    className="flex items-center gap-3 md:gap-6"
                                 >
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
-                                        <Lock className="w-5 h-5 text-cyan-400" />
+                                    {/* PIN Display */}
+                                    <div className="flex flex-col items-end md:items-center">
+                                        <span className="text-[10px] text-emerald-500/70 font-mono uppercase tracking-wider mb-0.5">Access PIN</span>
+                                        <div
+                                            onClick={() => copyToClipboard(vaultData.fullCode)}
+                                            className="flex items-center gap-2 cursor-pointer group"
+                                        >
+                                            <span className="text-2xl md:text-3xl font-mono font-black text-white tracking-widest drop-shadow-[0_0_10px_rgba(16,185,129,0.5)] group-hover:text-emerald-400 transition-colors">
+                                                {vaultData.fullCode.slice(0, 3)}-{vaultData.fullCode.slice(3)}
+                                            </span>
+                                            <Copy className="w-4 h-4 text-zinc-600 group-hover:text-emerald-500 opacity-0 group-hover:opacity-100 transition-all" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h1 className="font-bold text-lg tracking-tight">
-                                            VAULT<span className="text-cyan-400">BRIDGE</span>
-                                        </h1>
-                                        <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">SECURE CLIPBOARD</p>
+
+                                    {/* Divider */}
+                                    <div className="h-8 w-px bg-zinc-800 hidden md:block" />
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-2">
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button size="icon" variant="ghost" className="hover:bg-zinc-800 text-zinc-400 hover:text-white">
+                                                    <QrCode className="w-5 h-5" />
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="bg-zinc-950 border-zinc-800">
+                                                <DialogHeader>
+                                                    <DialogTitle className="text-center">Scan to Connect</DialogTitle>
+                                                </DialogHeader>
+                                                <div className="flex justify-center p-6 bg-white rounded-xl mx-auto my-4">
+                                                    <QRCodeSVG value={`${window.location.origin}/access#code=${vaultData.fullCode}`} size={200} />
+                                                </div>
+                                                <p className="text-center text-sm text-zinc-500">
+                                                    Scan with mobile camera to open this clipboard instantly.
+                                                </p>
+                                            </DialogContent>
+                                        </Dialog>
+
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-red-900/30 text-red-400 hover:bg-red-950/30 hover:text-red-300 hover:border-red-500/50"
+                                            onClick={terminateSession}
+                                        >
+                                            <Power className="w-4 h-4 mr-2" />
+                                            Terminate
+                                        </Button>
                                     </div>
                                 </motion.div>
-                            </Link>
+                            )}
+                        </AnimatePresence>
 
-                            <div className="flex items-center gap-3">
-                                <Link href="/access">
-                                    <Button variant="outline" size="sm" className="border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 gap-2">
-                                        <KeyRound className="w-4 h-4" />
-                                        Access Vault
-                                    </Button>
-                                </Link>
-                            </div>
+                        <Link href="/">
+                            <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="hidden sm:inline">Return</span>
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            </motion.header>
+
+
+            {/* --- MAIN EDITOR --- */}
+            <main className="flex-1 relative z-10 container max-w-5xl mx-auto px-4 py-8 flex flex-col">
+
+                <motion.div
+                    layout
+                    className={`flex-1 flex flex-col relative rounded-3xl border overflow-hidden transition-all duration-700 ${mode === 'live' ? 'bg-zinc-900/40 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.05)]' : 'bg-zinc-900/80 border-zinc-800 shadow-2xl'}`}
+                >
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-black/20">
+                        <div className="flex items-center gap-4">
+                            <PulseIndicator status={mode === 'draft' ? 'idle' : (isSyncing || isCreating) ? 'syncing' : 'live'} />
+
+                            {/* Metadata / Timestamp */}
+                            {mode === 'live' && (
+                                <span className="text-xs font-mono text-zinc-600 hidden sm:block">
+                                    Last Sync: {lastSynced ? lastSynced.toLocaleTimeString() : 'Just now'}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => setShowContent(!showContent)}
+                                title="Toggle Visibility"
+                            >
+                                {showContent ? <Eye className="w-4 h-4 text-zinc-400" /> : <EyeOff className="w-4 h-4 text-zinc-400" />}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => copyToClipboard(content)}
+                                title="Copy Content"
+                            >
+                                <Copy className="w-4 h-4 text-zinc-400" />
+                            </Button>
                         </div>
                     </div>
-                </header>
 
-                {/* Content Area */}
-                <main className="flex-1 container max-w-6xl mx-auto px-4 py-8 md:py-12">
-                    <AnimatePresence mode="wait">
-                        {createdData ? (
-                            // SUCCESS STATE
-                            <motion.div
-                                key="success"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                className="max-w-xl mx-auto"
-                            >
-                                {/* Success Header */}
-                                <div className="text-center mb-8">
-                                    <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ type: "spring", delay: 0.1 }}
-                                        className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30 mb-6"
-                                    >
-                                        <ShieldCheck className="w-10 h-10 text-emerald-400" />
-                                    </motion.div>
-                                    <h2 className="text-3xl font-bold text-white mb-2">Secure Clipboard Created</h2>
-                                    <p className="text-zinc-400">Share this PIN to grant one-time access</p>
-                                </div>
+                    {/* Text Area */}
+                    <div className="relative flex-1 group">
+                        <Textarea
+                            className={`w-full h-full min-h-[400px] bg-transparent border-0 resize-none p-6 text-base md:text-lg font-mono leading-relaxed focus-visible:ring-0 transition-colors ${!showContent ? 'text-security-disc' : 'text-zinc-200'}`}
+                            style={!showContent ? { WebkitTextSecurity: 'disc' } as any : {}}
+                            placeholder={mode === 'draft' ? "Initialize secure clipboard session..." : "Typing syncs instantly..."}
+                            value={content}
+                            onChange={(e) => handleContentChange(e.target.value)}
+                            spellCheck={false}
+                        />
 
-                                {/* PIN Display Card */}
+                        {/* Empty State Prompt (Draft Mode) */}
+                        {mode === 'draft' && !content && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-40">
                                 <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="relative group"
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="relative mb-6"
                                 >
-                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-500" />
-                                    <div className="relative bg-zinc-950 border border-zinc-800 rounded-2xl p-8">
-                                        {/* PIN */}
-                                        <div className="text-center mb-6">
-                                            <p className="text-xs font-mono uppercase tracking-[0.2em] text-emerald-400 mb-4">Your Access PIN</p>
-                                            <div className="flex items-center justify-center gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    {createdData.code.split('').map((digit, i) => (
-                                                        <motion.span
-                                                            key={i}
-                                                            initial={{ opacity: 0, y: 20 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: 0.3 + i * 0.05 }}
-                                                            className={`w-12 h-16 flex items-center justify-center text-3xl font-mono font-bold rounded-lg ${i === 3 ? 'ml-4' : ''
-                                                                } bg-zinc-900 border border-zinc-700 text-white`}
-                                                        >
-                                                            {digit}
-                                                        </motion.span>
-                                                    ))}
-                                                </div>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    onClick={copyPin}
-                                                    className="rounded-full hover:bg-emerald-500/20 text-emerald-400 h-12 w-12"
-                                                >
-                                                    <Copy className="w-5 h-5" />
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* Security Info */}
-                                        <div className="grid grid-cols-3 gap-3 mb-6">
-                                            <div className="bg-zinc-900/50 rounded-lg p-3 text-center border border-zinc-800">
-                                                <Timer className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                                                <p className="text-xs text-zinc-400">Expires in</p>
-                                                <p className="text-sm font-semibold text-white">{expiresIn[0]}h</p>
-                                            </div>
-                                            <div className="bg-zinc-900/50 rounded-lg p-3 text-center border border-zinc-800">
-                                                <Eye className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
-                                                <p className="text-xs text-zinc-400">Access</p>
-                                                <p className="text-sm font-semibold text-white">{burnAfterRead ? 'Once' : `${maxDownloads[0]}x`}</p>
-                                            </div>
-                                            <div className="bg-zinc-900/50 rounded-lg p-3 text-center border border-zinc-800">
-                                                <Shield className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                                                <p className="text-xs text-zinc-400">Encryption</p>
-                                                <p className="text-sm font-semibold text-white">AES-256</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="flex gap-3">
-                                            <Button
-                                                variant="outline"
-                                                className="flex-1 border-zinc-700 hover:bg-zinc-800"
-                                                onClick={handleReset}
-                                            >
-                                                <RefreshCw className="w-4 h-4 mr-2" />
-                                                Create Another
-                                            </Button>
-                                            <Button
-                                                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
-                                                onClick={() => setLocation("/access")}
-                                            >
-                                                Access Vault
-                                                <ArrowRight className="w-4 h-4 ml-2" />
-                                            </Button>
-                                        </div>
-                                    </div>
+                                    <div className="absolute inset-0 bg-emerald-500/20 blur-[60px] rounded-full" />
+                                    <img
+                                        src="/vault-icon.png"
+                                        alt="Secure Vault"
+                                        className="w-48 h-48 object-contain relative z-10 drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                                    />
                                 </motion.div>
+                                <p className="text-sm font-mono text-emerald-500/80 uppercase tracking-[0.2em] font-bold">
+                                    Secure Terminal Ready
+                                </p>
+                                <p className="text-xs text-zinc-600 mt-2 font-mono">
+                                    Paste sensitive data to initialize uplink
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
-                                {/* Security Notice */}
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.5 }}
-                                    className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20"
-                                >
-                                    <div className="flex gap-3">
-                                        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="text-sm text-amber-200 font-medium">Security Notice</p>
-                                            <p className="text-xs text-amber-400/80 mt-1">
-                                                Share this PIN through a secure channel. Once accessed, the content will be permanently destroyed.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </motion.div>
-                        ) : (
-                            // CREATE STATE
+                    {/* Footer / Action Area (Draft Mode Only) */}
+                    <AnimatePresence>
+                        {mode === 'draft' && (
                             <motion.div
-                                key="create"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                className="grid lg:grid-cols-5 gap-8 lg:gap-12"
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="border-t border-white/5 bg-zinc-950/50 p-4 md:p-6"
                             >
-                                {/* Left Column - Hero & Security Info */}
-                                <div className="lg:col-span-2 space-y-8">
-                                    {/* Hero */}
-                                    <div>
-                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono mb-6">
-                                            <Sparkles className="w-3 h-3" />
-                                            <span>ZERO-KNOWLEDGE ENCRYPTION</span>
-                                        </div>
-                                        <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-[1.1] mb-6">
-                                            Universal<br />
-                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400">
-                                                Secure Clipboard
-                                            </span>
-                                        </h1>
-                                        <p className="text-lg text-zinc-400 leading-relaxed">
-                                            Share passwords, API keys, and sensitive data with end-to-end encryption.
-                                            Your content never touches our servers in plain text.
-                                        </p>
-                                    </div>
-
-                                    {/* Security Strength */}
-                                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-                                        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2">
-                                            <Shield className="w-4 h-4 text-cyan-400" />
-                                            Security Strength
-                                        </h3>
-                                        <SecurityMeter strength={securityScore} />
-
-                                        <div className="grid grid-cols-2 gap-2 mt-4">
-                                            <SecurityBadge icon={Lock} label="E2E Encrypted" active={true} />
-                                            <SecurityBadge icon={Timer} label="Auto-Destruct" active={expiresIn[0] <= 24} />
-                                            <SecurityBadge icon={Eye} label="Single View" active={maxDownloads[0] === 1 || burnAfterRead} />
-                                            <SecurityBadge icon={Fingerprint} label="PIN Protected" active={true} />
-                                        </div>
-                                    </div>
-
-                                    {/* How it Works */}
+                                <div className="grid md:grid-cols-2 gap-8 items-center">
+                                    {/* Security Config */}
                                     <div className="space-y-4">
-                                        <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-                                            <Zap className="w-4 h-4 text-amber-400" />
-                                            How It Works
-                                        </h3>
-                                        {[
-                                            { step: "1", text: "Content encrypted in your browser" },
-                                            { step: "2", text: "6-digit PIN generated locally" },
-                                            { step: "3", text: "Share PIN through secure channel" },
-                                            { step: "4", text: "Content self-destructs after access" },
-                                        ].map((item, i) => (
-                                            <div key={i} className="flex items-center gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-sm font-mono text-cyan-400">
-                                                    {item.step}
-                                                </div>
-                                                <span className="text-sm text-zinc-400">{item.text}</span>
+                                        <div className="flex gap-2">
+                                            <SecurityBadge active={true} icon={Shield} label="AES-256-GCM" />
+                                            <SecurityBadge active={true} icon={Globe} label="Zero-Knowledge" />
+                                            <SecurityBadge active={expiresIn[0] <= 1} icon={Zap} label="High-Urgency" />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-xs font-mono text-zinc-500 uppercase">
+                                                <span>Auto-Destruct Timer</span>
+                                                <span className="text-emerald-400">{expiresIn[0]} Hours</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Right Column - Create Form */}
-                                <div className="lg:col-span-3">
-                                    <div className="relative">
-                                        {/* Glow effect */}
-                                        <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-xl opacity-50" />
-
-                                        <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 md:p-8">
-                                            {/* Header */}
-                                            <div className="flex items-center gap-4 mb-8">
-                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                                                    <Clipboard className="w-7 h-7 text-white" />
-                                                </div>
-                                                <div>
-                                                    <h2 className="text-xl font-bold text-white">New Secure Clipboard</h2>
-                                                    <p className="text-sm text-zinc-500">Content self-destructs after access</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Content Input */}
-                                            <div className="space-y-6">
-                                                <div>
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                                                            <Lock className="w-3 h-3" />
-                                                            Sensitive Content
-                                                        </label>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs text-zinc-600">{clipboardText.length}/5000</span>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="h-6 w-6 p-0"
-                                                                onClick={() => setShowContent(!showContent)}
-                                                            >
-                                                                {showContent ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="relative">
-                                                        <Textarea
-                                                            placeholder="Paste your sensitive data here..."
-                                                            className={`min-h-[180px] bg-zinc-900/70 border-zinc-700 focus:border-cyan-500/50 resize-none font-mono text-sm p-4 rounded-xl ${!showContent ? 'text-security-disc' : ''
-                                                                }`}
-                                                            style={!showContent ? { WebkitTextSecurity: 'disc' } as any : {}}
-                                                            value={clipboardText}
-                                                            onChange={e => setClipboardText(e.target.value.slice(0, 5000))}
-                                                        />
-                                                        {clipboardText && (
-                                                            <div className="absolute bottom-3 right-3">
-                                                                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px]">
-                                                                    <Lock className="w-2.5 h-2.5" />
-                                                                    Encrypted
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Security Options */}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {/* Expiry */}
-                                                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <label className="text-xs font-mono uppercase text-zinc-500 flex items-center gap-2">
-                                                                <Timer className="w-3 h-3" />
-                                                                Auto-Destruct
-                                                            </label>
-                                                            <span className="text-lg font-bold text-amber-400">{expiresIn[0]}h</span>
-                                                        </div>
-                                                        <Slider
-                                                            value={expiresIn}
-                                                            onValueChange={setExpiresIn}
-                                                            min={1}
-                                                            max={72}
-                                                            step={1}
-                                                            className="w-full"
-                                                        />
-                                                        <div className="flex justify-between mt-2 text-[10px] text-zinc-600">
-                                                            <span>1 hour</span>
-                                                            <span>72 hours</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Access Limit */}
-                                                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <label className="text-xs font-mono uppercase text-zinc-500 flex items-center gap-2">
-                                                                <Eye className="w-3 h-3" />
-                                                                Access Limit
-                                                            </label>
-                                                            <span className="text-lg font-bold text-cyan-400">
-                                                                {burnAfterRead ? '1x' : `${maxDownloads[0]}x`}
-                                                            </span>
-                                                        </div>
-                                                        <Slider
-                                                            value={maxDownloads}
-                                                            onValueChange={(v) => {
-                                                                setMaxDownloads(v);
-                                                                if (v[0] > 1) setBurnAfterRead(false);
-                                                            }}
-                                                            min={1}
-                                                            max={10}
-                                                            step={1}
-                                                            className="w-full"
-                                                            disabled={burnAfterRead}
-                                                        />
-                                                        <div className="flex justify-between mt-2 text-[10px] text-zinc-600">
-                                                            <span>Single use</span>
-                                                            <span>10 views</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Burn After Read Toggle */}
-                                                <div
-                                                    onClick={() => setBurnAfterRead(!burnAfterRead)}
-                                                    className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${burnAfterRead
-                                                        ? 'bg-red-500/10 border-red-500/30'
-                                                        : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${burnAfterRead ? 'bg-red-500/20' : 'bg-zinc-800'
-                                                            }`}>
-                                                            <Zap className={`w-5 h-5 ${burnAfterRead ? 'text-red-400' : 'text-zinc-500'}`} />
-                                                        </div>
-                                                        <div>
-                                                            <p className={`text-sm font-semibold ${burnAfterRead ? 'text-red-300' : 'text-zinc-300'}`}>
-                                                                Burn After Reading
-                                                            </p>
-                                                            <p className="text-xs text-zinc-500">Content destroyed after first view</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${burnAfterRead ? 'bg-red-500' : 'bg-zinc-700'
-                                                        }`}>
-                                                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${burnAfterRead ? 'translate-x-6' : 'translate-x-0'
-                                                            }`} />
-                                                    </div>
-                                                </div>
-
-                                                {/* Create Button */}
-                                                <Button
-                                                    className="w-full h-14 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-base uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-900/30 transition-all hover:shadow-cyan-800/40 hover:scale-[1.02]"
-                                                    onClick={handleCreate}
-                                                    disabled={isCreating || !clipboardText.trim()}
-                                                >
-                                                    {isCreating ? (
-                                                        <RefreshCw className="w-5 h-5 animate-spin" />
-                                                    ) : (
-                                                        <>
-                                                            <Shield className="w-5 h-5 mr-2" />
-                                                            Create Secure Link
-                                                        </>
-                                                    )}
-                                                </Button>
-
-                                                {/* Trust Indicators */}
-                                                <div className="flex items-center justify-center gap-6 pt-4 border-t border-zinc-800">
-                                                    {[
-                                                        { icon: Lock, label: "AES-256" },
-                                                        { icon: Shield, label: "Zero-Knowledge" },
-                                                        { icon: Zap, label: "Auto-Destruct" },
-                                                    ].map((item, i) => (
-                                                        <div key={i} className="flex items-center gap-2 text-zinc-500">
-                                                            <item.icon className="w-3.5 h-3.5" />
-                                                            <span className="text-xs">{item.label}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                            <Slider
+                                                value={expiresIn}
+                                                onValueChange={setExpiresIn}
+                                                max={24}
+                                                step={1}
+                                                min={1}
+                                                className="py-2"
+                                            />
                                         </div>
                                     </div>
+
+                                    {/* Go Live Button */}
+                                    <Button
+                                        size="lg"
+                                        className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white text-lg font-bold tracking-wider uppercase shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all transform hover:scale-[1.02]"
+                                        onClick={handleGoLive}
+                                        disabled={isCreating}
+                                    >
+                                        {isCreating ? (
+                                            <RefreshCw className="w-6 h-6 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Wifi className="w-5 h-5 mr-3" />
+                                                Initialize Live Link
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
-                </main>
+                </motion.div>
 
-                {/* Footer */}
-                <footer className="border-t border-zinc-800/50 py-6">
-                    <div className="container max-w-6xl mx-auto px-4">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
-                            <div className="flex items-center gap-2">
-                                <Lock className="w-4 h-4 text-cyan-500" />
-                                <span>End-to-end encrypted • Your data never leaves your device unencrypted</span>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-                                <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-                                <Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link>
-                            </div>
-                        </div>
-                    </div>
-                </footer>
-            </div>
+                {/* Info Footer */}
+                <div className="mt-8 text-center">
+                    <p className="text-xs text-zinc-600 font-mono flex items-center justify-center gap-2">
+                        <Lock className="w-3 h-3" />
+                        End-to-End Encrypted • Ephemeral Storage • No Logs
+                    </p>
+                </div>
+            </main>
         </div>
     );
 }
