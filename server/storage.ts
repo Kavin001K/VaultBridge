@@ -60,20 +60,27 @@ export class DatabaseStorage {
         return vault;
     }
 
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number) {
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1) {
         const [file] = await db.insert(files).values({
             vaultId,
             fileId,
             chunkCount,
             totalSize,
             isCompressed,
-            originalSize
+            originalSize,
+            maxDownloads,
+            downloadCount: 0
         }).returning();
         return file;
     }
 
     async getFiles(vaultId: string) {
         return db.select().from(files).where(eq(files.vaultId, vaultId));
+    }
+
+    async getFileByFileId(fileId: string) {
+        const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
+        return file;
     }
 
     async createChunk(fileId: string, chunkIndex: number, size: number) {
@@ -128,12 +135,50 @@ export class DatabaseStorage {
             .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
+    // Vault-level download count (legacy, for backwards compatibility)
     async incrementDownloadCount(vaultId: string) {
         const [updated] = await db.update(vaults)
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
             .where(eq(vaults.id, vaultId))
             .returning();
         return updated?.downloadCount || 0;
+    }
+
+    // Per-file download count increment
+    async incrementFileDownloadCount(fileIds: string[]): Promise<{
+        fileId: string;
+        downloadCount: number;
+        maxDownloads: number;
+        remainingDownloads: number;
+        isExhausted: boolean;
+    }[]> {
+        const results = [];
+
+        for (const fileId of fileIds) {
+            const [updated] = await db.update(files)
+                .set({ downloadCount: sql`${files.downloadCount} + 1` })
+                .where(eq(files.fileId, fileId))
+                .returning();
+
+            if (updated) {
+                const remaining = Math.max(0, updated.maxDownloads - updated.downloadCount);
+                results.push({
+                    fileId: updated.fileId,
+                    downloadCount: updated.downloadCount,
+                    maxDownloads: updated.maxDownloads,
+                    remainingDownloads: remaining,
+                    isExhausted: remaining <= 0
+                });
+            }
+        }
+
+        return results;
+    }
+
+    // Check if all files in a vault are exhausted
+    async areAllFilesExhausted(vaultId: string): Promise<boolean> {
+        const vaultFiles = await this.getFiles(vaultId);
+        return vaultFiles.every(f => f.downloadCount >= f.maxDownloads);
     }
 
     async updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date> {

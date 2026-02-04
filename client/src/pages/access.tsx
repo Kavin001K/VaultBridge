@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
 import { LiveClipboard } from "@/components/LiveClipboard";
-import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload } from "@/hooks/use-vaults";
+import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload, useTrackFileDownload } from "@/hooks/use-vaults";
 import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardText } from "@/lib/crypto";
 import { initiateStreamDownload } from "@/lib/downloadStream";
 import { useIsMobile } from "@/hooks/use-mobile"; // Installed Mobile SDK
@@ -25,6 +25,15 @@ interface FileMetadata {
     fileId: string;
     isCompressed?: boolean;
     lastModified: number;
+}
+
+// Per-file download state
+interface FileDownloadState {
+    fileId: string;
+    maxDownloads: number;
+    downloadCount: number;
+    remainingDownloads: number;
+    isExhausted: boolean;
 }
 
 // SVG Filter for Heat Distortion (Heavy on mobile GPU, will be conditional)
@@ -103,6 +112,9 @@ export default function AccessPage() {
     const [isBurned, setIsBurned] = useState(false);
     const [clipboardContent, setClipboardContent] = useState<string | null>(null);
 
+    // Per-file download tracking
+    const [fileDownloadStates, setFileDownloadStates] = useState<Map<string, FileDownloadState>>(new Map());
+
     // Derived lookupId for sync
     const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
 
@@ -112,6 +124,7 @@ export default function AccessPage() {
     const codeLookup = useCodeLookup();
     const getChunkUrl = useGetChunkDownloadUrl();
     const trackDownload = useTrackDownload();
+    const trackFileDownload = useTrackFileDownload();
 
     const handleCodeSubmit = async () => {
         // Validate 6-char alphanumeric code
@@ -136,6 +149,19 @@ export default function AccessPage() {
             // Fetch vault data using only the lookupId
             const vault = await codeLookup.mutateAsync(lookupId);
             setVaultData(vault);
+
+            // Initialize per-file download states
+            const fileStates = new Map<string, FileDownloadState>();
+            for (const file of vault.files) {
+                fileStates.set(file.fileId, {
+                    fileId: file.fileId,
+                    maxDownloads: file.maxDownloads,
+                    downloadCount: file.downloadCount,
+                    remainingDownloads: file.remainingDownloads,
+                    isExhausted: file.remainingDownloads <= 0
+                });
+            }
+            setFileDownloadStates(fileStates);
 
             setStage("decrypting");
             setStatusText("Unwrapping encryption key with PIN...");
@@ -318,23 +344,50 @@ export default function AccessPage() {
                     toast({ title: "File Downloaded", description: `${file.name} saved.` });
                 }
 
+                // Track per-file download
                 try {
-                    const res = await trackDownload.mutateAsync(vaultData.id);
-                    setVaultData((prev: any) => ({
-                        ...prev,
-                        downloadCount: prev.maxDownloads - res.remainingDownloads
-                    }));
+                    const res = await trackFileDownload.mutateAsync({
+                        vaultId: vaultData.id,
+                        fileId: file.fileId
+                    });
 
-                    if (res.remainingDownloads <= 0) {
+                    // Update per-file download states
+                    if (res.files && res.files.length > 0) {
+                        setFileDownloadStates(prev => {
+                            const newMap = new Map(prev);
+                            for (const fileResult of res.files) {
+                                newMap.set(fileResult.fileId, {
+                                    fileId: fileResult.fileId,
+                                    maxDownloads: fileResult.maxDownloads,
+                                    downloadCount: fileResult.downloadCount,
+                                    remainingDownloads: fileResult.remainingDownloads,
+                                    isExhausted: fileResult.isExhausted
+                                });
+                            }
+                            return newMap;
+                        });
+
+                        // Show remaining downloads for this file
+                        const fileResult = res.files.find((f: any) => f.fileId === file.fileId);
+                        if (fileResult && fileResult.remainingDownloads > 0) {
+                            toast({
+                                title: "Download Tracked",
+                                description: `${fileResult.remainingDownloads} download(s) remaining for ${file.name}.`
+                            });
+                        }
+                    }
+
+                    // Check if vault should be burned
+                    if (res.vaultExhausted) {
                         toast({
                             title: "Vault Depleted",
-                            description: "Initiating self-destruct sequence...",
+                            description: "All files have reached their download limit. Initiating self-destruct...",
                             variant: "destructive"
                         });
                         setTimeout(() => setIsBurned(true), 1500);
                     }
                 } catch (e) {
-                    console.error("Tracking failed", e);
+                    console.error("File download tracking failed", e);
                 }
             }
 
@@ -355,16 +408,35 @@ export default function AccessPage() {
         setStage("downloading");
 
         try {
+            // Download all files
             for (const file of fileMetadata) {
                 await downloadFile(file);
             }
 
-            const res = await trackDownload.mutateAsync(vaultData.id);
+            // Track all files at once using per-file tracking
+            const allFileIds = fileMetadata.map(f => f.fileId);
+            const res = await trackFileDownload.mutateAsync({
+                vaultId: vaultData.id,
+                fileId: allFileIds[0], // Primary file for URL
+                fileIds: allFileIds // All files to track
+            });
 
-            setVaultData((prev: any) => ({
-                ...prev,
-                downloadCount: prev.maxDownloads - res.remainingDownloads
-            }));
+            // Update all file download states
+            if (res.files && res.files.length > 0) {
+                setFileDownloadStates(prev => {
+                    const newMap = new Map(prev);
+                    for (const fileResult of res.files) {
+                        newMap.set(fileResult.fileId, {
+                            fileId: fileResult.fileId,
+                            maxDownloads: fileResult.maxDownloads,
+                            downloadCount: fileResult.downloadCount,
+                            remainingDownloads: fileResult.remainingDownloads,
+                            isExhausted: fileResult.isExhausted
+                        });
+                    }
+                    return newMap;
+                });
+            }
 
             setStage("ready");
             setStatusText("All files downloaded!");
@@ -374,10 +446,11 @@ export default function AccessPage() {
                 description: `${fileMetadata.length} file(s) downloaded successfully.`,
             });
 
-            if (res.remainingDownloads <= 0) {
+            // Check if vault should be burned
+            if (res.vaultExhausted) {
                 toast({
                     title: "Vault Depleted",
-                    description: "Initiating self-destruct sequence...",
+                    description: "All files have reached their download limit. Initiating self-destruct...",
                     variant: "destructive"
                 });
                 setTimeout(() => setIsBurned(true), 1500);
