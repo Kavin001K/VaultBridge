@@ -221,34 +221,61 @@ const getEmailStyles = () => `
   }
   
   .attachment-list {
-    background: rgba(0,0,0,0.25);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 14px;
-    padding: 24px;
-    margin: 28px 0;
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.06) 0%, rgba(0, 0, 0, 0.35) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    border-radius: 18px;
+    padding: 28px;
+    margin: 32px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
   
   .attachment-header {
-    font-size: 12px;
-    color: #9ca3af;
+    font-size: 11px;
+    color: #10b981;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 18px;
-    font-weight: 600;
+    letter-spacing: 2.5px;
+    margin-bottom: 20px;
+    font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(16, 185, 129, 0.12);
+  }
+  
+  .attachment-count {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #022c1e;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
   }
   
   .attachment-item {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 14px 16px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 10px;
-    margin-bottom: 10px;
+    gap: 18px;
+    padding: 18px 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .attachment-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+    border-radius: 3px 0 0 3px;
   }
   
   .attachment-item:last-child {
@@ -256,34 +283,118 @@ const getEmailStyles = () => `
   }
   
   .attachment-icon {
-    width: 44px;
-    height: 44px;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    border-radius: 10px;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
     flex-shrink: 0;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .attachment-icon.pdf {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  }
+  
+  .attachment-icon.doc {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  }
+  
+  .attachment-icon.image {
+    background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  }
+  
+  .attachment-icon.video {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  }
+  
+  .attachment-icon.audio {
+    background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  }
+  
+  .attachment-icon.archive {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
+  
+  .attachment-icon.code {
+    background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  }
+  
+  .attachment-icon.spreadsheet {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  }
+  
+  .attachment-icon.default {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  }
+  
+  .file-icon-svg {
+    width: 26px;
+    height: 26px;
+    fill: white;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
   }
   
   .attachment-info {
     flex: 1;
     min-width: 0;
+    padding-right: 10px;
   }
   
   .attachment-name {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: #ffffff;
-    margin-bottom: 3px;
+    margin-bottom: 6px;
     word-break: break-word;
+    line-height: 1.3;
+    letter-spacing: -0.2px;
+  }
+  
+  .attachment-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   
   .attachment-size {
     font-size: 12px;
-    color: #6b7280;
+    color: #9ca3af;
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .attachment-type {
+    font-size: 10px;
+    color: #6b7280;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .attachment-download {
+    width: 36px;
+    height: 36px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  .download-icon-svg {
+    width: 18px;
+    height: 18px;
+    fill: #10b981;
   }
   
   .divider {
@@ -650,11 +761,33 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
     const normalizedTo = input.to.trim().toLowerCase();
     const { subject, text, files } = input;
 
-    // Determine Provider
-    const provider = await getEmailProvider();
+    // File extensions that Brevo doesn't support - force fallback to Resend
+    const brevoUnsupportedExtensions = [
+      'json', 'yml', 'yaml', 'xml', 'toml', 'ini', 'cfg', 'conf',
+      'js', 'ts', 'jsx', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp',
+      'sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd',
+      'sql', 'graphql', 'prisma',
+      'env', 'lock', 'log', 'md', 'mdx', 'rst', 'tex',
+      'wasm', 'map', 'min'
+    ];
+
+    // Check if any files have unsupported extensions for Brevo
+    const hasUnsupportedForBrevo = files.some(f => {
+      const ext = f.filename.split('.').pop()?.toLowerCase() || '';
+      return brevoUnsupportedExtensions.includes(ext);
+    });
+
+    // Determine Provider - force Resend if files contain Brevo-unsupported types
+    let provider = await getEmailProvider();
     if (!provider) {
       log(`Direct email blocked: Quota exceeded`, "email");
       return false;
+    }
+
+    // Override to Resend if Brevo can't handle these file types
+    if (provider === "BREVO" && hasUnsupportedForBrevo) {
+      log(`Brevo doesn't support some file types, trying Resend instead`, "email");
+      provider = "RESEND"; // Force Resend for unsupported file types
     }
 
     const totalSize = files.reduce((acc, f) => acc + f.content.length, 0);
@@ -664,15 +797,105 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
 
-    const attachmentListHtml = files.map(f => `
-      <div class="attachment-item">
-        <div class="attachment-icon">📄</div>
-        <div class="attachment-info">
-          <div class="attachment-name">${f.filename}</div>
-          <div class="attachment-size">${formatSize(f.content.length)}</div>
+    // Helper to determine file type and get inline styles for icon background
+    const getFileTypeInfo = (filename: string) => {
+      const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+      // Icon backgrounds by file type (inline styles for email compatibility)
+      const iconStyles = {
+        pdf: 'background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);',
+        doc: 'background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);',
+        image: 'background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);',
+        video: 'background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);',
+        audio: 'background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);',
+        archive: 'background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);',
+        code: 'background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);',
+        spreadsheet: 'background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);',
+        default: 'background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);'
+      };
+
+      // PDF files
+      if (ext === 'pdf') {
+        return { bgStyle: iconStyles.pdf, type: 'PDF', emoji: '📕' };
+      }
+      // Documents  
+      if (['doc', 'docx', 'rtf', 'odt', 'txt'].includes(ext)) {
+        return { bgStyle: iconStyles.doc, type: ext.toUpperCase(), emoji: '📘' };
+      }
+      // Images
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'heic'].includes(ext)) {
+        return { bgStyle: iconStyles.image, type: ext.toUpperCase(), emoji: '🖼️' };
+      }
+      // Videos
+      if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'].includes(ext)) {
+        return { bgStyle: iconStyles.video, type: ext.toUpperCase(), emoji: '🎬' };
+      }
+      // Audio
+      if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'].includes(ext)) {
+        return { bgStyle: iconStyles.audio, type: ext.toUpperCase(), emoji: '🎵' };
+      }
+      // Archives
+      if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) {
+        return { bgStyle: iconStyles.archive, type: ext.toUpperCase(), emoji: '📦' };
+      }
+      // Code files
+      if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'html', 'css', 'json', 'xml', 'sql', 'php', 'rb', 'go', 'rs', 'swift'].includes(ext)) {
+        return { bgStyle: iconStyles.code, type: ext.toUpperCase(), emoji: '💻' };
+      }
+      // Spreadsheets
+      if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) {
+        return { bgStyle: iconStyles.spreadsheet, type: ext.toUpperCase(), emoji: '📊' };
+      }
+      // Default
+      return { bgStyle: iconStyles.default, type: ext ? ext.toUpperCase() : 'FILE', emoji: '📄' };
+    };
+
+    const attachmentListHtml = files.map(f => {
+      const typeInfo = getFileTypeInfo(f.filename);
+      return `
+      <!--[if mso]>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 12px;">
+        <tr>
+          <td style="padding: 16px; background: #1f1f23; border-radius: 12px; border-left: 4px solid #10b981;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="width: 48px; height: 48px; ${typeInfo.bgStyle} border-radius: 12px; text-align: center; vertical-align: middle; font-size: 24px;">
+                  ${typeInfo.emoji}
+                </td>
+                <td style="padding-left: 16px;">
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 4px;">${f.filename}</div>
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #9ca3af;">
+                    ${formatSize(f.content.length)} • <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;">${typeInfo.type}</span>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <![endif]-->
+      <!--[if !mso]><!-->
+      <div style="display: flex; align-items: center; gap: 16px; padding: 18px 20px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-left: 4px solid #10b981; border-radius: 14px; margin-bottom: 12px;">
+        <div style="width: 52px; height: 52px; ${typeInfo.bgStyle} border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);">
+          ${typeInfo.emoji}
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 6px; word-break: break-word; line-height: 1.3;">${f.filename}</div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #9ca3af; font-weight: 500;">
+              📁 ${formatSize(f.content.length)}
+            </span>
+            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #6b7280; background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+              ${typeInfo.type}
+            </span>
+          </div>
+        </div>
+        <div style="width: 40px; height: 40px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <span style="font-size: 18px;">⬇️</span>
         </div>
       </div>
-    `).join('');
+      <!--<![endif]-->`
+    }).join('');
 
     const html = `
 <!DOCTYPE html>
@@ -688,17 +911,20 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       ${getEmailHeader()}
       
       <h1 class="title">📬 Files Delivered to You</h1>
-      <p class="subtitle">Zero-Knowledge Relay Transfer</p>
+      <p class="subtitle">Zero-Knowledge Relay • End-to-End Encrypted</p>
       
       ${text ? `
       <div class="message-box">
-        <div class="message-label">💬 Message</div>
+        <div class="message-label">💬 Personal Message</div>
         <div class="message-text">${text}</div>
       </div>
       ` : ''}
       
-      <div class="attachment-list">
-        <div class="attachment-header">📎 ${files.length} ${files.length === 1 ? 'Attachment' : 'Attachments'}</div>
+      <div style="background: linear-gradient(145deg, rgba(16, 185, 129, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 18px; padding: 28px; margin: 32px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #10b981; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; font-weight: 700; display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid rgba(16, 185, 129, 0.15);">
+          📎 Secure Attachments
+          <span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #022c1e; font-size: 10px; font-weight: 800; padding: 5px 12px; border-radius: 20px; letter-spacing: 0.5px;">${files.length} ${files.length === 1 ? 'FILE' : 'FILES'}</span>
+        </div>
         ${attachmentListHtml}
       </div>
       
