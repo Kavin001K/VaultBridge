@@ -185,18 +185,43 @@ export default function Success() {
   };
 
   const handleSendEmail = async () => {
-    if (!email) return;
+    if (!email) {
+      toast({ variant: "destructive", title: "Email Required", description: "Please enter a recipient email address." });
+      return;
+    }
+
+    // Normalize email to lowercase for case-insensitive handling (handles ALL CAPS, MixedCase, etc.)
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      toast({ variant: "destructive", title: "Invalid Email", description: "Please enter a valid email address." });
+      return;
+    }
+
     setIsSending(true);
     try {
-      await fetch(`/api/vaults/${vaultId}/email`, {
+      const response = await fetch(`/api/vaults/${vaultId}/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: email, fullCode: splitCode }),
+        body: JSON.stringify({ to: normalizedEmail, fullCode: splitCode }),
       });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to send email");
+      }
+
       toast({ title: "Email Sent", description: "Recipient notified securely." });
       setEmail("");
-    } catch (e) {
-      toast({ variant: "destructive", title: "Failed to send", description: "Could not send email." });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to send",
+        description: e.message || "Could not send email. Please try again."
+      });
     } finally {
       setIsSending(false);
     }

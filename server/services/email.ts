@@ -491,13 +491,16 @@ async function sendViaBrevo(input: BrevoEmailInput): Promise<{ success: boolean;
 
 export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEmailResult> {
   try {
+    // Normalize email to lowercase for case-insensitive handling (handles ALL CAPS, Mixed Case, etc.)
+    const normalizedTo = input.to.trim().toLowerCase();
+
     const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
     if (sentCount >= MAX_EMAILS_PER_VAULT) {
       return { success: false, error: `Maximum ${MAX_EMAILS_PER_VAULT} emails per vault reached.` };
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(input.to)) {
+    if (!emailRegex.test(normalizedTo)) {
       return { success: false, error: "Invalid email address." };
     }
 
@@ -567,7 +570,7 @@ Expires: ${expiryFormatted}
     if (provider === "RESEND") {
       const { data, error } = await resend.emails.send({
         from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-        to: [input.to],
+        to: [normalizedTo], // Use normalized lowercase email
         replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
         subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
         text: textContent,
@@ -585,7 +588,7 @@ Expires: ${expiryFormatted}
     } else {
       // BREVO
       const res = await sendViaBrevo({
-        to: input.to,
+        to: normalizedTo, // Use normalized lowercase email
         subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
         htmlContent: html,
         textContent: textContent,
@@ -602,7 +605,7 @@ Expires: ${expiryFormatted}
     // Update Quota and Limit
     await incrementEmailUsage(provider);
     emailsSentPerVault.set(input.vaultId, sentCount + 1);
-    log(`Vault email sent to ${input.to} via ${provider}`, "email");
+    log(`Vault email sent to ${normalizedTo} via ${provider}`, "email");
 
     return result;
 
@@ -618,7 +621,9 @@ Expires: ${expiryFormatted}
 
 export async function sendDirectAttachment(input: SendDirectEmailInput): Promise<boolean> {
   try {
-    const { to, subject, text, files } = input;
+    // Normalize email to lowercase for case-insensitive handling
+    const normalizedTo = input.to.trim().toLowerCase();
+    const { subject, text, files } = input;
 
     // Determine Provider
     const provider = await getEmailProvider();
@@ -681,7 +686,7 @@ ${files.map(f => `• ${f.filename}`).join('\n')}
     if (provider === "RESEND") {
       const data = await resend.emails.send({
         from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-        to: [to],
+        to: [normalizedTo], // Use normalized lowercase email
         replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
         subject: `📬 ${subject}`,
         text: textPayload,
@@ -702,7 +707,7 @@ ${files.map(f => `• ${f.filename}`).join('\n')}
       }));
 
       const res = await sendViaBrevo({
-        to,
+        to: normalizedTo, // Use normalized lowercase email
         subject: `📬 ${subject}`,
         htmlContent: html,
         textContent: textPayload,
@@ -717,7 +722,7 @@ ${files.map(f => `• ${f.filename}`).join('\n')}
     }
 
     await incrementEmailUsage(provider);
-    log(`Direct email sent to ${to} via ${provider}`, "email");
+    log(`Direct email sent to ${normalizedTo} via ${provider}`, "email");
     return true;
   } catch (error) {
     log(`Failed to send direct email: ${error}`, "email");

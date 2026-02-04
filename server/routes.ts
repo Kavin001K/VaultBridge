@@ -308,17 +308,36 @@ export async function registerRoutes(
       }
 
       const files = req.files as Express.Multer.File[];
-      const { to, subject, body } = req.body;
+      const { to } = req.body;
+      let { subject, body } = req.body;
 
-      if (!to || !subject || !body) {
-        return res.status(400).json({ message: "Missing required fields: to, subject, body." });
+      // Require at least the recipient email
+      if (!to) {
+        return res.status(400).json({ message: "Missing required field: to (recipient email)." });
       }
 
-      // Parse multiple recipients (comma-separated)
+      // Auto-generate default subject if not provided
+      const fileNames = files.map(f => f.originalname).join(', ');
+      if (!subject || (typeof subject === 'string' && subject.trim() === '')) {
+        subject = `Files shared via VaultBridge: ${fileNames.substring(0, 50)}${fileNames.length > 50 ? '...' : ''}`;
+      }
+
+      // Auto-generate default body/message if not provided
+      if (!body || (typeof body === 'string' && body.trim() === '')) {
+        const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+        const formatSize = (bytes: number) => {
+          if (bytes < 1024) return `${bytes} B`;
+          if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+          return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        };
+        body = `You have received ${files.length} file(s) (${formatSize(totalSize)}) via VaultBridge secure transfer.\n\nFiles: ${fileNames}`;
+      }
+
+      // Parse multiple recipients (comma-separated) and NORMALIZE TO LOWERCASE
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const recipients = (to as string)
         .split(',')
-        .map(email => email.trim())
+        .map(email => email.trim().toLowerCase()) // Normalize to lowercase for case-insensitive handling
         .filter(email => emailRegex.test(email));
 
       if (recipients.length === 0) {
@@ -389,11 +408,15 @@ export async function registerRoutes(
   app.post(api.vaults.email.path, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const { to, senderName, fullCode } = req.body;
+      const { senderName, fullCode } = req.body;
+      let { to } = req.body;
 
       if (!to || typeof to !== "string") {
         return res.status(400).json({ message: "Email address required" });
       }
+
+      // Normalize email to lowercase for case-insensitive handling (handles ALL CAPS, MixedCase, etc.)
+      to = to.trim().toLowerCase();
 
       const vault = await storage.getVault(id);
       if (!vault) {
