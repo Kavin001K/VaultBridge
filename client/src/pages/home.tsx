@@ -4,11 +4,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Upload, KeyRound, Shield, Zap, Eye,
   ArrowRight, Sparkles, Mail, Send, Paperclip, FileText, CheckCircle2, AlertCircle, X,
-  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard
+  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard, AlertTriangle, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
 import { useCreateVault } from "@/hooks/use-vaults";
@@ -48,6 +56,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [, setLocation] = useLocation();
+  const [showSpamAlert, setShowSpamAlert] = useState(false);
 
   // Clipboard state
   const [clipboardText, setClipboardText] = useState("");
@@ -208,21 +217,11 @@ export default function Home() {
           description: responseData.message || `Sent to ${responseData.delivered}/${normalizedRecipients.length} recipients`,
           className: "bg-amber-900/90 border-amber-500"
         });
+        // Still show spam dialog for partial success
+        setShowSpamAlert(true);
       } else {
-        toast({
-          title: "✅ Emails Sent Successfully",
-          description: `${emailFiles.length} file(s) sent to ${normalizedRecipients.length} recipient(s)`,
-          className: "bg-emerald-900/90 border-emerald-500",
-          duration: 4000,
-        });
-
-        // Show spam folder warning as a separate prominent toast
-        toast({
-          title: "📬 Check Spam Folder!",
-          description: "Didn't receive the email? Ask recipients to check their Spam/Junk folder and mark as 'Not Spam'.",
-          className: "bg-amber-900/95 border-amber-500 text-amber-50",
-          duration: 10000, // Show for 10 seconds
-        });
+        // Show the spam folder dialog
+        setShowSpamAlert(true);
       }
 
       // Reset form
@@ -860,6 +859,56 @@ export default function Home() {
           © 2025 Ace-Groups. All rights reserved.
         </p>
       </footer>
+
+      {/* Redesigned Check Spam Folder Dialog */}
+      <Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert}>
+        <DialogContent className="sm:max-w-md bg-zinc-950 border border-zinc-800/80 text-zinc-100 shadow-2xl p-0 overflow-hidden">
+
+          {/* Header Pattern */}
+          <div className="relative h-24 bg-zinc-900/50 flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-0 grid-bg opacity-20" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-950" />
+
+            <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-center justify-center relative z-10 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+              <Mail className="w-8 h-8 text-emerald-500" />
+              <div className="absolute -bottom-2 -right-2 bg-zinc-950 rounded-full p-1 border border-zinc-800">
+                <Check className="w-4 h-4 text-emerald-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 pt-2 text-center">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-xl font-bold text-white text-center">Notification Sent</DialogTitle>
+              <DialogDescription className="text-center text-zinc-400">
+                The secure access link has been successfully dispatched.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Spam Alert - Redesigned */}
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 mb-6 text-left">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-amber-500">Delivery Confirmation</p>
+                  <p className="text-xs text-amber-200/70 leading-relaxed">
+                    If the email is not visible in the inbox within 2 minutes, it is highly likely in the <strong className="text-amber-200">Spam</strong> or <strong className="text-amber-200">Junk</strong> folder.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-wide rounded-xl shadow-lg shadow-emerald-900/20 transition-all"
+              onClick={() => setShowSpamAlert(false)}
+            >
+              UNDERSTOOD
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div >
   );
 }

@@ -92,20 +92,6 @@ function CountdownTimer({ expiresAt }: { expiresAt: string }) {
     );
 }
 
-// Security badge component
-function SecurityBadge({ icon: Icon, label, active }: { icon: any; label: string; active: boolean }) {
-    return (
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${active
-            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-            : 'bg-zinc-900/50 border border-zinc-800 text-zinc-500'
-            }`}>
-            <Icon className="w-3.5 h-3.5" />
-            <span className="text-xs font-medium">{label}</span>
-            {active && <CheckCircle2 className="w-3 h-3 ml-auto" />}
-        </div>
-    );
-}
-
 export default function AccessPage() {
     const [accessCode, setAccessCode] = useState("");
     const [stage, setStage] = useState<AccessStage>("input");
@@ -119,20 +105,12 @@ export default function AccessPage() {
     // Derived lookupId for sync
     const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
 
-
-
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const { play: playSound } = useSounds();
     const codeLookup = useCodeLookup();
     const getChunkUrl = useGetChunkDownloadUrl();
     const trackDownload = useTrackDownload();
-
-    // Format the code as XXX-XXX
-    const formatCodeDisplay = (code: string) => {
-        if (code.length <= 3) return code;
-        return `${code.slice(0, 3)}-${code.slice(3)}`;
-    };
 
     const handleCodeSubmit = async () => {
         // Validate 6-char alphanumeric code
@@ -155,7 +133,6 @@ export default function AccessPage() {
             const pin = cleanCode.slice(3, 6);
 
             // Fetch vault data using only the lookupId
-            // The server never sees the PIN!
             const vault = await codeLookup.mutateAsync(lookupId);
             setVaultData(vault);
 
@@ -240,7 +217,7 @@ export default function AccessPage() {
                     chunkIndex: i,
                 });
 
-                // Fetch logic...
+                // Robust Fetch logic with retries
                 let response: Response | null = null;
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
@@ -268,7 +245,6 @@ export default function AccessPage() {
                     // Lazy load Brotli
                     const brotli = await import("brotli-wasm");
                     await brotli.default; // init
-                    // Explicitly cast to ArrayBuffer to satisfy strict type checks
                     const inputBuffer = new Uint8Array(decryptedChunk as ArrayBuffer);
                     const decompressed = brotli.decompress(inputBuffer);
                     chunks.push(decompressed.buffer as ArrayBuffer);
@@ -277,16 +253,11 @@ export default function AccessPage() {
                 }
             }
 
-            // Create blob
-            const totalSize = chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
-            const combinedBuffer = new Uint8Array(totalSize);
-            let offset = 0;
-            for (const chunk of chunks) {
-                combinedBuffer.set(new Uint8Array(chunk), offset);
-                offset += chunk.byteLength;
-            }
+            // OPTIMIZED: Create blob directly from chunks array to avoid double memory allocation
+            setStatusText(`Assembling ${file.name}...`);
+            const blob = new Blob(chunks, { type: file.type || 'application/octet-stream' });
 
-            const blob = new Blob([combinedBuffer], { type: file.type || 'application/octet-stream' });
+            // Trigger Download
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -298,6 +269,7 @@ export default function AccessPage() {
 
             return true;
         } catch (error) {
+            console.error("Memory download failed:", error);
             throw error;
         }
     };
@@ -307,41 +279,49 @@ export default function AccessPage() {
 
         try {
             // Check for Service Worker Support (Streamed Download)
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > 10 * 1024 * 1024) { // Only stream > 10MB to verify optimization
-                console.log("Using Streamed Download for " + file.name);
+            // Stream files > 10MB to save memory, provided SW is active
+            let streamSuccess = false;
+
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > 10 * 1024 * 1024) {
+                console.log("Attempting Streamed Download for " + file.name);
                 setStatusText(`Preparing stream for ${file.name}...`);
 
-                const vaultFile = vaultData.files.find((f: any) => f.fileId === file.fileId);
-                if (!vaultFile) throw new Error("File not found");
+                try {
+                    const vaultFile = vaultData.files.find((f: any) => f.fileId === file.fileId);
+                    if (!vaultFile) throw new Error("File not found");
 
-                // Generate all chunk URLs upfront
-                const chunks = [];
-                for (let i = 0; i < vaultFile.chunkCount; i++) {
-                    const { downloadUrl } = await getChunkUrl.mutateAsync({
-                        vaultId: vaultData.id,
-                        fileId: file.fileId,
-                        chunkIndex: i
-                    });
-                    chunks.push({ downloadUrl, index: i });
+                    // Generate all chunk URLs upfront
+                    const chunks = [];
+                    for (let i = 0; i < vaultFile.chunkCount; i++) {
+                        const { downloadUrl } = await getChunkUrl.mutateAsync({
+                            vaultId: vaultData.id,
+                            fileId: file.fileId,
+                            chunkIndex: i
+                        });
+                        chunks.push({ downloadUrl, index: i });
+                    }
+
+                    await initiateStreamDownload(file.fileId, fileKey, chunks, file);
+                    streamSuccess = true;
+
+                    if (stage === "ready") {
+                        toast({ title: "Download Started", description: `Streaming ${file.name}...` });
+                    }
+                } catch (streamErr) {
+                    console.warn("Stream download failed, falling back to memory:", streamErr);
+                    streamSuccess = false;
                 }
+            }
 
-                await initiateStreamDownload(file.fileId, fileKey, chunks, file);
-
-                if (stage === "ready") {
-                    toast({ title: "Download Started", description: `Streaming ${file.name}...` });
-                }
-            } else {
-                // Fallback to Memory Download
+            // Fallback to Memory Download if stream wasn't attempted or failed
+            if (!streamSuccess) {
                 console.log("Using Memory Download for " + file.name);
                 await downloadFileInMemory(file);
             }
 
             // Track individual download (Shared logic)
             if (stage === "ready") {
-                if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > 10 * 1024 * 1024) {
-                    // For stream, we tracked start. Completion is hard to track from here seamlessly without bi-directional comms.
-                    // We assume success for tracking purposes or track immediately.
-                } else {
+                if (!streamSuccess) {
                     toast({ title: "File Downloaded", description: `${file.name} saved.` });
                 }
 
@@ -369,7 +349,7 @@ export default function AccessPage() {
             console.error("Download failed", error);
             toast({
                 variant: "destructive",
-                title: "Download Error",
+                title: "Download Failed",
                 description: error instanceof Error ? error.message : "Failed to download file"
             });
             if (stage === "downloading") throw error;
@@ -386,7 +366,9 @@ export default function AccessPage() {
                 await downloadFile(file);
             }
 
-            // Track download AFTER successful retrieval
+            // Track download AFTER successful retrieval if doing bulk
+            // Note: Individual tracking inside downloadFile handles the quota decrement better for partial failures
+            // But we can re-sync here
             const res = await trackDownload.mutateAsync(vaultData.id);
 
             setVaultData((prev: any) => ({
@@ -420,18 +402,6 @@ export default function AccessPage() {
                 description: err instanceof Error ? err.message : "An error occurred during download.",
             });
         }
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && accessCode.replace(/\D/g, '').length === 6 && stage === "input") {
-            handleCodeSubmit();
-        }
-    };
-
-    // Format input as XXX-XXX
-    const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-        setAccessCode(value);
     };
 
     return (

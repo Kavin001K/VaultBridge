@@ -875,23 +875,25 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       </table>
       <![endif]-->
       <!--[if !mso]><!-->
-      <div style="display: flex; align-items: center; gap: 16px; padding: 18px 20px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-left: 4px solid #10b981; border-radius: 14px; margin-bottom: 12px;">
-        <div style="width: 52px; height: 52px; ${typeInfo.bgStyle} border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);">
-          ${typeInfo.emoji}
-        </div>
-        <div style="flex: 1; min-width: 0;">
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 6px; word-break: break-word; line-height: 1.3;">${f.filename}</div>
-          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #9ca3af; font-weight: 500;">
-              📁 ${formatSize(f.content.length)}
-            </span>
-            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #6b7280; background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-              ${typeInfo.type}
-            </span>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-left: 4px solid #10b981; border-radius: 14px; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0;">
+          <div style="width: 48px; height: 48px; ${typeInfo.bgStyle} border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);">
+            ${typeInfo.emoji}
+          </div>
+          <div style="flex: 1; min-width: 0; padding-right: 10px;">
+            <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${f.filename}</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #9ca3af; font-weight: 500;">
+                ${formatSize(f.content.length)}
+              </span>
+              <span style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px; color: #ffffff; background: rgba(255, 255, 255, 0.15); padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                ${typeInfo.type}
+              </span>
+            </div>
           </div>
         </div>
-        <div style="width: 40px; height: 40px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <span style="font-size: 18px;">⬇️</span>
+        <div style="width: 40px; height: 40px; background: #10b981; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);">
+          <span style="color: #000000; font-size: 18px; font-weight: bold;">⬇</span>
         </div>
       </div>
       <!--<![endif]-->`
@@ -920,10 +922,10 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       </div>
       ` : ''}
       
-      <div style="background: linear-gradient(145deg, rgba(16, 185, 129, 0.08) 0%, rgba(0, 0, 0, 0.4) 100%); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 18px; padding: 28px; margin: 32px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #10b981; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; font-weight: 700; display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid rgba(16, 185, 129, 0.15);">
-          📎 Secure Attachments
-          <span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #022c1e; font-size: 10px; font-weight: 800; padding: 5px 12px; border-radius: 20px; letter-spacing: 0.5px;">${files.length} ${files.length === 1 ? 'FILE' : 'FILES'}</span>
+      <div style="background: #18181b; border: 1px solid #27272a; border-radius: 18px; padding: 24px; margin: 32px 0; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);">
+        <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #10b981; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid #27272a;">
+          <span style="display: flex; align-items: center; gap: 8px;">📎 Secure Attachments</span>
+          <span style="background: #10b981; color: #000000; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 20px;">${files.length} ${files.length === 1 ? 'FILE' : 'FILES'}</span>
         </div>
         ${attachmentListHtml}
       </div>
