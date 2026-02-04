@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Lock, KeyRound, ArrowLeft, Shield, AlertTriangle, Download, Loader2, Clock, HardDrive, FileText,
-    Clipboard, Check, Copy, ShieldCheck, Sparkles, Eye, Zap, CheckCircle2
+    Clipboard, Sparkles, ShieldCheck, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { LiveClipboard } from "@/components/LiveClipboard";
 import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload } from "@/hooks/use-vaults";
 import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardText } from "@/lib/crypto";
 import { initiateStreamDownload } from "@/lib/downloadStream";
-
+import { useIsMobile } from "@/hooks/use-mobile"; // Installed Mobile SDK
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
@@ -27,7 +27,7 @@ interface FileMetadata {
     lastModified: number;
 }
 
-// SVG Filter for Heat Distortion
+// SVG Filter for Heat Distortion (Heavy on mobile GPU, will be conditional)
 const BurnFilter = () => (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
@@ -55,7 +55,7 @@ const BurnFilter = () => (
     </svg>
 );
 
-function CountdownTimer({ expiresAt }: { expiresAt: string }) {
+function CountdownTimer({ expiresAt, isMobile }: { expiresAt: string, isMobile: boolean }) {
     const [timeLeft, setTimeLeft] = useState<{ h: number, m: number, s: number } | null>(null);
 
     useEffect(() => {
@@ -82,17 +82,18 @@ function CountdownTimer({ expiresAt }: { expiresAt: string }) {
     if (!timeLeft) return <span className="text-red-400 font-mono text-xs">Expired</span>;
 
     return (
-        <div className="flex items-center gap-1 font-mono text-sm font-bold">
-            <span className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded-lg min-w-[2ch] text-center text-cyan-400">{timeLeft.h.toString().padStart(2, '0')}</span>
+        <div className={`flex items-center gap-1 font-mono font-bold ${isMobile ? 'text-xs' : 'text-sm'}`}>
+            <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-1 rounded-lg min-w-[2ch] text-center text-cyan-400">{timeLeft.h.toString().padStart(2, '0')}</span>
             <span className="text-zinc-500">:</span>
-            <span className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded-lg min-w-[2ch] text-center text-cyan-400">{timeLeft.m.toString().padStart(2, '0')}</span>
+            <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-1 rounded-lg min-w-[2ch] text-center text-cyan-400">{timeLeft.m.toString().padStart(2, '0')}</span>
             <span className="text-zinc-500">:</span>
-            <span className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded-lg min-w-[2ch] text-center text-cyan-400">{timeLeft.s.toString().padStart(2, '0')}</span>
+            <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-1 rounded-lg min-w-[2ch] text-center text-cyan-400">{timeLeft.s.toString().padStart(2, '0')}</span>
         </div>
     );
 }
 
 export default function AccessPage() {
+    const isMobile = useIsMobile(); // Mobile SDK Hook
     const [accessCode, setAccessCode] = useState("");
     const [stage, setStage] = useState<AccessStage>("input");
     const [statusText, setStatusText] = useState("");
@@ -207,7 +208,6 @@ export default function AccessPage() {
 
             const chunks: ArrayBuffer[] = [];
 
-            // Download and decrypt each chunk
             for (let i = 0; i < vaultFile.chunkCount; i++) {
                 setStatusText(`Decrypting ${file.name} [${i + 1}/${vaultFile.chunkCount}]...`);
 
@@ -217,7 +217,6 @@ export default function AccessPage() {
                     chunkIndex: i,
                 });
 
-                // Robust Fetch logic with retries
                 let response: Response | null = null;
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
@@ -233,18 +232,15 @@ export default function AccessPage() {
                 if (!response || !response.ok) throw new Error("Failed to download chunk");
 
                 const encryptedChunk = await response.arrayBuffer();
-                // Validate size
                 if (encryptedChunk.byteLength < 12) throw new Error("Chunk too small");
 
                 const iv = new Uint8Array(encryptedChunk, 0, 12);
                 const encryptedData = new Uint8Array(encryptedChunk, 12);
-                // Decrypt the chunk
                 const decryptedChunk = await decryptData(encryptedData, iv, fileKey);
 
                 if (file.isCompressed) {
-                    // Lazy load Brotli
                     const brotli = await import("brotli-wasm");
-                    await brotli.default; // init
+                    await brotli.default;
                     const inputBuffer = new Uint8Array(decryptedChunk as ArrayBuffer);
                     const decompressed = brotli.decompress(inputBuffer);
                     chunks.push(decompressed.buffer as ArrayBuffer);
@@ -253,11 +249,9 @@ export default function AccessPage() {
                 }
             }
 
-            // OPTIMIZED: Create blob directly from chunks array to avoid double memory allocation
             setStatusText(`Assembling ${file.name}...`);
             const blob = new Blob(chunks, { type: file.type || 'application/octet-stream' });
 
-            // Trigger Download
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -278,11 +272,13 @@ export default function AccessPage() {
         if (!vaultData || !fileKey) return;
 
         try {
-            // Check for Service Worker Support (Streamed Download)
-            // Stream files > 10MB to save memory, provided SW is active
             let streamSuccess = false;
 
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > 10 * 1024 * 1024) {
+            // Check for SW + File Size Limit (Mobile browsers often have tighter RAM constraints)
+            // On mobile, force stream for anything over 5MB to be safe
+            const streamThreshold = isMobile ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller && file.size > streamThreshold) {
                 console.log("Attempting Streamed Download for " + file.name);
                 setStatusText(`Preparing stream for ${file.name}...`);
 
@@ -290,7 +286,6 @@ export default function AccessPage() {
                     const vaultFile = vaultData.files.find((f: any) => f.fileId === file.fileId);
                     if (!vaultFile) throw new Error("File not found");
 
-                    // Generate all chunk URLs upfront
                     const chunks = [];
                     for (let i = 0; i < vaultFile.chunkCount; i++) {
                         const { downloadUrl } = await getChunkUrl.mutateAsync({
@@ -313,13 +308,11 @@ export default function AccessPage() {
                 }
             }
 
-            // Fallback to Memory Download if stream wasn't attempted or failed
             if (!streamSuccess) {
                 console.log("Using Memory Download for " + file.name);
                 await downloadFileInMemory(file);
             }
 
-            // Track individual download (Shared logic)
             if (stage === "ready") {
                 if (!streamSuccess) {
                     toast({ title: "File Downloaded", description: `${file.name} saved.` });
@@ -366,9 +359,6 @@ export default function AccessPage() {
                 await downloadFile(file);
             }
 
-            // Track download AFTER successful retrieval if doing bulk
-            // Note: Individual tracking inside downloadFile handles the quota decrement better for partial failures
-            // But we can re-sync here
             const res = await trackDownload.mutateAsync(vaultData.id);
 
             setVaultData((prev: any) => ({
@@ -406,22 +396,25 @@ export default function AccessPage() {
 
     return (
         <div className={`min-h-screen bg-black text-zinc-100 selection:bg-cyan-500/30 overflow-hidden transition-colors duration-1000 ${isBurned ? 'bg-black' : ''}`}>
-            <BurnFilter />
 
-            {/* Ambient Background */}
+            {/* Optimization: Disable Heavy SVG Filters on Mobile */}
+            {!isMobile && <BurnFilter />}
+
+            {/* Ambient Background - Simplified for Mobile */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                {/* Gradient orbs */}
-                <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/8 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-emerald-500/8 rounded-full blur-[120px]" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-violet-500/5 rounded-full blur-[150px]" />
+                {!isMobile && (
+                    <>
+                        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/8 rounded-full blur-[120px]" />
+                        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-emerald-500/8 rounded-full blur-[120px]" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-violet-500/5 rounded-full blur-[150px]" />
+                    </>
+                )}
+                {/* Mobile uses simpler gradient to save battery */}
+                {isMobile && (
+                    <div className="absolute inset-0 bg-gradient-to-b from-cyan-950/10 to-zinc-950/20" />
+                )}
 
-                {/* Grid pattern */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
-
-                {/* Noise texture */}
-                <div className="absolute inset-0 opacity-[0.015]" style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
-                }} />
             </div>
 
             {/* Main Content */}
@@ -432,27 +425,28 @@ export default function AccessPage() {
                         <div className="flex items-center justify-between">
                             <Link href="/">
                                 <motion.div
-                                    className="flex items-center gap-3 cursor-pointer group"
-                                    whileHover={{ scale: 1.02 }}
+                                    className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
+                                    whileHover={!isMobile ? { scale: 1.02 } : {}}
                                     whileTap={{ scale: 0.98 }}
                                 >
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
-                                        <Lock className="w-5 h-5 text-cyan-400" />
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
+                                        <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
                                     </div>
                                     <div>
-                                        <h1 className="font-bold text-lg tracking-tight">
+                                        <h1 className="font-bold text-base sm:text-lg tracking-tight">
                                             VAULT<span className="text-cyan-400">BRIDGE</span>
                                         </h1>
-                                        <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">ACCESS VAULT</p>
+                                        {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">ACCESS VAULT</p>}
                                     </div>
                                 </motion.div>
                             </Link>
 
                             <div className="flex items-center gap-3">
                                 <Link href="/clipboard">
-                                    <Button variant="outline" size="sm" className="border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 gap-2">
+                                    <Button variant="outline" size="sm" className="border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 gap-2 h-9 sm:h-10 px-3">
                                         <Clipboard className="w-4 h-4" />
-                                        Create Clipboard
+                                        <span className="hidden sm:inline">Create Clipboard</span>
+                                        <span className="inline sm:hidden">Clipboard</span>
                                     </Button>
                                 </Link>
                             </div>
@@ -461,7 +455,7 @@ export default function AccessPage() {
                 </header>
 
                 {/* Content Area */}
-                <main className="flex-1 container max-w-6xl mx-auto px-4 py-8 md:py-12">
+                <main className="flex-1 container max-w-6xl mx-auto px-4 py-6 md:py-12 flex flex-col justify-center">
                     <AnimatePresence mode="wait">
                         {!isBurned ? (
                             <motion.div
@@ -469,31 +463,32 @@ export default function AccessPage() {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
+                                className="w-full"
                             >
                                 {/* Input Stage */}
                                 {stage === "input" && (
-                                    <div className="max-w-xl mx-auto">
+                                    <div className="max-w-xl mx-auto w-full">
                                         {/* Hero */}
-                                        <div className="text-center mb-8">
-                                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono mb-6">
+                                        <div className="text-center mb-6 md:mb-8">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] sm:text-xs font-mono mb-4 md:mb-6">
                                                 <Sparkles className="w-3 h-3" />
                                                 <span>ZERO-KNOWLEDGE DECRYPTION</span>
                                             </div>
-                                            <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-4">
+                                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3 sm:mb-4">
                                                 Access Secure{" "}
                                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">
                                                     Vault
                                                 </span>
                                             </h1>
-                                            <p className="text-zinc-400">
+                                            <p className="text-sm sm:text-base text-zinc-400 px-4">
                                                 Enter your 6-digit access code to unlock the vault
                                             </p>
                                         </div>
 
                                         {/* Access Card */}
                                         <div className="relative">
-                                            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-xl opacity-50" />
-                                            <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 md:p-8">
+                                            {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-xl opacity-50" />}
+                                            <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-5 sm:p-6 md:p-8">
                                                 {/* PIN Input */}
                                                 <div className="space-y-6">
                                                     <div className="space-y-4">
@@ -501,7 +496,7 @@ export default function AccessPage() {
                                                             Enter 6-Digit Code
                                                         </label>
 
-                                                        <div className="flex justify-center gap-2 md:gap-3 relative">
+                                                        <div className="flex justify-center gap-2 relative">
                                                             {/* Invisible input for handling focus/typing */}
                                                             <Input
                                                                 type="search"
@@ -517,18 +512,17 @@ export default function AccessPage() {
                                                                         handleCodeSubmit();
                                                                     }
                                                                 }}
-                                                                className="absolute inset-0 opacity-0 cursor-pointer z-10 h-16 w-full"
-                                                                autoFocus
+                                                                className="absolute inset-0 opacity-0 cursor-pointer z-10 h-20 w-full"
+                                                                autoFocus={!isMobile} // Disable autofocus on mobile to prevent keyboard popping up immediately
                                                                 autoComplete="off"
                                                                 spellCheck="false"
                                                                 name="vault_access_code_search"
                                                                 id="vault_access_code_search"
                                                             />
 
-                                                            {/* Visual Boxes */}
-                                                            <div className="flex items-center gap-1 md:gap-2">
-                                                                {/* First 3 Digits (Lookup ID) */}
-                                                                <div className="flex gap-1.5 md:gap-2">
+                                                            {/* Visual Boxes - Responsive Sizing */}
+                                                            <div className="flex items-center gap-1 sm:gap-2">
+                                                                <div className="flex gap-1 sm:gap-2">
                                                                     {Array.from({ length: 3 }).map((_, i) => {
                                                                         const index = i;
                                                                         const num = accessCode[index] || "";
@@ -540,50 +534,35 @@ export default function AccessPage() {
                                                                                 key={index}
                                                                                 initial={false}
                                                                                 animate={{
-                                                                                    scale: isFocused ? 1.05 : 1,
+                                                                                    scale: isFocused && !isMobile ? 1.05 : 1, // Disable scale anim on mobile
                                                                                     borderColor: isFocused ? "rgb(6, 182, 212)" : isFilled ? "rgba(6, 182, 212, 0.3)" : "rgba(63, 63, 70, 1)",
                                                                                     backgroundColor: isFilled ? "rgba(6, 182, 212, 0.1)" : "rgba(24, 24, 27, 1)"
                                                                                 }}
                                                                                 className={`
-                                                                                    w-12 h-16 md:w-14 md:h-20
-                                                                                    border-2 rounded-xl flex items-center justify-center 
-                                                                                    text-2xl md:text-3xl font-mono font-bold
+                                                                                    w-10 h-14 sm:w-12 sm:h-16 md:w-14 md:h-20
+                                                                                    border-2 rounded-lg sm:rounded-xl flex items-center justify-center 
+                                                                                    text-xl sm:text-2xl md:text-3xl font-mono font-bold
                                                                                     transition-colors duration-200
                                                                                     ${isFocused ? "shadow-[0_0_20px_rgba(6,182,212,0.3)] ring-2 ring-cyan-500/20" : ""}
                                                                                 `}
                                                                             >
-                                                                                <AnimatePresence mode="popLayout">
-                                                                                    {num ? (
-                                                                                        <motion.span
-                                                                                            key={num}
-                                                                                            initial={{ y: 20, opacity: 0 }}
-                                                                                            animate={{ y: 0, opacity: 1 }}
-                                                                                            exit={{ y: -20, opacity: 0 }}
-                                                                                            className="text-cyan-400"
-                                                                                        >
-                                                                                            {num}
-                                                                                        </motion.span>
-                                                                                    ) : (
-                                                                                        isFocused && (
-                                                                                            <motion.div
-                                                                                                layoutId="cursor"
-                                                                                                className="w-2 h-2 bg-cyan-400/50 rounded-full animate-pulse"
-                                                                                            />
-                                                                                        )
-                                                                                    )}
-                                                                                </AnimatePresence>
+                                                                                {num ? (
+                                                                                    <span className="text-cyan-400">{num}</span>
+                                                                                ) : (
+                                                                                    isFocused && (
+                                                                                        <div className="w-2 h-2 bg-cyan-400/50 rounded-full animate-pulse" />
+                                                                                    )
+                                                                                )}
                                                                             </motion.div>
                                                                         );
                                                                     })}
                                                                 </div>
 
-                                                                {/* Divider */}
-                                                                <div className="w-4 md:w-6 flex items-center justify-center">
+                                                                <div className="w-3 sm:w-6 flex items-center justify-center">
                                                                     <div className="w-full h-0.5 bg-zinc-700"></div>
                                                                 </div>
 
-                                                                {/* Last 3 Digits (PIN) */}
-                                                                <div className="flex gap-1.5 md:gap-2">
+                                                                <div className="flex gap-1 sm:gap-2">
                                                                     {Array.from({ length: 3 }).map((_, i) => {
                                                                         const index = i + 3;
                                                                         const num = accessCode[index] || "";
@@ -595,38 +574,25 @@ export default function AccessPage() {
                                                                                 key={index}
                                                                                 initial={false}
                                                                                 animate={{
-                                                                                    scale: isFocused ? 1.05 : 1,
+                                                                                    scale: isFocused && !isMobile ? 1.05 : 1,
                                                                                     borderColor: isFocused ? "rgb(16, 185, 129)" : isFilled ? "rgba(16, 185, 129, 0.3)" : "rgba(63, 63, 70, 1)",
                                                                                     backgroundColor: isFilled ? "rgba(16, 185, 129, 0.1)" : "rgba(24, 24, 27, 1)"
                                                                                 }}
                                                                                 className={`
-                                                                                    w-12 h-16 md:w-14 md:h-20
-                                                                                    border-2 rounded-xl flex items-center justify-center 
-                                                                                    text-2xl md:text-3xl font-mono font-bold
+                                                                                    w-10 h-14 sm:w-12 sm:h-16 md:w-14 md:h-20
+                                                                                    border-2 rounded-lg sm:rounded-xl flex items-center justify-center 
+                                                                                    text-xl sm:text-2xl md:text-3xl font-mono font-bold
                                                                                     transition-colors duration-200
                                                                                     ${isFocused ? "shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-2 ring-emerald-500/20" : ""}
                                                                                 `}
                                                                             >
-                                                                                <AnimatePresence mode="popLayout">
-                                                                                    {num ? (
-                                                                                        <motion.span
-                                                                                            key={num}
-                                                                                            initial={{ y: 20, opacity: 0 }}
-                                                                                            animate={{ y: 0, opacity: 1 }}
-                                                                                            exit={{ y: -20, opacity: 0 }}
-                                                                                            className="text-emerald-400"
-                                                                                        >
-                                                                                            {num}
-                                                                                        </motion.span>
-                                                                                    ) : (
-                                                                                        isFocused && (
-                                                                                            <motion.div
-                                                                                                layoutId="cursor"
-                                                                                                className="w-2 h-2 bg-emerald-400/50 rounded-full animate-pulse"
-                                                                                            />
-                                                                                        )
-                                                                                    )}
-                                                                                </AnimatePresence>
+                                                                                {num ? (
+                                                                                    <span className="text-emerald-400">{num}</span>
+                                                                                ) : (
+                                                                                    isFocused && (
+                                                                                        <div className="w-2 h-2 bg-emerald-400/50 rounded-full animate-pulse" />
+                                                                                    )
+                                                                                )}
                                                                             </motion.div>
                                                                         );
                                                                     })}
@@ -634,33 +600,32 @@ export default function AccessPage() {
                                                             </div>
                                                         </div>
 
-                                                        <p className="text-xs text-zinc-500 text-center">
+                                                        <p className="text-[10px] sm:text-xs text-zinc-500 text-center">
                                                             First 3 digits = Vault ID • Last 3 digits = PIN
                                                         </p>
                                                     </div>
 
-                                                    {/* Submit Button */}
                                                     <Button
                                                         onClick={handleCodeSubmit}
                                                         disabled={accessCode.length !== 6}
-                                                        className={`w-full h-14 font-bold uppercase tracking-wider text-base rounded-xl transition-all duration-300 ${accessCode.length === 6
-                                                            ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40 hover:scale-[1.02]"
+                                                        className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 6
+                                                            ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40" // Removed hover scale on mobile
                                                             : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}`}
                                                     >
-                                                        <KeyRound className={`w-5 h-5 mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
+                                                        <KeyRound className={`w-4 h-4 sm:w-5 sm:h-5 mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
                                                         {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
                                                     </Button>
 
-                                                    {/* Trust Indicators */}
-                                                    <div className="flex items-center justify-center gap-6 pt-4 border-t border-zinc-800">
+                                                    {/* Trust Indicators - Simplified on Mobile */}
+                                                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 pt-4 border-t border-zinc-800">
                                                         {[
                                                             { icon: Lock, label: "AES-256" },
                                                             { icon: Shield, label: "Zero-Knowledge" },
                                                             { icon: Zap, label: "Auto-Destruct" },
                                                         ].map((item, i) => (
-                                                            <div key={i} className="flex items-center gap-2 text-zinc-500">
-                                                                <item.icon className="w-3.5 h-3.5" />
-                                                                <span className="text-xs">{item.label}</span>
+                                                            <div key={i} className="flex items-center gap-1.5 sm:gap-2 text-zinc-500">
+                                                                <item.icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                                                <span className="text-[10px] sm:text-xs">{item.label}</span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -668,12 +633,11 @@ export default function AccessPage() {
                                             </div>
                                         </div>
 
-                                        {/* Warning */}
                                         <motion.div
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             transition={{ delay: 0.3 }}
-                                            className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20"
+                                            className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mx-4 sm:mx-0"
                                         >
                                             <div className="flex gap-3">
                                                 <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -691,9 +655,9 @@ export default function AccessPage() {
 
                                 {/* Fetching / Decrypting Stage */}
                                 {(stage === "fetching" || stage === "decrypting") && (
-                                    <div className="max-w-md mx-auto">
+                                    <div className="max-w-md mx-auto w-full px-4">
                                         <div className="relative">
-                                            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-3xl blur-xl opacity-50" />
+                                            {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-3xl blur-xl opacity-50" />}
                                             <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8 text-center">
                                                 <div className="w-20 h-20 mx-auto mb-6 relative">
                                                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 animate-pulse" />
@@ -705,10 +669,6 @@ export default function AccessPage() {
                                                     {stage === "fetching" ? "Locating Vault" : "Decrypting Content"}
                                                 </h3>
                                                 <p className="text-zinc-400 text-sm">{statusText}</p>
-                                                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
-                                                    <Shield className="w-3 h-3" />
-                                                    <span>Decryption happens in your browser</span>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -716,46 +676,45 @@ export default function AccessPage() {
 
                                 {/* Ready Stage */}
                                 {stage === "ready" && (
-                                    <div className="grid lg:grid-cols-3 gap-8">
+                                    <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
                                         {/* Left Sidebar - Vault Info */}
-                                        <div className="lg:col-span-1 space-y-6">
+                                        <div className="lg:col-span-1 space-y-4 sm:space-y-6">
                                             {/* Success Card */}
                                             <div className="relative">
-                                                <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur opacity-20" />
+                                                {!isMobile && <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur opacity-20" />}
                                                 <div className="relative bg-zinc-950 border border-zinc-800 rounded-2xl p-6">
                                                     <motion.div
                                                         initial={{ scale: 0 }}
                                                         animate={{ scale: 1 }}
-                                                        transition={{ type: "spring" }}
                                                         className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center"
                                                     >
                                                         <ShieldCheck className="w-8 h-8 text-emerald-400" />
                                                     </motion.div>
-                                                    <h2 className="text-2xl font-bold text-center text-white mb-1">Vault Unlocked</h2>
-                                                    <p className="text-sm text-zinc-400 text-center">Secure session established</p>
+                                                    <h2 className="text-xl sm:text-2xl font-bold text-center text-white mb-1">Vault Unlocked</h2>
+                                                    <p className="text-xs sm:text-sm text-zinc-400 text-center">Secure session established</p>
                                                 </div>
                                             </div>
 
                                             {/* Stats */}
-                                            <div className="bg-zinc-950/80 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                                            <div className="bg-zinc-950/80 border border-zinc-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3">
                                                 <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
                                                     <div className="flex items-center gap-3 text-zinc-400">
-                                                        <div className="p-2 rounded-lg bg-zinc-800">
+                                                        <div className="p-2 rounded-lg bg-zinc-800 shrink-0">
                                                             <Clock className="w-4 h-4" />
                                                         </div>
-                                                        <span className="text-xs font-bold uppercase tracking-wider">Expires</span>
+                                                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider hidden sm:block lg:inline">Expires</span>
                                                     </div>
-                                                    <CountdownTimer expiresAt={vaultData.expiresAt} />
+                                                    <CountdownTimer expiresAt={vaultData.expiresAt} isMobile={isMobile} />
                                                 </div>
 
                                                 <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
                                                     <div className="flex items-center gap-3 text-zinc-400">
-                                                        <div className="p-2 rounded-lg bg-zinc-800">
+                                                        <div className="p-2 rounded-lg bg-zinc-800 shrink-0">
                                                             <Download className="w-4 h-4" />
                                                         </div>
-                                                        <span className="text-xs font-bold uppercase tracking-wider">Downloads</span>
+                                                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider hidden sm:block lg:inline">Downloads</span>
                                                     </div>
-                                                    <span className="font-mono text-sm font-bold text-white">
+                                                    <span className="font-mono text-xs sm:text-sm font-bold text-white">
                                                         {vaultData.maxDownloads - vaultData.downloadCount} <span className="text-zinc-600">/</span> {vaultData.maxDownloads}
                                                     </span>
                                                 </div>
@@ -763,37 +722,24 @@ export default function AccessPage() {
                                                 {fileMetadata.length > 0 && (
                                                     <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
                                                         <div className="flex items-center gap-3 text-zinc-400">
-                                                            <div className="p-2 rounded-lg bg-zinc-800">
+                                                            <div className="p-2 rounded-lg bg-zinc-800 shrink-0">
                                                                 <HardDrive className="w-4 h-4" />
                                                             </div>
-                                                            <span className="text-xs font-bold uppercase tracking-wider">Size</span>
+                                                            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider hidden sm:block lg:inline">Size</span>
                                                         </div>
-                                                        <span className="font-mono text-sm font-bold text-white">
+                                                        <span className="font-mono text-xs sm:text-sm font-bold text-white">
                                                             {(fileMetadata.reduce((acc: any, f: any) => acc + f.size, 0) / (1024 * 1024)).toFixed(2)} MB
                                                         </span>
                                                     </div>
                                                 )}
-                                            </div>
-
-                                            {/* Security Info */}
-                                            <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                                                <div className="flex items-start gap-3">
-                                                    <Shield className="w-5 h-5 text-emerald-400 mt-0.5" />
-                                                    <div>
-                                                        <p className="text-xs font-bold text-emerald-300">Zero-Knowledge Architecture</p>
-                                                        <p className="text-xs text-emerald-400/70 mt-1">
-                                                            Content decrypted locally in your browser. Server never sees plaintext.
-                                                        </p>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </div>
 
                                         {/* Right Content - Files/Clipboard */}
                                         <div className="lg:col-span-2">
                                             <div className="relative">
-                                                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/10 via-emerald-500/10 to-cyan-500/10 rounded-3xl blur-xl opacity-50" />
-                                                <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 md:p-8">
+                                                {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/10 via-emerald-500/10 to-cyan-500/10 rounded-3xl blur-xl opacity-50" />}
+                                                <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-5 sm:p-6 md:p-8">
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <span className="flex items-center justify-center w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/30">
                                                             {fileMetadata.length + (clipboardContent ? 1 : 0)}
@@ -803,17 +749,17 @@ export default function AccessPage() {
                                                         </h3>
                                                     </div>
 
-                                                    {/* Live Universal Clipboard */}
                                                     {(clipboardContent !== null || !!vaultData.encryptedClipboardText) && (
-                                                        <LiveClipboard
-                                                            lookupId={lookupId}
-                                                            fileKey={fileKey!}
-                                                            wrappedKey={vaultData.wrappedKey}
-                                                            initialContent={clipboardContent}
-                                                        />
+                                                        <div className="mb-6">
+                                                            <LiveClipboard
+                                                                lookupId={lookupId}
+                                                                fileKey={fileKey!}
+                                                                wrappedKey={vaultData.wrappedKey}
+                                                                initialContent={clipboardContent}
+                                                            />
+                                                        </div>
                                                     )}
 
-                                                    {/* Files List */}
                                                     {fileMetadata.length > 0 && (
                                                         <>
                                                             <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto custom-scrollbar">
@@ -823,13 +769,13 @@ export default function AccessPage() {
                                                                         animate={{ opacity: 1, y: 0 }}
                                                                         transition={{ delay: index * 0.05 }}
                                                                         key={file.fileId}
-                                                                        className="group flex items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:bg-zinc-900/80 hover:border-zinc-700 transition-all duration-300"
+                                                                        className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:bg-zinc-900/80 hover:border-zinc-700 transition-all duration-300 gap-4 sm:gap-0"
                                                                     >
                                                                         <div className="flex items-center gap-4 min-w-0">
-                                                                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shrink-0 border border-zinc-700 group-hover:border-cyan-500/50 transition-colors">
-                                                                                <FileText className="w-6 h-6 text-zinc-400 group-hover:text-cyan-400 transition-colors" />
+                                                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shrink-0 border border-zinc-700 group-hover:border-cyan-500/50 transition-colors">
+                                                                                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400 group-hover:text-cyan-400 transition-colors" />
                                                                             </div>
-                                                                            <div className="min-w-0">
+                                                                            <div className="min-w-0 flex-1">
                                                                                 <p className="text-sm font-bold text-zinc-100 truncate max-w-[200px] sm:max-w-xs">{file.name}</p>
                                                                                 <div className="flex items-center gap-3 mt-1">
                                                                                     <span className="text-xs text-zinc-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
@@ -842,7 +788,7 @@ export default function AccessPage() {
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            className="bg-transparent border-zinc-700 hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 shrink-0 transition-colors"
+                                                                            className="w-full sm:w-auto bg-transparent border-zinc-700 hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 shrink-0 transition-colors h-10 sm:h-9"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 e.preventDefault();
@@ -856,18 +802,14 @@ export default function AccessPage() {
                                                                 ))}
                                                             </div>
 
-                                                            {/* Download All Button */}
                                                             <div className="pt-6 border-t border-zinc-800">
                                                                 <Button
                                                                     onClick={handleDownload}
-                                                                    className="w-full h-14 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-base uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40 hover:scale-[1.02] transition-all"
+                                                                    className="w-full h-12 sm:h-14 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-sm sm:text-base uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40"
                                                                 >
                                                                     <Download className="w-5 h-5 mr-3" />
                                                                     Download All Files
                                                                 </Button>
-                                                                <p className="text-center text-[10px] uppercase tracking-widest text-zinc-600 mt-4 font-bold">
-                                                                    {vaultData?.maxDownloads - vaultData?.downloadCount} Downloads remaining
-                                                                </p>
                                                             </div>
                                                         </>
                                                     )}
@@ -879,9 +821,9 @@ export default function AccessPage() {
 
                                 {/* Downloading Stage */}
                                 {stage === "downloading" && (
-                                    <div className="max-w-md mx-auto">
+                                    <div className="max-w-md mx-auto w-full px-4">
                                         <div className="relative">
-                                            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-3xl blur-xl opacity-50" />
+                                            {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-3xl blur-xl opacity-50" />}
                                             <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8 text-center">
                                                 <div className="w-20 h-20 mx-auto mb-6 relative">
                                                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 animate-pulse" />
@@ -906,7 +848,7 @@ export default function AccessPage() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: 2 }}
-                                className="max-w-lg mx-auto text-center"
+                                className="max-w-lg mx-auto text-center w-full px-4"
                             >
                                 <div className="relative">
                                     <div className="absolute -inset-1 bg-gradient-to-r from-red-500/30 to-orange-500/30 rounded-3xl blur-xl opacity-50" />
@@ -914,17 +856,17 @@ export default function AccessPage() {
                                         <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
                                             <AlertTriangle className="w-10 h-10 text-red-500 animate-pulse" />
                                         </div>
-                                        <h1 className="text-3xl font-black tracking-[0.15em] uppercase text-red-500 mb-4">
+                                        <h1 className="text-2xl sm:text-3xl font-black tracking-[0.15em] uppercase text-red-500 mb-4">
                                             Vault Incinerated
                                         </h1>
-                                        <div className="space-y-2 font-mono text-sm text-zinc-500">
+                                        <div className="space-y-2 font-mono text-xs sm:text-sm text-zinc-500">
                                             <p>&gt; SYSTEM_PURGE_COMPLETE</p>
                                             <p>&gt; FILES_OVERWRITTEN</p>
                                             <p className="text-red-700">&gt; LINK_TERMINATED</p>
                                         </div>
                                         <div className="mt-8">
                                             <Link href="/">
-                                                <Button variant="outline" className="border-red-900/50 hover:bg-red-500/10">
+                                                <Button variant="outline" className="border-red-900/50 hover:bg-red-500/10 w-full sm:w-auto h-12 sm:h-10">
                                                     <ArrowLeft className="w-4 h-4 mr-2" />
                                                     Return Home
                                                 </Button>
@@ -938,14 +880,14 @@ export default function AccessPage() {
                 </main>
 
                 {/* Footer */}
-                <footer className="border-t border-zinc-800/50 py-6">
+                <footer className="border-t border-zinc-800/50 py-6 mt-auto">
                     <div className="container max-w-6xl mx-auto px-4">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
-                            <div className="flex items-center gap-2">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-sm text-zinc-500 text-center md:text-left">
+                            <div className="flex items-center gap-2 justify-center md:justify-start">
                                 <Lock className="w-4 h-4 text-cyan-500" />
                                 <span>End-to-end encrypted • Your data never leaves your device unencrypted</span>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 justify-center md:justify-start">
                                 <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
                                 <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
                                 <Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link>
