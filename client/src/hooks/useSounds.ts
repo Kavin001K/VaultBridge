@@ -1,7 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 
 // Sound effect types available in the app
-type SoundType =
+export type SoundType =
     | 'click'
     | 'success'
     | 'error'
@@ -274,6 +274,3 @@ export function useSounds() {
         toggle,
     };
 }
-
-// Export sound types for type safety
-export type { SoundType };

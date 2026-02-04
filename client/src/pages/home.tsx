@@ -4,16 +4,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Upload, KeyRound, Shield, Zap, Eye,
   ArrowRight, Sparkles, Mail, Send, Paperclip, FileText, CheckCircle2, AlertCircle, X,
-  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard, Copy, Timer, Loader2
+  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
 import { useCreateVault } from "@/hooks/use-vaults";
-import { generateKey, generateSplitCode, wrapFileKey, encryptMetadata, encryptClipboardText } from "@/lib/crypto";
+import { generateKey, generateSplitCode, wrapFileKey, encryptMetadata } from "@/lib/crypto";
 
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
@@ -55,6 +54,13 @@ export default function Home() {
   const [clipboardExpiresIn, setClipboardExpiresIn] = useState([24]);
   const [clipboardMaxDownloads, setClipboardMaxDownloads] = useState([1]);
   const [isCreatingClipboard, setIsCreatingClipboard] = useState(false);
+  const [createdVaultData, setCreatedVaultData] = useState<{
+    code: string;
+    fullCode: string;
+    lookupId: string;
+    wrappedKey: string;
+    key: CryptoKey;
+  } | null>(null);
   const createVault = useCreateVault();
 
   // Email form state
@@ -99,19 +105,21 @@ export default function Home() {
     if (!recipientInput.trim()) return;
 
     // Allow comma separation in input for power users, but convert to chips
-    const inputs = recipientInput.split(',').map(e => e.trim()).filter(e => e);
+    const inputs = recipientInput.split(',').map(e => e.trim().toLowerCase()).filter(e => e); // Normalize to lowercase
     const validToAdd: string[] = [];
     let errorMsg = "";
 
     inputs.forEach(email => {
+      // Check case-insensitively against existing recipients
+      const existingLower = recipients.map(r => r.toLowerCase());
       if (!isValidEmail(email)) {
         errorMsg = `Invalid email: ${email}`;
-      } else if (recipients.includes(email)) {
+      } else if (existingLower.includes(email.toLowerCase())) {
         errorMsg = `Duplicate email: ${email}`;
       } else if (recipients.length + validToAdd.length >= MAX_RECIPIENTS) {
         errorMsg = `Max ${MAX_RECIPIENTS} recipients allowed`;
       } else {
-        validToAdd.push(email);
+        validToAdd.push(email.toLowerCase()); // Store normalized lowercase
       }
     });
 
@@ -146,23 +154,39 @@ export default function Home() {
   const handleSendEmail = async () => {
     const validRecipients = getValidRecipients();
 
-    if (emailFiles.length === 0 || validRecipients.length === 0 || !emailSubject || !emailBody) {
+    // Only files and recipients are truly required - subject and body will auto-generate if empty
+    if (emailFiles.length === 0 || validRecipients.length === 0) {
       toast({
         variant: "destructive",
-        title: "Missing fields",
-        description: "Please fill in all fields, add valid recipients, and attach at least one file.",
+        title: "Missing required fields",
+        description: "Please add at least one file and one valid recipient email address.",
       });
       return;
     }
+
+    // Normalize all recipients to lowercase before sending
+    const normalizedRecipients = validRecipients.map(email => email.trim().toLowerCase());
 
     setIsSending(true);
 
     try {
       const formData = new FormData();
-      // Send recipients as comma-separated string for backend
-      formData.append("to", validRecipients.join(","));
-      formData.append("subject", emailSubject);
-      formData.append("body", emailBody);
+      // Send recipients as comma-separated string for backend (normalized to lowercase)
+      formData.append("to", normalizedRecipients.join(","));
+
+      // Auto-generate subject if empty (server will also do this, but we show the user what's being sent)
+      const finalSubject = emailSubject.trim() || `Files shared via VaultBridge: ${emailFiles.map(f => f.name).join(", ").substring(0, 50)}`;
+      formData.append("subject", finalSubject);
+
+      // Auto-generate body if empty (server will also do this, but we show the user what's being sent)
+      const totalSize = emailFiles.reduce((acc, f) => acc + f.size, 0);
+      const formatSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      };
+      const finalBody = emailBody.trim() || `You have received ${emailFiles.length} file(s) (${formatSize(totalSize)}) via VaultBridge secure transfer.\n\nFiles: ${emailFiles.map(f => f.name).join(", ")}`;
+      formData.append("body", finalBody);
 
       emailFiles.forEach(file => formData.append("files", file));
 
@@ -171,16 +195,26 @@ export default function Home() {
         body: formData,
       });
 
+      const responseData = await res.json();
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to send email");
+        throw new Error(responseData.message || "Failed to send email");
       }
 
-      toast({
-        title: "✅ Emails Sent Successfully",
-        description: `${emailFiles.length} file(s) sent to ${validRecipients.length} recipient(s)`,
-        className: "bg-emerald-900/90 border-emerald-500"
-      });
+      // Handle partial success
+      if (responseData.failed && responseData.failed > 0) {
+        toast({
+          title: "⚠️ Partial Success",
+          description: responseData.message || `Sent to ${responseData.delivered}/${normalizedRecipients.length} recipients`,
+          className: "bg-amber-900/90 border-amber-500"
+        });
+      } else {
+        toast({
+          title: "✅ Emails Sent Successfully",
+          description: `${emailFiles.length} file(s) sent to ${normalizedRecipients.length} recipient(s)`,
+          className: "bg-emerald-900/90 border-emerald-500"
+        });
+      }
 
       // Reset form
       setEmailFiles([]);
@@ -193,7 +227,7 @@ export default function Home() {
       toast({
         variant: "destructive",
         title: "Failed to send",
-        description: err.message || "Something went wrong.",
+        description: err.message || "Something went wrong. Please try again.",
       });
     } finally {
       setIsSending(false);
@@ -708,175 +742,45 @@ export default function Home() {
               transition={{ duration: 0.3 }}
               className="w-full max-w-2xl mx-auto px-2"
             >
-              {/* Clipboard Card */}
-              <div className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-zinc-900/90 via-zinc-900/95 to-cyan-950/30 shadow-2xl shadow-cyan-500/10">
-                {/* Decorative gradient orbs */}
-                <div className="absolute -top-20 -right-20 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl" />
-                <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-teal-500/20 rounded-full blur-3xl" />
+              <div
+                className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-zinc-900/90 via-zinc-900/95 to-cyan-950/30 shadow-2xl shadow-cyan-500/10 p-8 text-center cursor-pointer group hover:border-cyan-500/40 transition-all duration-500"
+                onClick={() => setLocation("/clipboard")}
+              >
+                <div className="absolute inset-0 bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors duration-500" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                <div className="relative p-6 md:p-8">
-                  {/* Header */}
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="relative">
-                      <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/30">
-                        <Clipboard className="w-7 h-7 md:w-8 md:h-8 text-white" />
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-zinc-900">
-                        <Lock className="w-3 h-3 text-white" />
-                      </div>
+                <div className="relative z-10 flex flex-col items-center gap-6">
+                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-600 to-teal-700 flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform duration-500">
+                    <Clipboard className="w-10 h-10 text-white" />
+                  </div>
+
+                  <div>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent mb-2">
+                      Universal Clipboard
+                    </h2>
+                    <p className="text-zinc-400 max-w-md mx-auto">
+                      Share passwords, code snippets, and sensitive text across devices with end-to-end encryption.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs text-zinc-500">
+                    <div className="flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-emerald-400" />
+                      <span>AES-256</span>
                     </div>
-                    <div>
-                      <h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
-                        Secure Clipboard
-                      </h3>
-                      <p className="text-sm text-zinc-400 flex items-center gap-2 mt-1">
-                        <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                        End-to-End Encrypted Text Sharing
-                      </p>
+                    <div className="flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-amber-400" />
+                      <span>Auto-Destruct</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-cyan-400" />
+                      <span>Zero-Knowledge</span>
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    {/* Text Input */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                        Paste Your Text
-                      </label>
-                      <Textarea
-                        placeholder="Paste password, code snippet, or any secret text here..."
-                        className="min-h-[200px] bg-zinc-900/50 border-zinc-800 focus:border-cyan-500/50 resize-none text-base rounded-xl font-mono"
-                        value={clipboardText}
-                        onChange={(e) => setClipboardText(e.target.value)}
-                        maxLength={50000}
-                      />
-                      <p className="text-xs text-zinc-500 text-right">
-                        {clipboardText.length.toLocaleString()} / 50,000 characters
-                      </p>
-                    </div>
-
-                    {/* Settings */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <label className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-                            <Timer className="w-3.5 h-3.5 text-cyan-400" />
-                            Expires In
-                          </label>
-                          <span className="text-xs font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded">
-                            {clipboardExpiresIn[0]}h
-                          </span>
-                        </div>
-                        <Slider
-                          value={clipboardExpiresIn}
-                          onValueChange={setClipboardExpiresIn}
-                          min={1}
-                          max={168}
-                          step={1}
-                          className="py-1"
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <label className="text-xs font-medium text-zinc-400 flex items-center gap-2">
-                            <Zap className="w-3.5 h-3.5 text-teal-400" />
-                            Access Limit
-                          </label>
-                          <span className="text-xs font-mono text-teal-400 font-bold bg-teal-500/10 px-2 py-0.5 rounded">
-                            {clipboardMaxDownloads[0] === 1 ? "1x (Burn)" : `${clipboardMaxDownloads[0]}x`}
-                          </span>
-                        </div>
-                        <Slider
-                          value={clipboardMaxDownloads}
-                          onValueChange={setClipboardMaxDownloads}
-                          min={1}
-                          max={100}
-                          step={1}
-                          className="py-1"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Create Button */}
-                    <Button
-                      className="w-full h-14 text-base font-bold tracking-wide uppercase bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white shadow-lg shadow-cyan-500/20 rounded-xl transition-all hover:shadow-xl hover:shadow-cyan-500/30"
-                      size="lg"
-                      onClick={async () => {
-                        if (!clipboardText.trim()) {
-                          toast({
-                            variant: "destructive",
-                            title: "No text entered",
-                            description: "Please paste some text to share.",
-                          });
-                          return;
-                        }
-
-                        setIsCreatingClipboard(true);
-                        try {
-                          // Generate encryption key
-                          const key = await generateKey();
-                          const splitCode = generateSplitCode();
-                          const wrappedKey = await wrapFileKey(key, splitCode.pin);
-
-                          // Encrypt clipboard text
-                          const encryptedClipboard = await encryptClipboardText(clipboardText, key);
-
-                          // Encrypt empty metadata (no files)
-                          const encryptedMetadataStr = await encryptMetadata([], key);
-
-                          // Create vault with clipboard only
-                          const vault = await createVault.mutateAsync({
-                            expiresIn: clipboardExpiresIn[0],
-                            maxDownloads: clipboardMaxDownloads[0],
-                            encryptedMetadata: encryptedMetadataStr,
-                            lookupId: splitCode.lookupId,
-                            wrappedKey,
-                            files: [],
-                            encryptedClipboardText: encryptedClipboard,
-                          });
-
-                          playSound('success');
-
-                          // Navigate to success page
-                          setLocation(`/success/${vault.id}#code=${splitCode.fullCode}`);
-                        } catch (err: any) {
-                          playSound('error');
-                          toast({
-                            variant: "destructive",
-                            title: "Failed to create clipboard vault",
-                            description: err.message || "Something went wrong.",
-                          });
-                        } finally {
-                          setIsCreatingClipboard(false);
-                        }
-                      }}
-                      disabled={isCreatingClipboard || !clipboardText.trim()}
-                    >
-                      {isCreatingClipboard ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Encrypting...
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="w-5 h-5 mr-2" />
-                          Create Secure Clipboard
-                        </>
-                      )}
-                    </Button>
-
-                    {/* Security Notice */}
-                    <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-cyan-500/5 to-teal-500/5 border border-cyan-500/10">
-                      <div className="p-2 bg-cyan-500/10 rounded-lg flex-shrink-0">
-                        <Shield className="w-5 h-5 text-cyan-400" />
-                      </div>
-                      <div className="text-xs text-zinc-400 leading-relaxed">
-                        <p className="font-semibold text-zinc-300 mb-1">Universal Clipboard</p>
-                        Text is encrypted in your browser before upload. Access it from any device using the 6-digit code. Self-destructs after use.
-                      </div>
-                    </div>
-                  </div>
+                  <Button className="mt-2 bg-cyan-600 hover:bg-cyan-500 text-white gap-2 px-8 h-12 rounded-full font-bold group-hover:scale-105 transition-transform">
+                    Open Secure Clipboard <ArrowRight className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             </motion.div>

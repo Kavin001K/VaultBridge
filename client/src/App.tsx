@@ -1,15 +1,18 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSEO } from "@/components/SEO";
 
+import ClipboardPage from "@/pages/clipboard";
+
 // Lazy Load Pages
 const Home = lazy(() => import("@/pages/home"));
+
 const UploadPage = lazy(() => import("@/pages/upload"));
 const AccessPage = lazy(() => import("@/pages/access"));
 const DownloadPage = lazy(() => import("@/pages/download"));
@@ -30,9 +33,22 @@ function LoadingFallback() {
 function Router() {
   // Dynamic SEO based on current route
   useSEO();
+  const [location] = useLocation();
+
+  useEffect(() => {
+    console.log("[Router Debug] Current location:", location);
+  }, [location]);
+
+  // MANUAL OVERRIDE: Force render /clipboard to bypass Switch matching issues
+  if (location === "/clipboard" || location === "/clipboard/") {
+    return <ClipboardPage />;
+  }
 
   return (
     <Switch>
+      <Route path="/clipboard">
+        <ClipboardPage />
+      </Route>
       <Route path="/" component={Home} />
       <Route path="/upload" component={UploadPage} />
       <Route path="/access" component={AccessPage} />
