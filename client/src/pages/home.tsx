@@ -212,7 +212,16 @@ export default function Home() {
         toast({
           title: "✅ Emails Sent Successfully",
           description: `${emailFiles.length} file(s) sent to ${normalizedRecipients.length} recipient(s)`,
-          className: "bg-emerald-900/90 border-emerald-500"
+          className: "bg-emerald-900/90 border-emerald-500",
+          duration: 4000,
+        });
+
+        // Show spam folder warning as a separate prominent toast
+        toast({
+          title: "📬 Check Spam Folder!",
+          description: "Didn't receive the email? Ask recipients to check their Spam/Junk folder and mark as 'Not Spam'.",
+          className: "bg-amber-900/95 border-amber-500 text-amber-50",
+          duration: 10000, // Show for 10 seconds
         });
       }
 

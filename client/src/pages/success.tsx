@@ -214,7 +214,16 @@ export default function Success() {
         throw new Error(data.message || "Failed to send email");
       }
 
-      toast({ title: "Email Sent", description: "Recipient notified securely." });
+      toast({ title: "✅ Email Sent", description: "Recipient notified securely.", className: "bg-emerald-900/90 border-emerald-500" });
+
+      // Show spam folder warning immediately
+      toast({
+        title: "📬 Check Spam Folder!",
+        description: "Didn't receive the email? Ask the recipient to check their Spam/Junk folder.",
+        className: "bg-amber-900/95 border-amber-500 text-amber-50",
+        duration: 10000,
+      });
+
       setEmail("");
     } catch (e: any) {
       toast({
