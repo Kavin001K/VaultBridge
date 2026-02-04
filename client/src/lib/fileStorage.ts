@@ -63,6 +63,16 @@ export async function saveFilesToStorage(files: File[]): Promise<void> {
     }
 
     try {
+        // CRITICAL: Read all file buffers BEFORE starting the transaction.
+        // IndexedDB transactions auto-commit when the event loop is idle,
+        // so async operations like arrayBuffer() must complete first.
+        const fileDataPromises = files.map(async (file) => ({
+            file,
+            buffer: await file.arrayBuffer()
+        }));
+        const fileData = await Promise.all(fileDataPromises);
+
+        // Now start the transaction with all data ready
         const db = await openDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
@@ -70,9 +80,8 @@ export async function saveFilesToStorage(files: File[]): Promise<void> {
         // Clear existing files first
         store.clear();
 
-        // Save each file
-        for (const file of files) {
-            const buffer = await file.arrayBuffer();
+        // Save each file (synchronous puts, no async inside transaction)
+        for (const { file, buffer } of fileData) {
             const storedFile: StoredFile = {
                 id: generateFileId(file),
                 name: file.name,

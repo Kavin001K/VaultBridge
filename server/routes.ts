@@ -80,7 +80,12 @@ export async function registerRoutes(
           field: err.errors[0].path.join("."),
         });
       }
-      throw err;
+      // Log the actual error for debugging
+      console.error("[Vault Create Error]", err);
+      return res.status(500).json({
+        message: "Failed to create vault",
+        error: err instanceof Error ? err.message : "Unknown error"
+      });
     }
   });
 
@@ -136,7 +141,7 @@ export async function registerRoutes(
     res.json({ id: vault.id });
   });
 
-  // Mark download (increment counter)
+  // Mark download (vault-level increment - legacy, kept for backwards compatibility)
   app.post(api.vaults.download.path, async (req, res) => {
     const vault = await storage.getVault(req.params.id as string);
 
@@ -154,12 +159,77 @@ export async function registerRoutes(
     if (newCount >= vault.maxDownloads) {
       console.log(`[Vault ${vault.id}] Burn-on-read triggered. Deleting...`);
       await storage.deleteVault(vault.id);
-      // We still return success but with 0 remaining
       res.json({ success: true, remainingDownloads: 0 });
     } else {
       res.json({ success: true, remainingDownloads: vault.maxDownloads - newCount });
     }
   });
+
+  // Per-file download tracking
+  app.post(api.vaults.downloadFile.path, async (req, res) => {
+    try {
+      const vaultId = req.params.id as string;
+      const singleFileId = req.params.fileId as string;
+
+      // Support both single file (from URL) and multiple files (from body)
+      const body = req.body || {};
+      const fileIds: string[] = body.fileIds?.length ? body.fileIds : [singleFileId];
+
+      const vault = await storage.getVault(vaultId);
+      if (!vault) {
+        return res.status(404).json({ message: "Vault not found" });
+      }
+
+      // Check if vault has expired
+      if (new Date() > vault.expiresAt) {
+        await storage.deleteVault(vault.id);
+        return res.status(410).json({ message: "Vault has expired" });
+      }
+
+      // Get current file states to check limits before incrementing
+      const vaultFiles = await storage.getFiles(vault.id);
+      const requestedFiles = vaultFiles.filter(f => fileIds.includes(f.fileId));
+
+      if (requestedFiles.length === 0) {
+        return res.status(404).json({ message: "No matching files found" });
+      }
+
+      // Check if any requested file has already reached its limit
+      const exhaustedFiles = requestedFiles.filter(f => f.downloadCount >= f.maxDownloads);
+      if (exhaustedFiles.length > 0) {
+        return res.status(403).json({
+          message: `Download limit exceeded for ${exhaustedFiles.length} file(s)`,
+          exhaustedFiles: exhaustedFiles.map(f => f.fileId)
+        });
+      }
+
+      // Increment download counts for all requested files
+      const results = await storage.incrementFileDownloadCount(fileIds);
+
+      // Check if ALL files in the vault are now exhausted
+      const allVaultFilesExhausted = await storage.areAllFilesExhausted(vault.id);
+
+      // BURNING LOGIC: If all files exhausted, delete the vault
+      if (allVaultFilesExhausted) {
+        console.log(`[Vault ${vault.id}] All files exhausted. Initiating burn...`);
+        await storage.deleteVault(vault.id);
+      }
+
+      res.json({
+        success: true,
+        files: results,
+        vaultExhausted: allVaultFilesExhausted
+      });
+
+    } catch (err) {
+      console.error("[File Download Track Error]", err);
+      return res.status(500).json({
+        message: "Failed to track download",
+        error: err instanceof Error ? err.message : "Unknown error"
+      });
+    }
+  });
+
 
   // Burn/Delete Vault
   app.delete('/api/vaults/:id', async (req, res) => {
@@ -192,9 +262,9 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Invalid code or vault expired" });
     }
 
-    // Check if expired or depleted
-    if (new Date() > vault.expiresAt || vault.downloadCount >= vault.maxDownloads) {
-      return res.status(410).json({ message: "Vault expired or download limit reached" });
+    // Check if expired
+    if (new Date() > vault.expiresAt) {
+      return res.status(410).json({ message: "Vault expired" });
     }
 
     // Crucial: We return the wrappedKey, but NOT the PIN
@@ -205,18 +275,25 @@ export async function registerRoutes(
 
     const files = await storage.getFiles(vault.id);
 
+    // Calculate vault-level download stats (sum of all file download counts)
+    const totalFileDownloads = files.reduce((sum, f) => sum + (f.downloadCount || 0), 0);
+    const totalFileMaxDownloads = files.reduce((sum, f) => sum + (f.maxDownloads || 0), 0);
+
     res.json({
       id: vault.id,
       wrappedKey: vault.wrappedKey,
       encryptedMetadata: vault.encryptedMetadata,
       encryptedClipboardText: vault.encryptedClipboardText, // Include clipboard text if present
       expiresAt: vault.expiresAt.toISOString(),
-      maxDownloads: vault.maxDownloads,
-      downloadCount: vault.downloadCount,
+      maxDownloads: vault.maxDownloads, // Vault-level default
+      downloadCount: vault.downloadCount, // Vault-level (legacy)
       files: files.map((f) => ({
         fileId: f.fileId,
         chunkCount: f.chunkCount,
         totalSize: f.totalSize,
+        maxDownloads: f.maxDownloads || vault.maxDownloads, // Per-file, fallback to vault default
+        downloadCount: f.downloadCount || 0, // Per-file
+        remainingDownloads: Math.max(0, (f.maxDownloads || vault.maxDownloads) - (f.downloadCount || 0)),
       })),
     });
   });

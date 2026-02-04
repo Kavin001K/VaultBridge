@@ -164,7 +164,7 @@ export function useGetChunkDownloadUrl() {
   });
 }
 
-// Track Download (increment count)
+// Track Download (vault-level increment - legacy)
 export function useTrackDownload() {
   return useMutation({
     mutationFn: async (vaultId: string) => {
@@ -172,6 +172,36 @@ export function useTrackDownload() {
       const res = await fetch(url, { method: 'POST' });
       if (!res.ok) throw new Error("Failed to track download");
       return await res.json();
+    }
+  });
+}
+
+// Track Per-File Download (individual file tracking)
+export function useTrackFileDownload() {
+  return useMutation({
+    mutationFn: async ({
+      vaultId,
+      fileId,
+      fileIds
+    }: {
+      vaultId: string,
+      fileId: string, // Primary file for URL
+      fileIds?: string[] // Optional: track multiple files at once
+    }) => {
+      const url = buildUrl(api.vaults.downloadFile.path, { id: vaultId, fileId });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: fileIds || [fileId] })
+      });
+
+      if (res.status === 403) {
+        const error = await res.json();
+        throw new Error(error.message || "Download limit exceeded for one or more files");
+      }
+      if (!res.ok) throw new Error("Failed to track file download");
+
+      return api.vaults.downloadFile.responses[200].parse(await res.json());
     }
   });
 }

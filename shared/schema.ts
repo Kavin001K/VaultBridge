@@ -26,6 +26,8 @@ export const files = pgTable("files", {
   totalSize: integer("total_size").notNull(), // Bytes
   isCompressed: boolean("is_compressed").default(false).notNull(),
   originalSize: integer("original_size"), // Original size before compression/encryption
+  maxDownloads: integer("max_downloads").default(1).notNull(), // Per-file download limit
+  downloadCount: integer("download_count").default(0).notNull(), // Per-file download counter
 });
 
 export const chunks = pgTable("chunks", {
@@ -69,7 +71,7 @@ export type ChunkRecord = typeof chunks.$inferSelect;
 // Client-facing types for creation
 export const createVaultRequestSchema = z.object({
   expiresIn: z.number().min(1).max(168), // Hours, max 1 week
-  maxDownloads: z.number().min(1).max(100),
+  maxDownloads: z.number().min(1).max(100), // Vault-level (applies to all files by default)
   encryptedMetadata: z.string(), // Encrypted JSON of filenames, etc.
   lookupId: z.string().length(3).optional(), // 3-digit numeric ID for split-code lookup
   wrappedKey: z.string().optional(), // File key encrypted by PIN (for split-code vaults)
@@ -79,6 +81,7 @@ export const createVaultRequestSchema = z.object({
     size: z.number(),
     isCompressed: z.boolean().default(false),
     originalSize: z.number().optional(),
+    maxDownloads: z.number().min(1).max(100).optional(), // Per-file download limit (defaults to vault's maxDownloads)
   })),
   encryptedClipboardText: z.string().optional(), // Encrypted clipboard text
 });
@@ -92,6 +95,8 @@ export type VaultResponse = Vault & {
     totalSize: number;
     isCompressed: boolean;
     originalSize: number | null;
+    maxDownloads: number; // Per-file download limit
+    downloadCount: number; // Per-file download count
   }[];
   encryptedClipboardText?: string; // Optional encrypted clipboard text
 };

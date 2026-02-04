@@ -47,12 +47,39 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    // Vault-level download (legacy - increments vault counter)
     download: {
-      method: 'POST' as const, // POST because we might increment download count
+      method: 'POST' as const,
       path: '/api/vaults/:id/download',
       responses: {
-        200: z.object({ success: z.boolean() }),
+        200: z.object({
+          success: z.boolean(),
+          remainingDownloads: z.number(), // Vault-level remaining (for compatibility)
+        }),
         403: z.object({ message: z.string() }) // Limit exceeded
+      }
+    },
+    // Per-file download tracking
+    downloadFile: {
+      method: 'POST' as const,
+      path: '/api/vaults/:id/files/:fileId/download',
+      input: z.object({
+        fileIds: z.array(z.string()).optional(), // Optional: download multiple files at once
+      }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          files: z.array(z.object({
+            fileId: z.string(),
+            downloadCount: z.number(),
+            maxDownloads: z.number(),
+            remainingDownloads: z.number(),
+            isExhausted: z.boolean(), // True if file has reached download limit
+          })),
+          vaultExhausted: z.boolean(), // True if ALL files are exhausted
+        }),
+        403: z.object({ message: z.string() }), // File download limit exceeded
+        404: errorSchemas.notFound,
       }
     },
     // Split-code lookup: Find vault by 3-digit lookupId
@@ -64,14 +91,17 @@ export const api = {
           id: z.string(),
           wrappedKey: z.string(),
           encryptedMetadata: z.string(),
-          encryptedClipboardText: z.string().optional(), // Encrypted clipboard text
+          encryptedClipboardText: z.string().nullish(), // Encrypted clipboard text (null from DB, undefined from client)
           expiresAt: z.string(),
-          maxDownloads: z.number(),
-          downloadCount: z.number(),
+          maxDownloads: z.number(), // Vault-level default
+          downloadCount: z.number(), // Vault-level total (legacy, sum of file downloads)
           files: z.array(z.object({
             fileId: z.string(),
             chunkCount: z.number(),
             totalSize: z.number(),
+            maxDownloads: z.number(), // Per-file download limit
+            downloadCount: z.number(), // Per-file current downloads
+            remainingDownloads: z.number(), // Per-file remaining downloads
           })),
         }),
         404: errorSchemas.notFound,
@@ -120,7 +150,7 @@ export const api = {
       path: '/api/vault/code/:lookupId/clipboard',
       responses: {
         200: z.object({
-          encryptedClipboardText: z.string().optional(),
+          encryptedClipboardText: z.string().nullish(),
           updatedAt: z.string().optional(),
         }),
         404: errorSchemas.notFound,

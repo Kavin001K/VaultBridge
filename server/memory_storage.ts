@@ -71,7 +71,7 @@ export class MemoryStorage {
         return undefined;
     }
 
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number) {
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1) {
         const file: FileRecord = {
             id: randomUUID(),
             vaultId,
@@ -79,7 +79,9 @@ export class MemoryStorage {
             chunkCount,
             totalSize,
             isCompressed,
-            originalSize: originalSize || null
+            originalSize: originalSize || null,
+            maxDownloads,
+            downloadCount: 0
         };
         this.files.set(file.id, file);
         return file;
@@ -91,6 +93,13 @@ export class MemoryStorage {
             if (f.vaultId === vaultId) result.push(f);
         }
         return result;
+    }
+
+    async getFileByFileId(fileId: string): Promise<FileRecord | undefined> {
+        for (const f of Array.from(this.files.values())) {
+            if (f.fileId === fileId) return f;
+        }
+        return undefined;
     }
 
     async createChunk(fileId: string, chunkIndex: number, size: number) {
@@ -166,6 +175,7 @@ export class MemoryStorage {
         }
     }
 
+    // Vault-level download count (legacy)
     async incrementDownloadCount(vaultId: string) {
         const v = this.vaults.get(vaultId);
         if (v) {
@@ -174,6 +184,49 @@ export class MemoryStorage {
             return v.downloadCount;
         }
         return 0;
+    }
+
+    // Per-file download count increment
+    async incrementFileDownloadCount(fileIds: string[]): Promise<{
+        fileId: string;
+        downloadCount: number;
+        maxDownloads: number;
+        remainingDownloads: number;
+        isExhausted: boolean;
+    }[]> {
+        const results = [];
+
+        for (const fileId of fileIds) {
+            let file: FileRecord | undefined;
+            for (const f of Array.from(this.files.values())) {
+                if (f.fileId === fileId) {
+                    file = f;
+                    break;
+                }
+            }
+
+            if (file) {
+                file.downloadCount += 1;
+                this.files.set(file.id, file);
+
+                const remaining = Math.max(0, file.maxDownloads - file.downloadCount);
+                results.push({
+                    fileId: file.fileId,
+                    downloadCount: file.downloadCount,
+                    maxDownloads: file.maxDownloads,
+                    remainingDownloads: remaining,
+                    isExhausted: remaining <= 0
+                });
+            }
+        }
+
+        return results;
+    }
+
+    // Check if all files in a vault are exhausted
+    async areAllFilesExhausted(vaultId: string): Promise<boolean> {
+        const vaultFiles = await this.getFiles(vaultId);
+        return vaultFiles.every(f => f.downloadCount >= f.maxDownloads);
     }
 
     async updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date> {
