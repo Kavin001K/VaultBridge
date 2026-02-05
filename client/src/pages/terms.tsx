@@ -270,6 +270,7 @@ Code is Law. But for the lawyers: These terms are governed by the laws of the St
                     <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
                         VaultBridge Legal Protocol • Binding Agreement
                     </p>
+                    <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
                 </div>
             </footer>
         </div>

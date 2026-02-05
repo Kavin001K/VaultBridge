@@ -208,8 +208,9 @@ Because we possess zero knowledge of content:
                 <div className="container px-4 text-center max-w-4xl mx-auto">
                     <ShieldCheck className="w-12 h-12 text-zinc-800 mx-auto mb-6" />
                     <p className="text-zinc-500 text-sm">
-                        Last Updated: 2024 • VaultBridge Security Team
+                        Last Updated: 2026 • VaultBridge Security Team
                     </p>
+                    <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
                 </div>
             </footer>
         </div>
