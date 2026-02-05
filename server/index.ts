@@ -1,3 +1,8 @@
+// IMPORTANT: Force IPv4 first to avoid EHOSTUNREACH on some networks
+// This MUST be at the very top, before any imports that might create connections
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";

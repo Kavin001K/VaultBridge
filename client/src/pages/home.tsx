@@ -858,6 +858,9 @@ export default function Home() {
         <p className="text-xs md:text-sm text-muted-foreground/60">
           © 2025 Ace-Groups. All rights reserved.
         </p>
+        <p className="text-[10px] text-muted-foreground/40 mt-2 font-mono">
+          v1.2.0
+        </p>
       </footer>
 
       {/* Redesigned Check Spam Folder Dialog */}

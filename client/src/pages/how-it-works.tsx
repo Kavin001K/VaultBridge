@@ -312,6 +312,7 @@ export default function HowItWorksPage() {
                 <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
                     VaultBridge Security Team • Zero Knowledge Architecture
                 </p>
+                <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
             </footer>
         </div>
     );
