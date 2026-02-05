@@ -798,7 +798,15 @@ export default function AccessPage() {
                                                         <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider hidden sm:block lg:inline">Downloads</span>
                                                     </div>
                                                     <span className="font-mono text-xs sm:text-sm font-bold text-white">
-                                                        {vaultData.maxDownloads - vaultData.downloadCount} <span className="text-zinc-600">/</span> {vaultData.maxDownloads}
+                                                        {(() => {
+                                                            // Calculate combined totals from per-file states
+                                                            const totalRemaining = Array.from(fileDownloadStates.values()).reduce((sum, f) => sum + f.remainingDownloads, 0);
+                                                            const totalMax = Array.from(fileDownloadStates.values()).reduce((sum, f) => sum + f.maxDownloads, 0);
+                                                            // Fallback to vault data if no file states yet
+                                                            const remaining = fileDownloadStates.size > 0 ? totalRemaining : (vaultData.maxDownloads - vaultData.downloadCount);
+                                                            const max = fileDownloadStates.size > 0 ? totalMax : vaultData.maxDownloads;
+                                                            return <>{remaining} <span className="text-zinc-600">/</span> {max}</>;
+                                                        })()}
                                                     </span>
                                                 </div>
 
@@ -846,43 +854,55 @@ export default function AccessPage() {
                                                     {fileMetadata.length > 0 && (
                                                         <>
                                                             <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto custom-scrollbar">
-                                                                {fileMetadata.map((file, index) => (
-                                                                    <motion.div
-                                                                        initial={{ opacity: 0, y: 10 }}
-                                                                        animate={{ opacity: 1, y: 0 }}
-                                                                        transition={{ delay: index * 0.05 }}
-                                                                        key={file.fileId}
-                                                                        className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:bg-zinc-900/80 hover:border-zinc-700 transition-all duration-300 gap-4 sm:gap-0"
-                                                                    >
-                                                                        <div className="flex items-center gap-4 min-w-0">
-                                                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shrink-0 border border-zinc-700 group-hover:border-cyan-500/50 transition-colors">
-                                                                                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400 group-hover:text-cyan-400 transition-colors" />
-                                                                            </div>
-                                                                            <div className="min-w-0 flex-1">
-                                                                                <p className="text-sm font-bold text-zinc-100 truncate max-w-[200px] sm:max-w-xs">{file.name}</p>
-                                                                                <div className="flex items-center gap-3 mt-1">
-                                                                                    <span className="text-xs text-zinc-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                                                                                    <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                                                                                    <span className="text-[10px] text-zinc-500 uppercase font-bold">{file.type?.split('/')[1] || 'FILE'}</span>
+                                                                {fileMetadata.map((file, index) => {
+                                                                    const fileState = fileDownloadStates.get(file.fileId);
+                                                                    const remaining = fileState?.remainingDownloads ?? vaultData?.maxDownloads ?? 1;
+                                                                    const maxDl = fileState?.maxDownloads ?? vaultData?.maxDownloads ?? 1;
+                                                                    const isExhausted = fileState?.isExhausted ?? false;
+
+                                                                    return (
+                                                                        <motion.div
+                                                                            initial={{ opacity: 0, y: 10 }}
+                                                                            animate={{ opacity: 1, y: 0 }}
+                                                                            transition={{ delay: index * 0.05 }}
+                                                                            key={file.fileId}
+                                                                            className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-zinc-900/50 border rounded-xl hover:bg-zinc-900/80 transition-all duration-300 gap-4 sm:gap-0 ${isExhausted ? 'border-red-500/30 opacity-60' : 'border-zinc-800 hover:border-zinc-700'}`}
+                                                                        >
+                                                                            <div className="flex items-center gap-4 min-w-0">
+                                                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shrink-0 border transition-colors ${isExhausted ? 'border-red-500/30' : 'border-zinc-700 group-hover:border-cyan-500/50'}`}>
+                                                                                    <FileText className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${isExhausted ? 'text-red-400' : 'text-zinc-400 group-hover:text-cyan-400'}`} />
+                                                                                </div>
+                                                                                <div className="min-w-0 flex-1">
+                                                                                    <p className="text-sm font-bold text-zinc-100 truncate max-w-[200px] sm:max-w-xs">{file.name}</p>
+                                                                                    <div className="flex items-center gap-3 mt-1">
+                                                                                        <span className="text-xs text-zinc-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                                                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                                                                                        <span className="text-[10px] text-zinc-500 uppercase font-bold">{file.type?.split('/')[1] || 'FILE'}</span>
+                                                                                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                                                                                        <span className={`text-[10px] font-bold uppercase ${isExhausted ? 'text-red-400' : remaining <= 1 ? 'text-amber-400' : 'text-cyan-400'}`}>
+                                                                                            {remaining}/{maxDl} DL
+                                                                                        </span>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
 
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="w-full sm:w-auto bg-transparent border-zinc-700 hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 shrink-0 transition-colors h-10 sm:h-9"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                e.preventDefault();
-                                                                                downloadFile(file);
-                                                                            }}
-                                                                        >
-                                                                            <Download className="w-4 h-4 mr-2" />
-                                                                            Download
-                                                                        </Button>
-                                                                    </motion.div>
-                                                                ))}
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                disabled={isExhausted}
+                                                                                className={`w-full sm:w-auto shrink-0 transition-colors h-10 sm:h-9 ${isExhausted ? 'bg-transparent border-red-500/30 text-red-400 cursor-not-allowed' : 'bg-transparent border-zinc-700 hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400'}`}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    e.preventDefault();
+                                                                                    if (!isExhausted) downloadFile(file);
+                                                                                }}
+                                                                            >
+                                                                                <Download className="w-4 h-4 mr-2" />
+                                                                                {isExhausted ? 'Limit Reached' : 'Download'}
+                                                                            </Button>
+                                                                        </motion.div>
+                                                                    );
+                                                                })}
                                                             </div>
 
                                                             <Button
