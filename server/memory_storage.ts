@@ -40,9 +40,10 @@ export class MemoryStorage {
 
         this.vaults.set(vault.id, vault);
 
-        // Create file records
+        // Create file records with per-file maxDownloads (defaults to vault's maxDownloads)
         for (const f of data.files) {
-            await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize);
+            const fileMaxDownloads = (f as any).maxDownloads ?? data.maxDownloads;
+            await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize, fileMaxDownloads);
         }
 
         return vault;

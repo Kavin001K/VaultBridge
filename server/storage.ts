@@ -37,9 +37,10 @@ export class DatabaseStorage {
             isDeleted: false
         }).returning();
 
-        // Create file records
+        // Create file records with per-file maxDownloads (defaults to vault's maxDownloads)
         for (const f of data.files) {
-            await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize);
+            const fileMaxDownloads = f.maxDownloads ?? data.maxDownloads;
+            await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize, fileMaxDownloads);
         }
 
         return vault;
@@ -299,12 +300,17 @@ class FallbackStorage {
     async getVault(id: string) { return this.execute(s => s.getVault(id)); }
     async getVaultByShortCode(code: string) { return this.execute(s => s.getVaultByShortCode(code)); }
     async getVaultByLookupId(lookupId: string) { return this.execute(s => s.getVaultByLookupId(lookupId)); }
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number) { return this.execute(s => s.createFile(vaultId, fileId, chunkCount, totalSize)); }
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1) {
+        return this.execute(s => s.createFile(vaultId, fileId, chunkCount, totalSize, isCompressed, originalSize, maxDownloads));
+    }
     async getFiles(vaultId: string) { return this.execute(s => s.getFiles(vaultId)); }
+    async getFileByFileId(fileId: string) { return this.execute(s => s.getFileByFileId(fileId)); }
     async createChunk(fileId: string, chunkIndex: number, size: number) { return this.execute(s => s.createChunk(fileId, chunkIndex, size)); }
     async getChunk(fileId: string, chunkIndex: number) { return this.execute(s => s.getChunk(fileId, chunkIndex)); }
     async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) { return this.execute(s => s.updateChunkStatus(fileId, chunkIndex, storagePath)); }
     async incrementDownloadCount(vaultId: string) { return this.execute(s => s.incrementDownloadCount(vaultId)); }
+    async incrementFileDownloadCount(fileIds: string[]) { return this.execute(s => s.incrementFileDownloadCount(fileIds)); }
+    async areAllFilesExhausted(vaultId: string) { return this.execute(s => s.areAllFilesExhausted(vaultId)); }
     async updateClipboard(lookupId: string, encryptedClipboardText: string) { return this.execute(s => s.updateClipboard(lookupId, encryptedClipboardText)); }
     async deleteVault(id: string) { return this.execute(s => s.deleteVault(id)); }
     async cleanupExpiredVaults() { return this.execute(s => s.cleanupExpiredVaults()); }
