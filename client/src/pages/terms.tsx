@@ -44,8 +44,9 @@ By initializing a secure channel on VaultBridge, you agree to these terms. If yo
             content: `
 VaultBridge provides ephemeral, encrypted data transfer focused on Zero-Knowledge architecture.
 * **Universal Live Clipboard**: Real-time, RAM-only synchronization between devices via WebSocket.
-* **Secure Vaults**: Time-limited encrypted file storage with adaptive streaming decryption.
+* **Secure Vaults**: Time-limited encrypted file storage with adaptive streaming decryption and **Dual-Provider Storage Routing** (R2/Supabase).
 * **The "Burn" Protocol**: A manual override to instantly incinerate session data from our volatile memory.
+* **Burn-on-Read**: Option to auto-destruct a vault immediately after its first successful download.
             `
         },
         {
@@ -69,6 +70,7 @@ This software is provided "as is."
 * We guarantee the **math** (AES-256-GCM is verified).
 * We do NOT guarantee **availability**. We are not a backup service. If your timer runs out, your data is incinerated. If our server catches fire, your data is gone.
 * **Live Clipboard Volatility**: Clipboard data exists ONLY in RAM. If the server restarts, data is lost. This is a feature, not a bug.
+* **Memory Storage Fallback**: In the event of primary database failure, the system automatically switches to **Volatile Memory Storage**. Data stored in this mode exists ONLY in RAM and will be lost if the server restarts. We do not guarantee persistence in this state.
             `
         },
         {
@@ -143,7 +145,7 @@ Code is Law. But for the lawyers: These terms are governed by the laws of the St
                         className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono uppercase tracking-wider"
                     >
                         <FileText className="w-3 h-3" />
-                        Version 3.0 (Quantum)
+                        Version 3.1 (Quantum + R2)
                     </motion.div>
 
                     <motion.h1
@@ -270,7 +272,7 @@ Code is Law. But for the lawyers: These terms are governed by the laws of the St
                     <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
                         VaultBridge Legal Protocol • Binding Agreement
                     </p>
-                    <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
+                    <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.3.0</p>
                 </div>
             </footer>
         </div>

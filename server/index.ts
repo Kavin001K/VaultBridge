@@ -11,6 +11,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startCleanupWorker } from "./cron/cleanup";
+import { storage } from "./storage";
+import { logStorageStatus } from "./services/storage_router";
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,7 +37,15 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'", "ws:", "wss:", "https://kigljmhbgzbbhrtgtxmk.supabase.co"], // WebSocket for HMR + Supabase
+        connectSrc: [
+          "'self'",
+          "ws:",
+          "wss:",
+          process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
+          "https://*.r2.cloudflarestorage.com",
+          "https://*.cloudflarestorage.com",
+          process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : ""
+        ].filter(Boolean) as string[], // WebSocket for HMR + Supabase + R2
       },
     },
     crossOriginEmbedderPolicy: false, // Required for some features
@@ -159,6 +169,14 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+
+  // Reconcile storage usage from DB (count existing bytes per provider)
+  try {
+    await storage.reconcileStorageUsage();
+    logStorageStatus();
+  } catch (err) {
+    console.error("[Storage] Non-fatal: Failed to reconcile storage usage:", err);
+  }
 
   // Start cleanup worker (Phase 1.2)
   startCleanupWorker();

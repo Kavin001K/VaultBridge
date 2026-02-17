@@ -1,7 +1,7 @@
 {
     "name": "VaultBridge",
     "short_name": "VaultBridge",
-    "description": "Secure encrypted file sharing with end-to-end encryption, self-destructing vaults, and P2P transfer. Zero-knowledge privacy.",
+    "description": "Secure encrypted file sharing with end-to-end encryption, self-destructing vaults, secure email relay, and encrypted clipboard sync. Zero-knowledge privacy.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0a0a0f",
@@ -62,10 +62,22 @@
             ]
         },
         {
-            "name": "Live P2P Transfer",
-            "short_name": "Live",
-            "description": "Direct peer-to-peer file transfer",
-            "url": "/live",
+            "name": "Get it Mailed",
+            "short_name": "Email Files",
+            "description": "Send files securely via email relay",
+            "url": "/get-it-mailed",
+            "icons": [
+                {
+                    "src": "/vault-logo.jpg",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Secure Clipboard",
+            "short_name": "Clipboard",
+            "description": "Sync encrypted text across devices",
+            "url": "/clipboard",
             "icons": [
                 {
                     "src": "/vault-logo.jpg",

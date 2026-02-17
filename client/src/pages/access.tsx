@@ -294,7 +294,7 @@ export default function AccessPage() {
         }
     };
 
-    const downloadFile = async (file: FileMetadata) => {
+    const downloadFile = async (file: FileMetadata, skipTracking = false) => {
         if (!vaultData || !fileKey) return;
 
         try {
@@ -339,12 +339,12 @@ export default function AccessPage() {
                 await downloadFileInMemory(file);
             }
 
-            if (stage === "ready") {
-                if (!streamSuccess) {
-                    toast({ title: "File Downloaded", description: `${file.name} saved.` });
-                }
+            if (stage === "ready" && !streamSuccess) {
+                toast({ title: "File Downloaded", description: `${file.name} saved.` });
+            }
 
-                // Track per-file download
+            // Track per-file download (skip when called from Download All — bulk tracking happens there)
+            if (!skipTracking && stage === "ready") {
                 try {
                     const res = await trackFileDownload.mutateAsync({
                         vaultId: vaultData.id,
@@ -408,20 +408,39 @@ export default function AccessPage() {
         setStage("downloading");
 
         try {
-            // Download all files
-            for (const file of fileMetadata) {
-                await downloadFile(file);
-            }
-
-            // Track all files at once using per-file tracking
-            const allFileIds = fileMetadata.map(f => f.fileId);
-            const res = await trackFileDownload.mutateAsync({
-                vaultId: vaultData.id,
-                fileId: allFileIds[0], // Primary file for URL
-                fileIds: allFileIds // All files to track
+            // Filter out already-exhausted files
+            const downloadableFiles = fileMetadata.filter(file => {
+                const fileState = fileDownloadStates.get(file.fileId);
+                return !fileState?.isExhausted;
             });
 
-            // Update all file download states
+            if (downloadableFiles.length === 0) {
+                toast({
+                    variant: "destructive",
+                    title: "No Downloads Available",
+                    description: "All files have reached their download limit."
+                });
+                setStage("ready");
+                return;
+            }
+
+            // Download all files sequentially, skipping per-file tracking
+            let downloadedCount = 0;
+            for (const file of downloadableFiles) {
+                setStatusText(`Downloading ${file.name} (${downloadedCount + 1}/${downloadableFiles.length})...`);
+                await downloadFile(file, true); // skipTracking = true
+                downloadedCount++;
+            }
+
+            // Track all downloaded files in a single batch request
+            const downloadedFileIds = downloadableFiles.map(f => f.fileId);
+            const res = await trackFileDownload.mutateAsync({
+                vaultId: vaultData.id,
+                fileId: downloadedFileIds[0], // Primary file for URL
+                fileIds: downloadedFileIds // All files to track
+            });
+
+            // Update all file download states from the batch response
             if (res.files && res.files.length > 0) {
                 setFileDownloadStates(prev => {
                     const newMap = new Map(prev);
@@ -443,7 +462,7 @@ export default function AccessPage() {
 
             toast({
                 title: "Download Complete!",
-                description: `${fileMetadata.length} file(s) downloaded successfully.`,
+                description: `${downloadedCount} file(s) downloaded successfully.`,
             });
 
             // Check if vault should be burned
@@ -907,11 +926,25 @@ export default function AccessPage() {
 
                                                             <Button
                                                                 size="lg"
-                                                                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold h-12"
+                                                                className={`w-full font-bold h-12 transition-all ${Array.from(fileDownloadStates.values()).every(f => f.isExhausted) && fileDownloadStates.size > 0
+                                                                    ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-red-500/20"
+                                                                    : "bg-cyan-600 hover:bg-cyan-500 text-white"
+                                                                    }`}
                                                                 onClick={handleDownload}
+                                                                disabled={Array.from(fileDownloadStates.values()).every(f => f.isExhausted) && fileDownloadStates.size > 0}
                                                             >
-                                                                Download All Files
+                                                                {Array.from(fileDownloadStates.values()).every(f => f.isExhausted) && fileDownloadStates.size > 0 ? (
+                                                                    'All Limits Reached'
+                                                                ) : (
+                                                                    <>
+                                                                        <Download className="w-4 h-4 mr-2" />
+                                                                        Download All Files
+                                                                    </>
+                                                                )}
                                                             </Button>
+                                                            <p className="text-[10px] md:text-xs text-center text-muted-foreground mt-4 opacity-70">
+                                                                By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
+                                                            </p>
                                                         </>
                                                     )}
                                                 </div>

@@ -1,16 +1,14 @@
-# VaultBridge Robots.txt
-# https://vaultbridge.io
-
 User-agent: *
 Allow: /
 Allow: /upload
 Allow: /access
-Allow: /live
+Allow: /get-it-mailed
+Allow: /clipboard
 Allow: /how-it-works
 Allow: /terms
 Allow: /privacy
 
-# Disallow temporary/dynamic pages
+# Disallow temporary/dynamic sensitive pages
 Disallow: /download/
 Disallow: /success/
 Disallow: /live/

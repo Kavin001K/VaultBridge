@@ -1,15 +1,20 @@
-
 import {
     type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest
 } from "@shared/schema";
-import { localStorage } from "./services/local_storage";
-import { supabaseStorage } from "./services/supabase_storage";
 import { randomUUID } from "node:crypto";
-import path from "path";
+import type { IStorage } from "./storage_interface";
+import {
+    deleteFiles as routerDeleteFiles,
+    parseStoragePath,
+    trackDeletion,
+} from "./services/storage_router";
 
-const USE_LOCAL_STORAGE = process.env.STORAGE_PROVIDER === 'local';
-
-export class MemoryStorage {
+/**
+ * In-Memory Storage — fallback when PostgreSQL is unavailable.
+ * Implements the same IStorage interface as DatabaseStorage.
+ * Data is lost on server restart.
+ */
+export class MemoryStorage implements IStorage {
     private vaults: Map<string, Vault> = new Map();
     private files: Map<string, FileRecord> = new Map();
     private chunks: Map<number, ChunkRecord> = new Map();
@@ -30,7 +35,7 @@ export class MemoryStorage {
             lookupId: data.lookupId || null,
             wrappedKey: data.wrappedKey || null,
             encryptedMetadata: data.encryptedMetadata,
-            encryptedClipboardText: data.encryptedClipboardText || null, // Store encrypted clipboard text
+            encryptedClipboardText: data.encryptedClipboardText || null,
             createdAt: new Date(),
             expiresAt,
             maxDownloads: data.maxDownloads,
@@ -40,7 +45,6 @@ export class MemoryStorage {
 
         this.vaults.set(vault.id, vault);
 
-        // Create file records with per-file maxDownloads (defaults to vault's maxDownloads)
         for (const f of data.files) {
             const fileMaxDownloads = (f as any).maxDownloads ?? data.maxDownloads;
             await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize, fileMaxDownloads);
@@ -56,23 +60,23 @@ export class MemoryStorage {
         return undefined;
     }
 
-    async getVault(id: string) {
+    async getVault(id: string): Promise<Vault | undefined> {
         const v = this.vaults.get(id);
         return v && !v.isDeleted ? v : undefined;
     }
 
-    async getVaultByShortCode(code: string) {
+    async getVaultByShortCode(code: string): Promise<Vault | undefined> {
         return this.getVaultByShortCodeSync(code);
     }
 
-    async getVaultByLookupId(lookupId: string) {
+    async getVaultByLookupId(lookupId: string): Promise<Vault | undefined> {
         for (const v of Array.from(this.vaults.values())) {
             if (v.lookupId === lookupId && !v.isDeleted) return v;
         }
         return undefined;
     }
 
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1) {
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1): Promise<FileRecord> {
         const file: FileRecord = {
             id: randomUUID(),
             vaultId,
@@ -88,7 +92,7 @@ export class MemoryStorage {
         return file;
     }
 
-    async getFiles(vaultId: string) {
+    async getFiles(vaultId: string): Promise<FileRecord[]> {
         const result: FileRecord[] = [];
         for (const f of Array.from(this.files.values())) {
             if (f.vaultId === vaultId) result.push(f);
@@ -103,12 +107,8 @@ export class MemoryStorage {
         return undefined;
     }
 
-    async createChunk(fileId: string, chunkIndex: number, size: number) {
-        // Resolve internal file ID from client fileId if needed, but schema says createChunk takes fileId (internal or external?)
-        // In storage.ts: createChunk(fileId: string...) 
-        // -> const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
-        // So the argument `fileId` is the CLIENT ID (string), not the UUID PK.
-
+    async createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord> {
+        // Resolve internal file from client fileId
         let internalFile: FileRecord | undefined;
         for (const f of Array.from(this.files.values())) {
             if (f.fileId === fileId) {
@@ -138,8 +138,7 @@ export class MemoryStorage {
         return chunk;
     }
 
-    async getChunk(clientFileId: string, chunkIndex: number) {
-        // Join logic
+    async getChunk(clientFileId: string, chunkIndex: number): Promise<ChunkRecord | undefined> {
         let internalFile: FileRecord | undefined;
         for (const f of Array.from(this.files.values())) {
             if (f.fileId === clientFileId) {
@@ -157,7 +156,7 @@ export class MemoryStorage {
         return undefined;
     }
 
-    async updateChunkStatus(clientFileId: string, chunkIndex: number, storagePath: string) {
+    async updateChunkStatus(clientFileId: string, chunkIndex: number, storagePath: string): Promise<void> {
         let internalFile: FileRecord | undefined;
         for (const f of Array.from(this.files.values())) {
             if (f.fileId === clientFileId) {
@@ -176,8 +175,7 @@ export class MemoryStorage {
         }
     }
 
-    // Vault-level download count (legacy)
-    async incrementDownloadCount(vaultId: string) {
+    async incrementDownloadCount(vaultId: string): Promise<number> {
         const v = this.vaults.get(vaultId);
         if (v) {
             v.downloadCount += 1;
@@ -187,7 +185,6 @@ export class MemoryStorage {
         return 0;
     }
 
-    // Per-file download count increment
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
         fileId: string;
         downloadCount: number;
@@ -224,7 +221,6 @@ export class MemoryStorage {
         return results;
     }
 
-    // Check if all files in a vault are exhausted
     async areAllFilesExhausted(vaultId: string): Promise<boolean> {
         const vaultFiles = await this.getFiles(vaultId);
         return vaultFiles.every(f => f.downloadCount >= f.maxDownloads);
@@ -241,9 +237,12 @@ export class MemoryStorage {
         throw new Error("Vault not found");
     }
 
-    async deleteVault(id: string) {
-        // Gather paths for deletion
+    async deleteVault(id: string): Promise<void> {
         const vaultFiles = await this.getFiles(id);
+
+        // Gather all storage paths and sizes for proper cleanup
+        const allPrefixedPaths: string[] = [];
+        const bytesPerProvider: Record<string, number> = { r2: 0, supabase: 0 };
 
         for (const file of vaultFiles) {
             const fileChunks: ChunkRecord[] = [];
@@ -251,18 +250,13 @@ export class MemoryStorage {
                 if (c.fileId === file.id) fileChunks.push(c);
             }
 
-            const validPaths = fileChunks
-                .map(c => c.storagePath)
-                .filter(p => p !== null && p !== undefined) as string[];
-
-            if (validPaths.length > 0) {
-                if (USE_LOCAL_STORAGE) {
-                    for (const p of validPaths) {
-                        const filename = path.basename(p);
-                        await localStorage.deleteFile(filename);
+            for (const c of fileChunks) {
+                if (c.storagePath) {
+                    allPrefixedPaths.push(c.storagePath);
+                    const { provider } = parseStoragePath(c.storagePath);
+                    if (provider in bytesPerProvider) {
+                        bytesPerProvider[provider] += c.size || 0;
                     }
-                } else {
-                    await supabaseStorage.deleteFiles(validPaths);
                 }
             }
 
@@ -274,11 +268,22 @@ export class MemoryStorage {
             this.files.delete(file.id);
         }
 
-        this.vaults.delete(id); // Or mark isDeleted
+        // Delete from cloud storage providers via router
+        if (allPrefixedPaths.length > 0) {
+            try {
+                await routerDeleteFiles(allPrefixedPaths);
+                if (bytesPerProvider.r2 > 0) trackDeletion("r2", bytesPerProvider.r2);
+                if (bytesPerProvider.supabase > 0) trackDeletion("supabase", bytesPerProvider.supabase);
+            } catch (err) {
+                console.error(`[MemoryStorage] Failed to delete physical files:`, err);
+            }
+        }
+
+        this.vaults.delete(id);
         console.log(`[MemoryStorage] Deleted vault ${id} and resources.`);
     }
 
-    async cleanupExpiredVaults() {
+    async cleanupExpiredVaults(): Promise<void> {
         const now = new Date();
         const expiredIds: string[] = [];
         for (const v of Array.from(this.vaults.values())) {
@@ -291,16 +296,5 @@ export class MemoryStorage {
                 await this.deleteVault(id);
             }
         }
-    }
-
-    // Proxy to storage providers
-    async getUploadUrl(path: string) {
-        if (USE_LOCAL_STORAGE) return `/api/local/upload?path=${encodeURIComponent(path)}`;
-        return supabaseStorage.getUploadUrl(path);
-    }
-
-    async getDownloadUrl(path: string) {
-        if (USE_LOCAL_STORAGE) return `/api/local/download?path=${encodeURIComponent(path)}`;
-        return supabaseStorage.getDownloadUrl(path);
     }
 }
