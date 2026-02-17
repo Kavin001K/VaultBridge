@@ -61,6 +61,10 @@ When utilizing the Universal Live Clipboard feature:
 * **Ephemeral Metadata**: File size, upload timestamp, and expiration timer (TTL).
 * **Access Logs**: IP addresses are logged for 24 hours strictly for DDoS mitigation and abuse prevention, then sanitized.
 
+### Storage Architecture
+* **Multi-Cloud Redundancy**: Encrypted blobs are distributed across Cloudflare R2 (Primary) and Supabase Storage (Secondary). We hold no keys for either.
+* **Memory-Only Mode**: During database outages, the system fails over to volatile RAM. Metadata stored in this state is lost instantly upon server restart.
+
 ### What We DO NOT Collect
 * **Your Decryption Keys**: The full 6-digit PIN never leaves your device.
 * **Your Content**: Streaming decryption ensures even large files are never realized on our server's disk in plaintext.
@@ -72,7 +76,10 @@ When utilizing the Universal Live Clipboard feature:
             id: "infrastructure",
             title: "4. Infrastructure",
             content: `
-Our servers act as a blind courier. They take a locked briefcase (your encrypted data) from Point A and hand it to Point B. They do not have the key to the briefcase, nor do they care what is inside. Large file transfers use **Adaptive Streaming** to pipe data directly to your browser without caching it fully on our side.
+Our servers act as a blind courier. They take a locked briefcase (your encrypted data) from Point A and hand it to Point B. They do not have the key to the briefcase, nor do they care what is inside.
+
+* **Adaptive Streaming**: Large files are piped directly to your browser without caching fully on our side.
+* **Volatile Fallback**: We maintain a "break-glass" in-memory database that activates automatically if our primary storage goes dark, ensuring uptime without persistence.
             `
         },
         {
@@ -204,13 +211,21 @@ Because we possess zero knowledge of content:
                 </motion.button>
             </main>
 
-            <footer className="border-t border-white/5 py-12 mt-24 bg-zinc-950">
-                <div className="container px-4 text-center max-w-4xl mx-auto">
-                    <ShieldCheck className="w-12 h-12 text-zinc-800 mx-auto mb-6" />
-                    <p className="text-zinc-500 text-sm">
+            <footer className="border-t border-white/5 py-12 mt-24 bg-zinc-950 text-center overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/20 to-transparent pointer-events-none" />
+                <div className="container px-4 text-center max-w-4xl mx-auto relative z-10">
+                    <ShieldCheck className="w-12 h-12 text-zinc-900 mx-auto mb-6" />
+                    <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
                         Last Updated: 2026 • VaultBridge Security Team
                     </p>
-                    <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
+
+                    <motion.div
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800/50 mt-4 cursor-default group hover:border-emerald-500/20 transition-colors"
+                        whileHover={{ scale: 1.05 }}
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-mono text-zinc-400 group-hover:text-emerald-400 transition-colors">v1.3.0 (Quantum + R2)</span>
+                    </motion.div>
                 </div>
             </footer>
         </div>

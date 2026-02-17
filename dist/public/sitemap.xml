@@ -6,31 +6,39 @@
   <!-- Homepage -->
   <url>
     <loc>https://vaultbridge.io/</loc>
-    <lastmod>2026-01-28</lastmod>
-    <changefreq>weekly</changefreq>
+    <lastmod>2026-02-18</lastmod>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   
-  <!-- Upload Page -->
+  <!-- Upload & Encrypt -->
   <url>
     <loc>https://vaultbridge.io/upload</loc>
-    <lastmod>2026-01-28</lastmod>
+    <lastmod>2026-02-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   
-  <!-- Access Vault Page -->
+  <!-- Access Vault -->
   <url>
     <loc>https://vaultbridge.io/access</loc>
-    <lastmod>2026-01-28</lastmod>
+    <lastmod>2026-02-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
-  
-  <!-- Live P2P Transfer -->
+
+  <!-- Get it Mailed (Secure Email) -->
   <url>
-    <loc>https://vaultbridge.io/live</loc>
-    <lastmod>2026-01-28</lastmod>
+    <loc>https://vaultbridge.io/get-it-mailed</loc>
+    <lastmod>2026-02-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Universal Clipboard -->
+  <url>
+    <loc>https://vaultbridge.io/clipboard</loc>
+    <lastmod>2026-02-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -38,7 +46,7 @@
   <!-- How It Works -->
   <url>
     <loc>https://vaultbridge.io/how-it-works</loc>
-    <lastmod>2026-01-28</lastmod>
+    <lastmod>2026-02-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -46,16 +54,16 @@
   <!-- Terms of Service -->
   <url>
     <loc>https://vaultbridge.io/terms</loc>
-    <lastmod>2026-01-28</lastmod>
-    <changefreq>yearly</changefreq>
+    <lastmod>2026-02-18</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   
   <!-- Privacy Policy -->
   <url>
     <loc>https://vaultbridge.io/privacy</loc>
-    <lastmod>2026-01-28</lastmod>
-    <changefreq>yearly</changefreq>
+    <lastmod>2026-02-18</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   
