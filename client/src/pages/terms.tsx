@@ -266,13 +266,21 @@ Code is Law. But for the lawyers: These terms are governed by the laws of the St
                 </motion.button>
             </main>
 
-            <footer className="border-t border-white/5 py-12 relative z-10 bg-black">
-                <div className="container px-4 text-center max-w-4xl mx-auto">
+            <footer className="border-t border-white/5 py-12 relative z-10 bg-black text-center overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-t from-red-950/20 to-transparent pointer-events-none" />
+                <div className="container px-4 text-center max-w-4xl mx-auto relative z-10">
                     <ShieldAlert className="w-12 h-12 text-zinc-900 mx-auto mb-6" />
                     <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
                         VaultBridge Legal Protocol • Binding Agreement
                     </p>
-                    <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.3.0</p>
+
+                    <motion.div
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800/50 mt-4 cursor-default group hover:border-red-500/20 transition-colors"
+                        whileHover={{ scale: 1.05 }}
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-[10px] font-mono text-zinc-400 group-hover:text-red-400 transition-colors">v1.3.0 (Quantum + R2)</span>
+                    </motion.div>
                 </div>
             </footer>
         </div>

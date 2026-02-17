@@ -509,19 +509,46 @@ export default function Home() {
       </main >
 
       {/* Footer */}
-      < footer className="relative z-10 py-8 text-center px-4" >
-        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mb-4">
-          <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
-          <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
-          <Link href="/how-it-works" className="hover:text-primary transition-colors">How It Works</Link>
+      <footer className="relative z-10 py-12 text-center px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/20 to-transparent pointer-events-none" />
+
+        <div className="flex items-center justify-center gap-8 text-sm font-medium text-zinc-500 mb-8 relative z-10">
+          {[
+            { text: "Terms of Service", href: "/terms" },
+            { text: "Privacy Policy", href: "/privacy" },
+            { text: "How It Works", href: "/how-it-works" }
+          ].map((link) => (
+            <Link key={link.text} href={link.href}>
+              <motion.span
+                className="hover:text-emerald-400 transition-colors cursor-pointer inline-block"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {link.text}
+              </motion.span>
+            </Link>
+          ))}
         </div>
-        <p className="text-xs md:text-sm text-muted-foreground/60">
-          © 2025 Ace-Groups. All rights reserved.
-        </p>
-        <p className="text-[10px] text-muted-foreground/40 mt-2 font-mono">
-          v1.2.0
-        </p>
-      </footer >
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="relative z-10"
+        >
+          <p className="text-xs md:text-sm text-zinc-600 mb-2">
+            © 2026 Ace-Groups. <span className="text-zinc-700">Zero Knowledge Architecture.</span>
+          </p>
+
+          <motion.div
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800/50 mt-4 cursor-default group hover:border-emerald-500/20 transition-colors"
+            whileHover={{ scale: 1.05 }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-mono text-zinc-400 group-hover:text-emerald-400 transition-colors">v1.3.0 (Quantum)</span>
+          </motion.div>
+        </motion.div>
+      </footer>
 
       {/* Redesigned Check Spam Folder Dialog */}
       < Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert} >

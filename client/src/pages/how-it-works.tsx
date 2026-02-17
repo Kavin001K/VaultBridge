@@ -241,6 +241,7 @@ export default function HowItWorksPage() {
                                             "Brotli (Wasm) Compression before encryption.",
                                             "Client-side AES-256-GCM chunking.",
                                             "Partial Key Routing (Server sees 3 digits, you hold 6).",
+                                            "Multi-Cloud Routing: Encrypted blobs in Cloudflare R2 / Supabase.",
                                             "Zero-Knowledge storage (we strictly store blobs)."
                                         ].map((point, i) => (
                                             <li key={i} className="flex items-start gap-3">
@@ -410,11 +411,21 @@ export default function HowItWorksPage() {
 
             </main>
 
-            <footer className="border-t border-white/5 py-12 bg-black text-center">
-                <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
-                    VaultBridge Security Team • Zero Knowledge Architecture
-                </p>
-                <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
+            <footer className="border-t border-white/5 py-12 bg-black text-center overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/20 to-transparent pointer-events-none" />
+                <div className="container px-4 text-center max-w-4xl mx-auto relative z-10">
+                    <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
+                        VaultBridge Security Team • Zero Knowledge Architecture
+                    </p>
+
+                    <motion.div
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800/50 mt-4 cursor-default group hover:border-cyan-500/20 transition-colors"
+                        whileHover={{ scale: 1.05 }}
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                        <span className="text-[10px] font-mono text-zinc-400 group-hover:text-cyan-400 transition-colors">v1.3.0 (Quantum + R2)</span>
+                    </motion.div>
+                </div>
             </footer>
         </div >
     );
