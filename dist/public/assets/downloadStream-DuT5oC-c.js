@@ -1,4 +1,4 @@
-import { as as f } from "./index-BkiWEDQ0.js";
+import { as as f } from "./index-Brl99K9S.js";
 function c() {
   return "serviceWorker" in navigator && navigator.serviceWorker.controller !== null;
 }

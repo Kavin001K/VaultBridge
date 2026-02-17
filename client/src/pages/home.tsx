@@ -16,30 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import { useSounds } from "@/hooks/useSounds";
 
+import { useIsMobile } from "@/hooks/use-mobile";
+
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
 const hoverSpring = { type: "spring", stiffness: 300, damping: 20 };
-
-// Stagger animation for children
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: springConfig
-  }
-};
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"vault" | "email" | "clipboard">("vault");
@@ -48,6 +29,29 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [showSpamAlert, setShowSpamAlert] = useState(false);
   const [githubStars, setGithubStars] = useState<number | null>(null);
+
+  const isMobile = useIsMobile();
+
+  // Stagger animation for children
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: isMobile ? 0.05 : 0.1,
+        delayChildren: isMobile ? 0.05 : 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: isMobile ? 10 : 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: springConfig
+    }
+  };
 
   // Fetch GitHub stars
   useEffect(() => {
