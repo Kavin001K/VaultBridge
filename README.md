@@ -6,16 +6,18 @@
 ![React](https://img.shields.io/badge/frontend-React_18-61DAFB.svg)
 ![Node](https://img.shields.io/badge/backend-Node.js-339933.svg)
 ![Supabase](https://img.shields.io/badge/database-Supabase-3ECF8E.svg)
+![Mobile Ready](https://img.shields.io/badge/mobile-PWA%20Ready-purple.svg)
 
 ---
 
 ## 🌟 Overview
 
-**VaultBridge** is a secure, ephemeral file transfer tool designed with **Zero-Knowledge** architecture at its core.
+**VaultBridge** is a secure, ephemeral file transfer tool designed with **Zero-Knowledge** architecture at its core. Now optimized for mobile with a native-like PWA experience.
 
 - **Files are encrypted in your browser** before they ever touch our servers.
 - **We never see your files or keys.** The decryption key is part of the URL fragment (`#`) and is never sent to the backend.
 - **Auto-Destruction:** Vaults automatically burn after a set number of downloads or time expiry.
+- **Mobile Optimized:** Touch-friendly interface, battery-aware animations, and PWA support.
 
 Perfect for sharing sensitive documents, code snippets, or private data without leaving a digital footprint.
 
@@ -25,19 +27,22 @@ Perfect for sharing sensitive documents, code snippets, or private data without 
 
 | Feature | Description |
 | :--- | :--- |
-| � **End-to-End Encryption** | AES-256-GCM encryption performed entirely client-side. |
-| 🗑️ **Burn-on-Read** | Set vaults to self-destruct after 1 download or 1 hour. |
+| 🔒 **End-to-End Encryption** | AES-256-GCM encryption performed entirely client-side. |
+| 🗑️ **Burn-on-Read** | Set vaults to self-destruct immediately after 1 successful download. |
 | ⚡ **Streamed Transfers** | Handle large files (1GB+) with low memory usage via chunked streaming. |
+| 📱 **Mobile SDK & PWA** | Native-like experience with touch optimizations, battery awareness, and home screen installation. |
 | 🛡️ **Zero Tracking** | No cookies, no analytics, no user accounts, no logs. |
 | 📋 **Live Clipboard** | Securely share text snippets and secrets across devices instantly. |
 | ☁️ **Dual-Cloud Storage** | **Cloudflare R2** (Primary) for massive scale + **Supabase** (Backup) for redundancy. |
+| 💾 **Memory Fallback** | Automatic fallback to volatile memory storage if primary storage fails. |
 | 📧 **Direct Email** | Send secure access codes directly to recipients (keys remain with you). |
 
 ---
 
-## �️ Tech Stack
+## 🛠️ Tech Stack
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS, Framer Motion
+- **Mobile SDK:** Custom hook-based SDK for device capabilities (battery, network, touch)
 - **Backend:** Node.js, Express
 - **Database:** Supabase (PostgreSQL)
 - **Object Storage:** Cloudflare R2 (Primary) + Supabase Storage (Backup)
@@ -45,7 +50,7 @@ Perfect for sharing sensitive documents, code snippets, or private data without 
 
 ---
 
-## � Self-Hosting Guide (Localhost)
+## 🚀 Self-Hosting Guide (Localhost)
 
 Follow these steps to run your own instance of VaultBridge locally.
 
@@ -132,7 +137,7 @@ See the full [Docker Guide](DOCKER_GUIDE.md) for production deployment details.
 
 ---
 
-## � Screenshots
+## 📸 Screenshots
 
 *(Add your screenshots here)*
 
