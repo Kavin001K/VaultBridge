@@ -4,19 +4,37 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, lt } from "drizzle-orm";
-import { localStorage } from "./services/local_storage";
-import { supabaseStorage } from "./services/supabase_storage";
-import path from "path";
 
-// THE SWITCH: Checks .env to decide storage mode
-const USE_LOCAL_STORAGE = process.env.STORAGE_PROVIDER === 'local';
+// Smart Storage Router — manages R2 / Supabase / Local
+import {
+    resolveUploadProvider,
+    buildPrefixedPath,
+    getUploadUrl as routerGetUploadUrl,
+    getDownloadUrl as routerGetDownloadUrl,
+    deleteFiles as routerDeleteFiles,
+    parseStoragePath,
+    trackUpload,
+    trackDeletion,
+    reconcileUsage,
+    getStorageStatus,
+    type StorageProvider,
+} from "./services/storage_router";
 
-export class DatabaseStorage {
-    // --- DATABASE OPERATIONS (Using Drizzle - Works for both Local & Cloud) ---
+// ═══════════════════════════════════════════════════════════════════════════════
+//  STORAGE INTERFACE — imported from separate file to avoid circular dependency
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import type { IStorage } from "./storage_interface";
+export type { IStorage };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DATABASE STORAGE — Production storage backed by Drizzle/PostgreSQL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export class DatabaseStorage implements IStorage {
 
     async createVault(data: CreateVaultRequest): Promise<Vault> {
         let shortCode = "", isUnique = false;
-        // Retry loop for unique code
         while (!isUnique) {
             shortCode = Math.random().toString(36).substring(2, 8).toUpperCase();
             const existing = await this.getVaultByShortCode(shortCode);
@@ -30,14 +48,13 @@ export class DatabaseStorage {
             lookupId: data.lookupId,
             wrappedKey: data.wrappedKey,
             encryptedMetadata: data.encryptedMetadata,
-            encryptedClipboardText: data.encryptedClipboardText, // Store encrypted clipboard
+            encryptedClipboardText: data.encryptedClipboardText,
             expiresAt,
             maxDownloads: data.maxDownloads,
             downloadCount: 0,
             isDeleted: false
         }).returning();
 
-        // Create file records with per-file maxDownloads (defaults to vault's maxDownloads)
         for (const f of data.files) {
             const fileMaxDownloads = f.maxDownloads ?? data.maxDownloads;
             await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize, fileMaxDownloads);
@@ -46,22 +63,22 @@ export class DatabaseStorage {
         return vault;
     }
 
-    async getVault(id: string) {
+    async getVault(id: string): Promise<Vault | undefined> {
         const [vault] = await db.select().from(vaults).where(eq(vaults.id, id));
         return vault;
     }
 
-    async getVaultByShortCode(code: string) {
+    async getVaultByShortCode(code: string): Promise<Vault | undefined> {
         const [vault] = await db.select().from(vaults).where(eq(vaults.shortCode, code));
         return vault;
     }
 
-    async getVaultByLookupId(lookupId: string) {
+    async getVaultByLookupId(lookupId: string): Promise<Vault | undefined> {
         const [vault] = await db.select().from(vaults).where(eq(vaults.lookupId, lookupId));
         return vault;
     }
 
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1) {
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1): Promise<FileRecord> {
         const [file] = await db.insert(files).values({
             vaultId,
             fileId,
@@ -75,23 +92,21 @@ export class DatabaseStorage {
         return file;
     }
 
-    async getFiles(vaultId: string) {
+    async getFiles(vaultId: string): Promise<FileRecord[]> {
         return db.select().from(files).where(eq(files.vaultId, vaultId));
     }
 
-    async getFileByFileId(fileId: string) {
+    async getFileByFileId(fileId: string): Promise<FileRecord | undefined> {
         const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
         return file;
     }
 
-    async createChunk(fileId: string, chunkIndex: number, size: number) {
-        // Resolve internal file ID
+    async createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord> {
         const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
         if (!file) {
             throw new Error(`File not found for ID: ${fileId}`);
         }
 
-        // Idempotent check using internal ID
         const [existing] = await db.select().from(chunks).where(
             sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`
         );
@@ -106,9 +121,7 @@ export class DatabaseStorage {
         return chunk;
     }
 
-    async getChunk(fileId: string, chunkIndex: number) {
-        // Find the chunk by matching fileId (client ID) and index
-        // Join with files table to resolve fileId
+    async getChunk(fileId: string, chunkIndex: number): Promise<ChunkRecord | undefined> {
         const [chunk] = await db.select({
             id: chunks.id,
             fileId: chunks.fileId,
@@ -123,8 +136,7 @@ export class DatabaseStorage {
         return chunk;
     }
 
-    async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) {
-        // Resolve internal file ID
+    async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string): Promise<void> {
         const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
         if (!file) {
             console.error(`File not found for ID during update: ${fileId}`);
@@ -136,8 +148,7 @@ export class DatabaseStorage {
             .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
-    // Vault-level download count (legacy, for backwards compatibility)
-    async incrementDownloadCount(vaultId: string) {
+    async incrementDownloadCount(vaultId: string): Promise<number> {
         const [updated] = await db.update(vaults)
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
             .where(eq(vaults.id, vaultId))
@@ -145,7 +156,6 @@ export class DatabaseStorage {
         return updated?.downloadCount || 0;
     }
 
-    // Per-file download count increment
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
         fileId: string;
         downloadCount: number;
@@ -176,7 +186,6 @@ export class DatabaseStorage {
         return results;
     }
 
-    // Check if all files in a vault are exhausted
     async areAllFilesExhausted(vaultId: string): Promise<boolean> {
         const vaultFiles = await this.getFiles(vaultId);
         return vaultFiles.every(f => f.downloadCount >= f.maxDownloads);
@@ -192,46 +201,44 @@ export class DatabaseStorage {
         return new Date();
     }
 
-    async deleteVault(id: string) {
-        // 1. Gather all file paths for this vault
+    // --- SMART FILE DELETION (Multi-Provider) ---
+    async deleteVault(id: string): Promise<void> {
         try {
             const vaultFiles = await db.select({ id: files.id }).from(files).where(eq(files.vaultId, id));
 
+            const allPrefixedPaths: string[] = [];
+            const bytesPerProvider: Record<string, number> = { r2: 0, supabase: 0 };
+
             for (const file of vaultFiles) {
-                const fileChunks = await db.select({ storagePath: chunks.storagePath })
+                const fileChunks = await db.select({ storagePath: chunks.storagePath, size: chunks.size })
                     .from(chunks)
                     .where(eq(chunks.fileId, file.id));
 
-                const validPaths = fileChunks
-                    .map(c => c.storagePath)
-                    .filter(p => p !== null && p !== undefined) as string[];
-
-                if (validPaths.length > 0) {
-                    if (USE_LOCAL_STORAGE) {
-                        // Local: Delete one by one
-                        for (const p of validPaths) {
-                            // DB stores absolute path for local.
-                            // localStorage.deleteFile expects relative filename (it joins UPLOAD_DIR).
-                            const filename = path.basename(p);
-                            await localStorage.deleteFile(filename);
+                for (const c of fileChunks) {
+                    if (c.storagePath) {
+                        allPrefixedPaths.push(c.storagePath);
+                        const { provider } = parseStoragePath(c.storagePath);
+                        if (provider in bytesPerProvider) {
+                            bytesPerProvider[provider] += c.size || 0;
                         }
-                    } else {
-                        // Supabase: Batch delete
-                        await supabaseStorage.deleteFiles(validPaths);
                     }
                 }
             }
+
+            if (allPrefixedPaths.length > 0) {
+                await routerDeleteFiles(allPrefixedPaths);
+                if (bytesPerProvider.r2 > 0) trackDeletion("r2", bytesPerProvider.r2);
+                if (bytesPerProvider.supabase > 0) trackDeletion("supabase", bytesPerProvider.supabase);
+            }
         } catch (err) {
             console.error(`[Cleanup Error] Failed to delete physical files for vault ${id}:`, err);
-            // Continue to delete DB record anyway to prevent loop
         }
 
-        // 2. Delete DB Record (Cascades to files/chunks)
         await db.delete(vaults).where(eq(vaults.id, id));
         console.log(`[Storage] Deleted vault ${id} and resources.`);
     }
 
-    async cleanupExpiredVaults() {
+    async cleanupExpiredVaults(): Promise<void> {
         const now = new Date();
         const expiredVaults = await db.select({ id: vaults.id })
             .from(vaults)
@@ -245,26 +252,78 @@ export class DatabaseStorage {
         }
     }
 
-    // --- FILE STORAGE SWITCHER ---
-    // Routes to either Local Disk or Supabase S3 based on env var
+    // --- SMART UPLOAD URL (Multi-Provider Routing) ---
+    async getSmartUploadUrl(vaultId: string, fileId: string, chunkIndex: number, chunkSize: number): Promise<{
+        uploadUrl: string;
+        storagePath: string;
+        provider: StorageProvider;
+    }> {
+        const provider = resolveUploadProvider(chunkSize);
 
-    async getUploadUrl(path: string) {
-        // If Local, we don't need a signed URL, just the API path
-        if (USE_LOCAL_STORAGE) return `/api/local/upload?path=${encodeURIComponent(path)}`;
-        return supabaseStorage.getUploadUrl(path);
+        if (!provider) {
+            throw new Error("STORAGE_FULL: Both R2 and Supabase storage are at capacity. Please wait for expired vaults to be cleaned up.");
+        }
+
+        const rawPath = `${vaultId}/${fileId}/${chunkIndex}.enc`;
+        const uploadUrl = await routerGetUploadUrl(provider, rawPath);
+        const storagePath = buildPrefixedPath(provider, rawPath);
+
+        trackUpload(provider, chunkSize);
+        console.log(`[Storage Router] Upload → ${provider.toUpperCase()} | ${rawPath} | ${chunkSize} bytes`);
+
+        return { uploadUrl, storagePath, provider };
     }
 
-    async getDownloadUrl(path: string) {
-        if (USE_LOCAL_STORAGE) return `/api/local/download?path=${encodeURIComponent(path)}`;
-        return supabaseStorage.getDownloadUrl(path);
+    // --- SMART DOWNLOAD URL (Auto-Detect Provider from Path) ---
+    async getDownloadUrl(prefixedPath: string): Promise<string> {
+        return routerGetDownloadUrl(prefixedPath);
+    }
+
+    // --- LEGACY: Simple upload URL ---
+    async getUploadUrl(storagePath: string): Promise<string> {
+        const { provider, rawPath } = parseStoragePath(storagePath);
+        return routerGetUploadUrl(provider, rawPath);
+    }
+
+    // --- STORAGE STATUS ---
+    getStorageStatus() {
+        return getStorageStatus();
+    }
+
+    // --- Reconcile usage from DB on startup ---
+    async reconcileStorageUsage(): Promise<void> {
+        try {
+            const allChunks = await db.select({
+                storagePath: chunks.storagePath,
+                size: chunks.size,
+                isUploaded: chunks.isUploaded,
+            }).from(chunks);
+
+            let r2Total = 0;
+            let supabaseTotal = 0;
+
+            for (const chunk of allChunks) {
+                if (!chunk.storagePath || !chunk.isUploaded) continue;
+                const { provider } = parseStoragePath(chunk.storagePath);
+                if (provider === "r2") r2Total += chunk.size || 0;
+                else if (provider === "supabase") supabaseTotal += chunk.size || 0;
+            }
+
+            reconcileUsage(r2Total, supabaseTotal);
+        } catch (err) {
+            console.error("[Storage] Failed to reconcile usage from DB:", err);
+        }
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FALLBACK STORAGE — Auto-switches to MemoryStorage if DB is unavailable
+//  Uses a proper typed interface instead of `any` to preserve type safety.
+// ═══════════════════════════════════════════════════════════════════════════════
+
 import { MemoryStorage } from "./memory_storage";
 
-// --- PROXY STORAGE (Auto-Switching) ---
-
-class FallbackStorage {
+class FallbackStorage implements IStorage {
     private primary: DatabaseStorage;
     private memory: MemoryStorage;
     private usingMemory: boolean = false;
@@ -274,7 +333,11 @@ class FallbackStorage {
         this.memory = new MemoryStorage();
     }
 
-    private async execute<T>(operation: (s: any) => Promise<T>): Promise<T> {
+    /**
+     * Execute an operation with automatic fallback to memory storage.
+     * Uses typed IStorage interface instead of `any` — preserves full type safety.
+     */
+    private async execute<T>(operation: (s: IStorage) => Promise<T>): Promise<T> {
         if (this.usingMemory) {
             return operation(this.memory);
         }
@@ -282,13 +345,19 @@ class FallbackStorage {
         try {
             return await operation(this.primary);
         } catch (err: any) {
-            // Detect Connection Refused or other fatal DB errors
-            if (err.code === 'ECONNREFUSED' || err.code === '57P03' || err.message?.includes('connect')) {
-                console.error("===============================================================");
-                console.error("❌ DATABASE UNAVAILABLE - SWITCHING TO MEMORY STORAGE");
+            // Detect fatal DB errors and switch to memory
+            const isFatalDb = err.code === 'ECONNREFUSED'
+                || err.code === '57P03'
+                || err.code === 'ENOTFOUND'
+                || err.message?.includes('connect')
+                || err.message?.includes('getaddrinfo');
+
+            if (isFatalDb) {
+                console.error("═══════════════════════════════════════════════════════════");
+                console.error("❌ DATABASE UNAVAILABLE — SWITCHING TO MEMORY STORAGE");
                 console.error("   Reason:", err.message);
                 console.error("   Note: Data will be lost when server restarts.");
-                console.error("===============================================================");
+                console.error("═══════════════════════════════════════════════════════════");
                 this.usingMemory = true;
                 return operation(this.memory);
             }
@@ -296,29 +365,78 @@ class FallbackStorage {
         }
     }
 
-    async createVault(data: CreateVaultRequest) { return this.execute(s => s.createVault(data)); }
-    async getVault(id: string) { return this.execute(s => s.getVault(id)); }
-    async getVaultByShortCode(code: string) { return this.execute(s => s.getVaultByShortCode(code)); }
-    async getVaultByLookupId(lookupId: string) { return this.execute(s => s.getVaultByLookupId(lookupId)); }
-    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1) {
+    // --- IStorage implementation (fully typed) ---
+    async createVault(data: CreateVaultRequest): Promise<Vault> {
+        return this.execute(s => s.createVault(data));
+    }
+    async getVault(id: string): Promise<Vault | undefined> {
+        return this.execute(s => s.getVault(id));
+    }
+    async getVaultByShortCode(code: string): Promise<Vault | undefined> {
+        return this.execute(s => s.getVaultByShortCode(code));
+    }
+    async getVaultByLookupId(lookupId: string): Promise<Vault | undefined> {
+        return this.execute(s => s.getVaultByLookupId(lookupId));
+    }
+    async createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed = false, originalSize?: number, maxDownloads = 1): Promise<FileRecord> {
         return this.execute(s => s.createFile(vaultId, fileId, chunkCount, totalSize, isCompressed, originalSize, maxDownloads));
     }
-    async getFiles(vaultId: string) { return this.execute(s => s.getFiles(vaultId)); }
-    async getFileByFileId(fileId: string) { return this.execute(s => s.getFileByFileId(fileId)); }
-    async createChunk(fileId: string, chunkIndex: number, size: number) { return this.execute(s => s.createChunk(fileId, chunkIndex, size)); }
-    async getChunk(fileId: string, chunkIndex: number) { return this.execute(s => s.getChunk(fileId, chunkIndex)); }
-    async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string) { return this.execute(s => s.updateChunkStatus(fileId, chunkIndex, storagePath)); }
-    async incrementDownloadCount(vaultId: string) { return this.execute(s => s.incrementDownloadCount(vaultId)); }
-    async incrementFileDownloadCount(fileIds: string[]) { return this.execute(s => s.incrementFileDownloadCount(fileIds)); }
-    async areAllFilesExhausted(vaultId: string) { return this.execute(s => s.areAllFilesExhausted(vaultId)); }
-    async updateClipboard(lookupId: string, encryptedClipboardText: string) { return this.execute(s => s.updateClipboard(lookupId, encryptedClipboardText)); }
-    async deleteVault(id: string) { return this.execute(s => s.deleteVault(id)); }
-    async cleanupExpiredVaults() { return this.execute(s => s.cleanupExpiredVaults()); }
+    async getFiles(vaultId: string): Promise<FileRecord[]> {
+        return this.execute(s => s.getFiles(vaultId));
+    }
+    async getFileByFileId(fileId: string): Promise<FileRecord | undefined> {
+        return this.execute(s => s.getFileByFileId(fileId));
+    }
+    async createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord> {
+        return this.execute(s => s.createChunk(fileId, chunkIndex, size));
+    }
+    async getChunk(fileId: string, chunkIndex: number): Promise<ChunkRecord | undefined> {
+        return this.execute(s => s.getChunk(fileId, chunkIndex));
+    }
+    async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string): Promise<void> {
+        return this.execute(s => s.updateChunkStatus(fileId, chunkIndex, storagePath));
+    }
+    async incrementDownloadCount(vaultId: string): Promise<number> {
+        return this.execute(s => s.incrementDownloadCount(vaultId));
+    }
+    async incrementFileDownloadCount(fileIds: string[]): Promise<{
+        fileId: string;
+        downloadCount: number;
+        maxDownloads: number;
+        remainingDownloads: number;
+        isExhausted: boolean;
+    }[]> {
+        return this.execute(s => s.incrementFileDownloadCount(fileIds));
+    }
+    async areAllFilesExhausted(vaultId: string): Promise<boolean> {
+        return this.execute(s => s.areAllFilesExhausted(vaultId));
+    }
+    async updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date> {
+        return this.execute(s => s.updateClipboard(lookupId, encryptedClipboardText));
+    }
+    async deleteVault(id: string): Promise<void> {
+        return this.execute(s => s.deleteVault(id));
+    }
+    async cleanupExpiredVaults(): Promise<void> {
+        return this.execute(s => s.cleanupExpiredVaults());
+    }
 
-    // These methods don't use DB, but are part of the interface. 
-    // They are stateless in DatabaseStorage, but we can just use the primary one or delegate.
-    async getUploadUrl(path: string) { return this.primary.getUploadUrl(path); }
-    async getDownloadUrl(path: string) { return this.primary.getDownloadUrl(path); }
+    // --- Extended methods (not part of IStorage — always use primary) ---
+    async getSmartUploadUrl(vaultId: string, fileId: string, chunkIndex: number, chunkSize: number) {
+        return this.primary.getSmartUploadUrl(vaultId, fileId, chunkIndex, chunkSize);
+    }
+    async getDownloadUrl(path: string) {
+        return this.primary.getDownloadUrl(path);
+    }
+    async getUploadUrl(path: string) {
+        return this.primary.getUploadUrl(path);
+    }
+    getStorageStatus() {
+        return this.primary.getStorageStatus();
+    }
+    async reconcileStorageUsage() {
+        return this.primary.reconcileStorageUsage();
+    }
 }
 
 export const storage = new FallbackStorage();

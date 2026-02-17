@@ -1,12 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage"; // Switched to Database Storage
+import { storage } from "./storage";
 import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./services/email";
 import { codeLimiter, uploadLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";
-import { localStorage } from "./services/local_storage"; // <--- Add this import!
+import { localStorage } from "./services/local_storage";
+import { logStorageStatus } from "./services/storage_router";
 import multer from "multer";
 
 export async function registerRoutes(
@@ -16,7 +17,7 @@ export async function registerRoutes(
   // Configure Multer for transient "hot potato" memory storage
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per-file limit
   });
 
   // =============================================================================
@@ -122,6 +123,9 @@ export async function registerRoutes(
         fileId: f.fileId,
         chunkCount: f.chunkCount,
         totalSize: f.totalSize,
+        maxDownloads: f.maxDownloads || vault.maxDownloads,
+        downloadCount: f.downloadCount || 0,
+        remainingDownloads: Math.max(0, (f.maxDownloads || vault.maxDownloads) - (f.downloadCount || 0)),
       })),
     });
   });
@@ -370,7 +374,7 @@ export async function registerRoutes(
     upload.array("files", 10)(req, res, (err) => { // Allow up to 10 files
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
-          return res.status(413).json({ message: "File too large. Max limit is 10MB per file." });
+          return res.status(413).json({ message: "File too large. Max limit is 25MB per file." });
         }
         return res.status(400).json({ message: err.message });
       } else if (err) {
@@ -427,8 +431,8 @@ export async function registerRoutes(
 
       // Calculate total size check
       const totalSize = files.reduce((acc, f) => acc + f.size, 0);
-      if (totalSize > 25 * 1024 * 1024) { // 25MB Hard Limit
-        return res.status(413).json({ message: "Total attachment size exceeds 25MB limit." });
+      if (totalSize > 50 * 1024 * 1024) { // 50MB Hard Limit
+        return res.status(413).json({ message: "Total attachment size exceeds 50MB limit." });
       }
 
       // Prepare file attachments once
@@ -543,6 +547,16 @@ export async function registerRoutes(
   // =============================================================================
 
   // Get presigned upload URL for a chunk
+  // --- STORAGE STATUS ENDPOINT ---
+  app.get("/api/storage/status", async (_req, res) => {
+    try {
+      const status = storage.getStorageStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get storage status" });
+    }
+  });
+
   app.post(api.chunks.getUploadUrl.path, uploadLimiter, async (req, res) => {
     const id = req.params.id as string;
     const fileId = req.params.fileId as string;
@@ -557,17 +571,19 @@ export async function registerRoutes(
     // Ensure the chunk record exists (idempotent)
     await storage.createChunk(fileId, parseInt(chunkIndex), size);
 
-    // Generate Supabase Signed URL
-    // Path: vaultId/fileId/chunkIndex.enc
-    const storagePath = supabaseStorage.getStoragePath(id, fileId, parseInt(chunkIndex));
-
     try {
-      const uploadUrl = await storage.getUploadUrl(storagePath);
+      // Smart routing: R2 first, Supabase overflow
+      const result = await storage.getSmartUploadUrl(id, fileId, parseInt(chunkIndex), size);
       res.json({
-        uploadUrl,
-        storagePath,
+        uploadUrl: result.uploadUrl,
+        storagePath: result.storagePath,  // Prefixed path: "r2:..." or "sb:..."
+        provider: result.provider,
       });
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message?.includes('STORAGE_FULL')) {
+        console.error("[Upload] Storage capacity reached:", err.message);
+        return res.status(507).json({ message: "Storage capacity reached. Please try again later as expired vaults are cleaned up." });
+      }
       console.error("Upload URL Gen Failed:", err);
       res.status(500).json({ message: "Failed to generate upload URL" });
     }
@@ -584,7 +600,7 @@ export async function registerRoutes(
   });
 
   app.get(api.chunks.getDownloadUrl.path, async (req, res) => {
-    // Security headers
+    // Security headers — no caching of signed URLs
     res.set({
       "Cache-Control": "no-store",
       "Clear-Site-Data": '"cache", "storage"',
@@ -594,31 +610,23 @@ export async function registerRoutes(
     const fileId = req.params.fileId as string;
     const chunkIndex = req.params.chunkIndex as string;
 
-    console.log(`[Download Debug] Requesting chunk: Vault=${id}, File=${fileId}, Index=${chunkIndex}`);
-
     try {
       const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
 
       if (!chunk) {
-        console.error(`[Download Debug] Chunk not found in DB: File=${fileId}, Index=${chunkIndex}`);
         return res.status(404).json({ message: "Chunk not found" });
       }
 
       if (!chunk.storagePath) {
-        console.error(`[Download Debug] Chunk has no storagePath: File=${fileId}, Index=${chunkIndex}`);
-        return res.status(404).json({ message: "Chunk not found (no path)" });
+        return res.status(404).json({ message: "Chunk not uploaded yet" });
       }
 
-      console.log(`[Download Debug] Chunk found. Path=${chunk.storagePath}. Getting signed URL...`);
-
-      // Get signed download URL from Supabase
+      // Get signed download URL (auto-detects R2/Supabase/Local from path prefix)
       const downloadUrl = await storage.getDownloadUrl(chunk.storagePath);
-      console.log(`[Download Debug] Signed URL generated successfully.`);
-
       res.json({ downloadUrl });
     } catch (err) {
-      console.error("Download URL Gen Failed:", err);
-      res.status(404).json({ message: "File not found in storage" });
+      console.error(`[Download] URL generation failed: Vault=${id}, File=${fileId}, Chunk=${chunkIndex}`, err);
+      res.status(500).json({ message: "Failed to generate download URL" });
     }
   });
 

@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useGetVault, useGetChunkDownloadUrl, useTrackDownload } from "@/hooks/use-vaults";
+import { useGetVault, useGetChunkDownloadUrl, useTrackFileDownload } from "@/hooks/use-vaults";
 import { importKey, decryptMetadata, decryptData, exportKey } from "@/lib/crypto";
 import { VaultCard } from "@/components/vault-card";
 
@@ -49,8 +49,18 @@ export default function DownloadPage() {
 
   const { data: vault, isLoading, error: apiError } = useGetVault(vaultId || "");
   const getDownloadUrl = useGetChunkDownloadUrl();
-  const trackDownload = useTrackDownload();
+  const trackFileDownload = useTrackFileDownload();
   const { toast } = useToast();
+
+  // Per-file download tracking
+  const [fileDownloadStates, setFileDownloadStates] = useState<Map<string, {
+    fileId: string;
+    maxDownloads: number;
+    downloadCount: number;
+    remainingDownloads: number;
+    isExhausted: boolean;
+  }>>(new Map());
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   // Worker Management
   const workerRef = useRef<Worker | null>(null);
@@ -92,6 +102,25 @@ export default function DownloadPage() {
         });
 
         setFiles(mergedFiles);
+
+        // Initialize per-file download states from vault files
+        const fileStates = new Map<string, {
+          fileId: string; maxDownloads: number; downloadCount: number;
+          remainingDownloads: number; isExhausted: boolean;
+        }>();
+        for (const file of vault.files) {
+          const maxDl = file.maxDownloads || vault.maxDownloads || 5;
+          const dlCount = file.downloadCount || 0;
+          fileStates.set(file.fileId, {
+            fileId: file.fileId,
+            maxDownloads: maxDl,
+            downloadCount: dlCount,
+            remainingDownloads: Math.max(0, maxDl - dlCount),
+            isExhausted: dlCount >= maxDl
+          });
+        }
+        setFileDownloadStates(fileStates);
+
         setIsDecrypting(false);
       } catch (err) {
         console.error(err);
@@ -211,23 +240,50 @@ export default function DownloadPage() {
       }
 
       // === POST DOWNLOAD ACTIONS ===
-      trackDownload.mutate(vaultId);
-      toast({ title: "Download Complete", description: `Saved ${file.name}` });
+      // Track per-file download
+      try {
+        const res = await trackFileDownload.mutateAsync({
+          vaultId: vaultId,
+          fileId: file.fileId
+        });
 
-      // Self-Destruct if limit reached
-      if (vault?.maxDownloads === 1 || (vault?.downloadCount || 0) + 1 >= (vault?.maxDownloads || 5)) {
-        setTimeout(() => {
-          toast({
-            title: "Self-Destruct Initiated",
-            description: "This link is burning...",
-            variant: "destructive"
+        // Update per-file download states
+        if (res.files && res.files.length > 0) {
+          setFileDownloadStates(prev => {
+            const newMap = new Map(prev);
+            for (const fileResult of res.files) {
+              newMap.set(fileResult.fileId, {
+                fileId: fileResult.fileId,
+                maxDownloads: fileResult.maxDownloads,
+                downloadCount: fileResult.downloadCount,
+                remainingDownloads: fileResult.remainingDownloads,
+                isExhausted: fileResult.isExhausted
+              });
+            }
+            return newMap;
           });
-          setIsDestructing(true);
-        }, 2000);
+        }
 
-        setTimeout(() => {
-          setIsDestroyed(true);
-        }, 4500);
+        toast({ title: "Download Complete", description: `Saved ${file.name}` });
+
+        // Self-Destruct if all files exhausted
+        if (res.vaultExhausted) {
+          setTimeout(() => {
+            toast({
+              title: "Self-Destruct Initiated",
+              description: "This link is burning...",
+              variant: "destructive"
+            });
+            setIsDestructing(true);
+          }, 2000);
+
+          setTimeout(() => {
+            setIsDestroyed(true);
+          }, 4500);
+        }
+      } catch (trackErr) {
+        console.error("File download tracking failed", trackErr);
+        toast({ title: "Download Complete", description: `Saved ${file.name} (tracking failed)` });
       }
 
     } catch (err) {
@@ -237,6 +293,115 @@ export default function DownloadPage() {
       setActiveDownload(null);
       setDownloadProgress(0);
       setDownloadMethod(null);
+    }
+  };
+
+  // Download All handler — downloads sequentially and tracks as a single batch
+  const handleDownloadAll = async () => {
+    if (!decryptionKey || !vaultId || files.length === 0) return;
+
+    // Filter out exhausted files
+    const downloadableFiles = files.filter(f => {
+      const state = fileDownloadStates.get(f.fileId);
+      return !state?.isExhausted;
+    });
+
+    if (downloadableFiles.length === 0) {
+      toast({ variant: "destructive", title: "No Downloads Available", description: "All files have reached their download limit." });
+      return;
+    }
+
+    setIsDownloadingAll(true);
+
+    try {
+      // Download each file sequentially (skip tracking per-file)
+      for (let i = 0; i < downloadableFiles.length; i++) {
+        const file = downloadableFiles[i];
+        setActiveDownload(file.fileId);
+        setDownloadProgress(0);
+
+        const useStream = shouldUseStreamedDownload(file.size);
+        setDownloadMethod(useStream ? 'stream' : 'memory');
+
+        try {
+          if (useStream) {
+            const chunkUrls = await fetchChunkUrls(file);
+            const result = await initiateStreamDownload(
+              file.fileId, decryptionKey, chunkUrls,
+              { name: file.name, size: file.size, type: file.type, fileId: file.fileId, isCompressed: file.isCompressed },
+              (prog: DownloadProgress) => { setDownloadProgress(10 + (prog.progress * 0.9)); }
+            );
+            if (!result.success) throw new Error(result.error);
+          } else {
+            const chunks: Uint8Array[] = [];
+            let downloadedSize = 0;
+            for (let ci = 0; ci < file.chunks; ci++) {
+              const { downloadUrl } = await getDownloadUrl.mutateAsync({ vaultId, fileId: file.fileId, chunkIndex: ci });
+              const res = await fetch(downloadUrl);
+              const buffer = await res.arrayBuffer();
+              const iv = new Uint8Array(buffer.slice(0, 12));
+              const encryptedData = buffer.slice(12);
+              const decryptedBuffer = await decryptWithWorker(encryptedData, iv, decryptionKey, file.isCompressed);
+              chunks.push(new Uint8Array(decryptedBuffer as ArrayBuffer));
+              downloadedSize += (decryptedBuffer as ArrayBuffer).byteLength;
+              setDownloadProgress((downloadedSize / file.size) * 100);
+            }
+            const blob = new Blob(chunks as BlobPart[], { type: file.type });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = file.name;
+            document.body.appendChild(a); a.click();
+            window.URL.revokeObjectURL(url); document.body.removeChild(a);
+          }
+        } catch (fileErr) {
+          console.error(`Failed to download ${file.name}:`, fileErr);
+          toast({ variant: "destructive", title: "Download Failed", description: `Failed to download ${file.name}` });
+        }
+      }
+
+      // Track all downloaded files in a single batch
+      try {
+        const downloadedFileIds = downloadableFiles.map(f => f.fileId);
+        const res = await trackFileDownload.mutateAsync({
+          vaultId: vaultId,
+          fileId: downloadedFileIds[0],
+          fileIds: downloadedFileIds
+        });
+
+        if (res.files && res.files.length > 0) {
+          setFileDownloadStates(prev => {
+            const newMap = new Map(prev);
+            for (const fileResult of res.files) {
+              newMap.set(fileResult.fileId, {
+                fileId: fileResult.fileId,
+                maxDownloads: fileResult.maxDownloads,
+                downloadCount: fileResult.downloadCount,
+                remainingDownloads: fileResult.remainingDownloads,
+                isExhausted: fileResult.isExhausted
+              });
+            }
+            return newMap;
+          });
+        }
+
+        toast({ title: "Download Complete", description: `${downloadableFiles.length} file(s) downloaded.` });
+
+        if (res.vaultExhausted) {
+          setTimeout(() => {
+            toast({ title: "Self-Destruct Initiated", description: "This link is burning...", variant: "destructive" });
+            setIsDestructing(true);
+          }, 2000);
+          setTimeout(() => { setIsDestroyed(true); }, 4500);
+        }
+      } catch (trackErr) {
+        console.error("Batch tracking failed", trackErr);
+      }
+
+    } finally {
+      setActiveDownload(null);
+      setDownloadProgress(0);
+      setDownloadMethod(null);
+      setIsDownloadingAll(false);
     }
   };
 
@@ -362,50 +527,99 @@ export default function DownloadPage() {
               <p className="text-sm md:text-base">Decrypting metadata...</p>
             </div>
           ) : (
-            files.map((file) => (
-              <motion.div
-                key={file.fileId}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-card border border-border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-primary/30 transition-colors"
-              >
-                <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                  <div className="p-2 md:p-3 bg-secondary rounded-lg flex-shrink-0">
-                    <File className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate text-sm md:text-base">{file.name}</p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type || 'Unknown'}
-                    </p>
-                  </div>
-                </div>
+            <>
+              {files.map((file) => {
+                const fileState = fileDownloadStates.get(file.fileId);
+                const remaining = fileState?.remainingDownloads ?? 0;
+                const maxDl = fileState?.maxDownloads ?? 0;
+                const isExhausted = fileState?.isExhausted ?? false;
 
-                <div className="flex items-center gap-4 w-full md:w-auto mt-2 md:mt-0">
-                  {activeDownload === file.fileId ? (
-                    <div className="w-full md:w-48 space-y-2">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{downloadMethod === 'stream' ? 'Stream ' : ''}Decrypting...</span>
-                        <span>{Math.round(downloadProgress)}%</span>
+                return (
+                  <motion.div
+                    key={file.fileId}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`bg-card border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 group transition-colors ${isExhausted ? 'border-destructive/30 opacity-60' : 'border-border hover:border-primary/30'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                      <div className="p-2 md:p-3 bg-secondary rounded-lg flex-shrink-0">
+                        <File className={`w-5 h-5 md:w-6 md:h-6 ${isExhausted ? 'text-destructive' : 'text-primary'}`} />
                       </div>
-                      <Progress value={downloadProgress} className="h-1.5 md:h-2" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate text-sm md:text-base">{file.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type || 'Unknown'}
+                          </p>
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                          <span className={`text-[10px] font-bold uppercase ${isExhausted ? 'text-destructive' : remaining <= 1 ? 'text-amber-400' : 'text-primary'
+                            }`}>
+                            {remaining}/{maxDl} DL
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <Button
-                      onClick={() => handleDownload(file)}
-                      className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-sm md:text-base h-10 md:h-11"
-                    >
-                      {shouldUseStreamedDownload(file.size) ? (
-                        <Zap className="w-4 h-4 mr-2 text-amber-500" />
+
+                    <div className="flex items-center gap-4 w-full md:w-auto mt-2 md:mt-0">
+                      {activeDownload === file.fileId ? (
+                        <div className="w-full md:w-48 space-y-2">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{downloadMethod === 'stream' ? 'Stream ' : ''}Decrypting...</span>
+                            <span>{Math.round(downloadProgress)}%</span>
+                          </div>
+                          <Progress value={downloadProgress} className="h-1.5 md:h-2" />
+                        </div>
                       ) : (
-                        <DownloadIcon className="w-4 h-4 mr-2" />
+                        <Button
+                          onClick={() => handleDownload(file)}
+                          disabled={isExhausted || isDownloadingAll}
+                          className={`w-full md:w-auto font-mono text-sm md:text-base h-10 md:h-11 ${isExhausted
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            }`}
+                        >
+                          {isExhausted ? (
+                            'Limit Reached'
+                          ) : shouldUseStreamedDownload(file.size) ? (
+                            <><Zap className="w-4 h-4 mr-2 text-amber-500" />Download</>
+                          ) : (
+                            <><DownloadIcon className="w-4 h-4 mr-2" />Download</>
+                          )}
+                        </Button>
                       )}
-                      Download
-                    </Button>
-                  )}
-                </div>
-              </motion.div>
-            ))
+                    </div>
+                  </motion.div>
+                );
+              })}
+
+              {/* Download All Button */}
+              {files.length > 1 && (
+                <>
+                  <Button
+                    onClick={handleDownloadAll}
+                    disabled={isDownloadingAll || activeDownload !== null || (Array.from(fileDownloadStates.values()).every(f => f.isExhausted) && fileDownloadStates.size > 0)}
+                    className={`w-full h-12 mt-4 font-mono text-sm md:text-base uppercase tracking-wider ${Array.from(fileDownloadStates.values()).every(f => f.isExhausted) && fileDownloadStates.size > 0
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                      : isDownloadingAll
+                        ? 'bg-primary/70 text-primary-foreground cursor-wait'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      }`}
+                  >
+                    {isDownloadingAll ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Downloading All...</>
+                    ) : Array.from(fileDownloadStates.values()).every(f => f.isExhausted) && fileDownloadStates.size > 0 ? (
+                      'All Limits Reached'
+                    ) : (
+                      <><DownloadIcon className="w-4 h-4 mr-2" />Download All Files</>
+                    )}
+                  </Button>
+                  <p className="text-[10px] md:text-xs text-center text-muted-foreground mt-4 opacity-70">
+                    By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
+                  </p>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

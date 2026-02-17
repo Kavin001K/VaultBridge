@@ -21,6 +21,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 const HowItWorks = lazy(() => import("@/pages/how-it-works"));
 const Terms = lazy(() => import("@/pages/terms"));
 const Privacy = lazy(() => import("@/pages/privacy"));
+const GetItMailed = lazy(() => import("@/pages/get-it-mailed"));
 
 function LoadingFallback() {
   return (
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/download/:id" component={DownloadPage} />
       <Route path="/success/:id" component={SuccessPage} />
       <Route path="/how-it-works" component={HowItWorks} />
+      <Route path="/get-it-mailed" component={GetItMailed} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
       <Route component={NotFound} />
