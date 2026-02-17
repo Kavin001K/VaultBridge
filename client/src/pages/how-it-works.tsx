@@ -4,7 +4,7 @@ import {
     Shield, Lock, Zap, Eye, Server, Wifi,
     Upload, ArrowLeft, ArrowRight, CheckCircle2,
     Activity, Radio, Fingerprint, Database,
-    Network, Binary, Key, Cpu, ChevronUp, HardDrive
+    Network, Binary, Key, Cpu, ChevronUp, HardDrive, Mail, Github
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -55,12 +55,22 @@ export default function HowItWorksPage() {
                             </span>
                         </div>
                     </Link>
-                    <Link href="/">
-                        <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5">
-                            <ArrowLeft className="w-4 h-4" />
-                            <span className="hidden sm:inline">Return</span>
-                        </Button>
-                    </Link>
+                    <div className="flex items-center gap-4">
+                        <a
+                            href="https://github.com/Kavin001K/VaultBridge"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-zinc-400 hover:text-white transition-colors"
+                        >
+                            <Github className="w-5 h-5" />
+                        </a>
+                        <Link href="/">
+                            <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5">
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="hidden sm:inline">Return</span>
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
             </motion.header>
 
@@ -269,6 +279,98 @@ export default function HowItWorksPage() {
                     </div>
                 </motion.section>
 
+                {/* Secure Email Section (New) */}
+                <motion.section
+                    initial={{ opacity: 0, y: 40 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="mb-32 relative"
+                >
+                    <div className="absolute -inset-1 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 rounded-[2.5rem] blur-xl opacity-20 pointer-events-none" />
+
+                    <div className="border border-violet-500/20 bg-zinc-950/80 backdrop-blur-md rounded-3xl p-8 md:p-16 relative overflow-hidden group">
+
+                        {/* Animated background noise */}
+                        <div className="absolute inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+
+                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity duration-700">
+                            <Mail className="w-48 h-48 text-violet-500 rotate-12" />
+                        </div>
+
+                        <div className="relative z-10">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-mono mb-8">
+                                <Zap className="w-3 h-3 animate-pulse" />
+                                EPHEMERAL RELAY
+                            </div>
+
+                            <div className="flex flex-col md:flex-row-reverse gap-12 items-start">
+                                <div className="flex-1">
+                                    <h2 className="text-4xl md:text-6xl font-black mb-8 text-white tracking-tight">Direct <span className="text-violet-500">Email</span></h2>
+                                    <p className="text-xl text-zinc-400 mb-8 leading-relaxed">
+                                        Bypass attachment limits and privacy concerns. We act as a blind courier, streaming your files directly to the recipient's inbox through a transient memory tunnel.
+                                    </p>
+
+                                    <ul className="space-y-4 text-zinc-400">
+                                        {[
+                                            "RAM-Only Processing (No Disk I/O).",
+                                            "On-the-fly MIME construction.",
+                                            "Instant zero-fill memory wipe after dispatch.",
+                                            "TLS 1.3 End-to-End Transport Layer."
+                                        ].map((point, i) => (
+                                            <li key={i} className="flex items-start gap-3">
+                                                <CheckCircle2 className="w-5 h-5 text-violet-500 shrink-0 mt-0.5" />
+                                                <span>{point}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                <div className="flex-1 w-full bg-black/40 rounded-2xl p-6 border border-white/5">
+                                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                        <Server className="w-4 h-4 text-violet-400" /> The Hot-Potato Protocol
+                                    </h3>
+                                    <div className="space-y-4 font-mono text-sm">
+                                        <div className="grid grid-cols-3 gap-2 text-center items-center">
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-2">
+                                                    <Upload className="w-5 h-5 text-zinc-400" />
+                                                </div>
+                                                <span className="text-[10px] text-zinc-500">Upload</span>
+                                            </div>
+                                            <div className="relative h-px bg-zinc-800">
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-2">
+                                                    <Mail className="w-5 h-5 text-violet-400" />
+                                                </div>
+                                                <span className="text-[10px] text-zinc-500">Inbox</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-zinc-900/50 rounded-lg border border-white/5 space-y-2">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-zinc-500">Storage Time:</span>
+                                                <span className="text-emerald-400 font-bold">0.00s</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-zinc-500">Disk Usage:</span>
+                                                <span className="text-emerald-400 font-bold">0 Bytes</span>
+                                            </div>
+                                            <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                                                <div className="h-full bg-violet-500 w-full animate-[progress_1s_ease-in-out_infinite]" />
+                                            </div>
+                                            <p className="text-[10px] text-zinc-600 mt-2 text-center">
+                                                Streamed directly through memory buffers.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </motion.section>
+
                 {/* Technical Stack */}
                 <div className="text-center border-t border-white/5 pt-24">
                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-12">Cryptographic Primitives & Stack</h3>
@@ -314,6 +416,6 @@ export default function HowItWorksPage() {
                 </p>
                 <p className="text-zinc-700 text-[10px] font-mono mt-2">v1.2.0</p>
             </footer>
-        </div>
+        </div >
     );
 }

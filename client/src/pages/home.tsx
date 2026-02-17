@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Upload, KeyRound, Shield, Zap, Eye,
   ArrowRight, Sparkles, Mail, Send, Paperclip, FileText, CheckCircle2, AlertCircle, X,
-  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard, AlertTriangle, Check
+  Users, AtSign, Plus, Trash2, Volume2, VolumeX, Clipboard, AlertTriangle, Check, Github
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -279,19 +279,28 @@ export default function Home() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-2"
           >
+            <a
+              href="https://github.com/Kavin001K/VaultBridge"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Github className="w-5 h-5" />
+            </a>
             <div className="flex items-center gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-primary/10 border border-primary/20">
               <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-primary animate-pulse" />
               <span className="text-[10px] md:text-xs font-mono text-primary uppercase">Online</span>
             </div>
           </motion.div>
         </div>
-      </header>
+      </header >
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-6xl mx-auto px-4 md:px-6 py-8 md:py-12 w-full">
+      < main className="relative z-10 flex-1 flex flex-col items-center justify-center max-w-6xl mx-auto px-4 md:px-6 py-8 md:py-12 w-full" >
         {/* Toggle Switch */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
+        < motion.div
+          initial={{ opacity: 0, y: -20 }
+          }
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center justify-center mb-8 md:mb-12 w-full"
         >
@@ -370,7 +379,7 @@ export default function Home() {
               <VolumeX className="w-4 h-4 text-muted-foreground" />
             )}
           </motion.button>
-        </motion.div>
+        </motion.div >
 
         <AnimatePresence mode="wait">
           {activeTab === "vault" ? (
@@ -846,10 +855,10 @@ export default function Home() {
             </motion.div>
           )
         }
-      </main>
+      </main >
 
       {/* Footer */}
-      <footer className="relative z-10 py-8 text-center px-4">
+      < footer className="relative z-10 py-8 text-center px-4" >
         <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mb-4">
           <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
           <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
@@ -861,10 +870,10 @@ export default function Home() {
         <p className="text-[10px] text-muted-foreground/40 mt-2 font-mono">
           v1.2.0
         </p>
-      </footer>
+      </footer >
 
       {/* Redesigned Check Spam Folder Dialog */}
-      <Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert}>
+      < Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert} >
         <DialogContent className="sm:max-w-md bg-zinc-950 border border-zinc-800/80 text-zinc-100 shadow-2xl p-0 overflow-hidden">
 
           {/* Header Pattern */}
@@ -911,7 +920,7 @@ export default function Home() {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
     </div >
   );
 }
