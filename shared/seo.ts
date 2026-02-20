@@ -8,6 +8,8 @@ export interface SEOConfig {
   siteName?: string;
 }
 
+import { generateSEOPages } from "./seo-generator";
+
 export const defaultSEO: SEOConfig = {
   siteName: "VaultBridge",
   title: "VaultBridge | Secure Encrypted File Sharing & Transfer",
@@ -20,7 +22,7 @@ export const defaultSEO: SEOConfig = {
   type: "website",
 };
 
-export const pageSEO: Record<string, Partial<SEOConfig>> = {
+const staticPageSEO: Record<string, Partial<SEOConfig>> = {
   "/": {
     title: "VaultBridge | Secure Encrypted File Sharing & Transfer",
     description:
@@ -160,6 +162,12 @@ export const pageSEO: Record<string, Partial<SEOConfig>> = {
   },
 };
 
+// Merge static SEO configurations with the dynamically generated programmatic SEO configs
+export const pageSEO: Record<string, Partial<SEOConfig>> = {
+  ...staticPageSEO,
+  ...generateSEOPages(),
+};
+
 // Public routes safe to pre-render and expose to crawlers
 export const publicRoutesForPreRender = [
   "/",
@@ -173,12 +181,7 @@ export const publicRoutesForPreRender = [
   "/security",
   "/privacy-manifesto",
   "/roadmap",
-  "/secure-file-sharing-free",
-  "/encrypted-file-transfer",
-  "/private-file-sharing",
-  "/anonymous-file-sharing",
-  "/free-encrypted-upload",
-  "/send-files-securely",
+  ...Object.keys(generateSEOPages()),
 ];
 
 export function resolveSEO(

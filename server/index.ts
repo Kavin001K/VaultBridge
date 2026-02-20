@@ -13,6 +13,7 @@ import { createServer } from "http";
 import { startCleanupWorker } from "./cron/cleanup";
 import { storage } from "./storage";
 import { logStorageStatus } from "./services/storage_router";
+import { registerSeoRoutes } from "./seo-routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -170,6 +171,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+  registerSeoRoutes(app);
 
   // Reconcile storage usage from DB (count existing bytes per provider)
   try {
