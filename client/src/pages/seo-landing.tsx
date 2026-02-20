@@ -1,71 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface LandingContent {
-  title: string;
-  intro: string;
-  explanation: string;
-  useCases: string[];
-  seoFooter: string;
-}
-
-const landingContent: Record<string, LandingContent> = {
-  "/secure-file-sharing-free": {
-    title: "Secure File Sharing Free",
-    intro: "Share files securely without login, tracking, or permanent storage.",
-    explanation:
-      "VaultBridge provides secure file sharing using encrypted transfer and temporary storage. Files remain private and automatically expire based on lifecycle settings.",
-    useCases: ["Developers sharing builds", "Business document exchange", "Personal private transfer"],
-    seoFooter:
-      "VaultBridge provides free secure file sharing, encrypted file transfer, anonymous upload, and privacy-focused sharing.",
-  },
-  "/encrypted-file-transfer": {
-    title: "Encrypted File Transfer",
-    intro: "Transfer files with end-to-end privacy defaults and temporary retention.",
-    explanation:
-      "VaultBridge encrypts data before storage and moves payloads over secure transport. Access is short-lived and optimized for controlled sharing, not permanent archives.",
-    useCases: ["Engineering handoffs", "Security review artifacts", "Client file delivery"],
-    seoFooter:
-      "Encrypted file transfer with temporary storage and secure access links for privacy-sensitive workflows.",
-  },
-  "/private-file-sharing": {
-    title: "Private File Sharing",
-    intro: "Private file sharing for teams and individuals who do not want tracking layers.",
-    explanation:
-      "VaultBridge minimizes data collection and enforces temporary lifecycle controls so files are shared with clear expiration behavior.",
-    useCases: ["Confidential team collaboration", "Sensitive student project exchange", "Legal and finance workflows"],
-    seoFooter:
-      "Private file sharing platform with encrypted transfer, no required account, and lifecycle-based deletion.",
-  },
-  "/anonymous-file-sharing": {
-    title: "Anonymous File Sharing",
-    intro: "Share files anonymously without account creation.",
-    explanation:
-      "VaultBridge supports anonymous secure sharing flows where users can transfer encrypted content without persistent identity profiles.",
-    useCases: ["No-login secure sharing", "Ad hoc transfer needs", "Privacy-first communities"],
-    seoFooter:
-      "Anonymous file sharing with encrypted transfer and controlled expiration.",
-  },
-  "/free-encrypted-upload": {
-    title: "Free Encrypted Upload",
-    intro: "Encrypted upload workflow with zero-friction access and privacy-first defaults.",
-    explanation:
-      "VaultBridge enables free encrypted upload and short-lived vault delivery for users who need secure transfer without heavy onboarding.",
-    useCases: ["Freelancer file exchange", "Secure one-time links", "Cross-device secure handoff"],
-    seoFooter:
-      "Free encrypted upload service with secure links, temporary storage, and minimal data collection.",
-  },
-  "/send-files-securely": {
-    title: "Send Files Securely",
-    intro: "Send files securely with encrypted transfer and temporary access controls.",
-    explanation:
-      "VaultBridge is built for secure file delivery with architecture-focused privacy controls and a fast no-login user flow.",
-    useCases: ["Operational file delivery", "Vendor handoffs", "Personal secure sharing"],
-    seoFooter:
-      "Send files securely with encrypted file transfer, private access links, and automatic expiration behavior.",
-  },
-};
+import { generateSEOLandingContent } from "@shared/seo-generator";
 
 const whyVaultBridge = [
   "No login required",
@@ -76,7 +12,14 @@ const whyVaultBridge = [
 
 export default function SEOLandingPage() {
   const [location] = useLocation();
-  const content = landingContent[location] || landingContent["/secure-file-sharing-free"];
+  const landingContent = generateSEOLandingContent();
+
+  // Normalize location slightly to handle potential trailing slashes
+  const normalizedLocation = location.endsWith('/') && location.length > 1
+    ? location.slice(0, -1)
+    : location;
+
+  const content = landingContent[normalizedLocation] || landingContent["/secure-file-sharing-free"];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">

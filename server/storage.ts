@@ -356,6 +356,15 @@ class FallbackStorage implements IStorage {
                 console.error("═══════════════════════════════════════════════════════════");
                 console.error("❌ DATABASE UNAVAILABLE — SWITCHING TO MEMORY STORAGE");
                 console.error("   Reason:", err.message);
+
+                if (err.message?.includes('ENETUNREACH') || err.message?.includes('ENOTFOUND') || err.message?.includes('supabase')) {
+                    console.error("   ⚠️ SUPABASE IPv6 CONNECTION ERROR DETECTED!");
+                    console.error("   Supabase has phased out IPv4 on direct connections (`db.[ref].supabase.co`).");
+                    console.error("   Render instances often fail to connect via IPv6 by default.");
+                    console.error("   FIX: Update your DATABASE_URL in Render to use the Connection Pooler URL.");
+                    console.error("   Go to Supabase -> Database -> Connection Pooler and copy the Session URL.");
+                }
+
                 console.error("   Note: Data will be lost when server restarts.");
                 console.error("═══════════════════════════════════════════════════════════");
                 this.usingMemory = true;
