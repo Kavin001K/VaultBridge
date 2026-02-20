@@ -22,6 +22,10 @@ const HowItWorks = lazy(() => import("@/pages/how-it-works"));
 const Terms = lazy(() => import("@/pages/terms"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const GetItMailed = lazy(() => import("@/pages/get-it-mailed"));
+const Security = lazy(() => import("@/pages/security"));
+const PrivacyManifesto = lazy(() => import("@/pages/privacy-manifesto"));
+const Roadmap = lazy(() => import("@/pages/roadmap"));
+const SEOLandingPage = lazy(() => import("@/pages/seo-landing"));
 
 function LoadingFallback() {
   return (
@@ -59,6 +63,15 @@ function Router() {
       <Route path="/get-it-mailed" component={GetItMailed} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
+      <Route path="/security" component={Security} />
+      <Route path="/privacy-manifesto" component={PrivacyManifesto} />
+      <Route path="/roadmap" component={Roadmap} />
+      <Route path="/secure-file-sharing-free" component={SEOLandingPage} />
+      <Route path="/encrypted-file-transfer" component={SEOLandingPage} />
+      <Route path="/private-file-sharing" component={SEOLandingPage} />
+      <Route path="/anonymous-file-sharing" component={SEOLandingPage} />
+      <Route path="/free-encrypted-upload" component={SEOLandingPage} />
+      <Route path="/send-files-securely" component={SEOLandingPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -80,4 +93,3 @@ function App() {
 }
 
 export default App;
-

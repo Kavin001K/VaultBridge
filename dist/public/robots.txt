@@ -7,6 +7,15 @@ Allow: /clipboard
 Allow: /how-it-works
 Allow: /terms
 Allow: /privacy
+Allow: /security
+Allow: /privacy-manifesto
+Allow: /roadmap
+Allow: /secure-file-sharing-free
+Allow: /encrypted-file-transfer
+Allow: /private-file-sharing
+Allow: /anonymous-file-sharing
+Allow: /free-encrypted-upload
+Allow: /send-files-securely
 
 # Disallow temporary/dynamic sensitive pages
 Disallow: /download/
