@@ -78,8 +78,19 @@
   <!-- Google Fonts (Optimized) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
 
-  <!-- Privacy-respecting analytics -->
-  <script defer="" data-domain="vaultbridge.org" src="https://plausible.io/js/script.outbound-links.js"></script>
+  <!-- Privacy-respecting analytics (only on production domains) -->
+  <script>
+    (function () {
+      const analyticsHosts = new Set(["vaultbridge.org", "www.vaultbridge.org"]);
+      if (!analyticsHosts.has(window.location.hostname)) return;
+
+      const script = document.createElement("script");
+      script.defer = true;
+      script.setAttribute("data-domain", "vaultbridge.org");
+      script.src = "https://plausible.io/js/script.outbound-links.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 
   <!-- JSON-LD Structured Data: WebApplication -->
   <script type="application/ld+json">
@@ -239,9 +250,9 @@
   <!-- Preload Critical Assets -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-  <script type="module" crossorigin="" src="/assets/index-Bp-iVgYV.js"></script>
+  <script type="module" crossorigin="" src="/assets/index-CjvZq1Jz.js"></script>
   <link rel="stylesheet" crossorigin="" href="/assets/index-mQkNEeE1.css">
-<link rel="modulepreload" as="script" crossorigin="" href="/assets/home-BPeogXsu.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/input-BqWSKQPL.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/use-mobile-C9RPC97M.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/github-CWWgf1Cq.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/users-Ofn2PMDd.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/upload-fmNAfe41.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/mail-BxVQKn90.js"></head>
+<link rel="modulepreload" as="script" crossorigin="" href="/assets/home-CIjI-FXB.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/input-BYH2_Ruj.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/use-mobile-GpQFaWOK.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/github-C9hcNVy9.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/users-5pRFB5gw.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/upload-B7sDPfqr.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/mail-Jas8egYG.js"></head>
 
 <body>
   <!-- Noscript fallback for SEO -->

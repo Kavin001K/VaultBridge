@@ -24,9 +24,6 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-const MAX_CLIPBOARD_LENGTH = 50000; // 50K chars
-
 const STEPS = [
     { id: 1, label: "Compose", icon: Type },
     { id: 2, label: "Configure", icon: Eye },
@@ -187,11 +184,6 @@ export default function UniversalClipboard() {
 
     // 3. Outgoing Sync Handler (Debounced)
     const handleContentChange = (newText: string) => {
-        // Enforce max length
-        if (newText.length > MAX_CLIPBOARD_LENGTH) {
-            newText = newText.substring(0, MAX_CLIPBOARD_LENGTH);
-            toast({ variant: "destructive", title: "Character Limit", description: `Maximum ${MAX_CLIPBOARD_LENGTH.toLocaleString()} characters.` });
-        }
         setContent(newText);
 
         if (mode === 'live' && vaultData) {
@@ -237,7 +229,6 @@ export default function UniversalClipboard() {
     };
 
     const canProceed = content.trim().length > 0;
-    const charPercentage = Math.min((content.length / MAX_CLIPBOARD_LENGTH) * 100, 100);
 
     return (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 overflow-hidden flex flex-col">
@@ -453,8 +444,8 @@ export default function UniversalClipboard() {
                         <div className="flex items-center gap-1">
                             {/* Character Counter */}
                             {content.length > 0 && (
-                                <span className={`text-[10px] font-mono mr-2 ${charPercentage > 90 ? 'text-red-400' : charPercentage > 70 ? 'text-amber-400' : 'text-zinc-600'}`}>
-                                    {content.length.toLocaleString()}/{MAX_CLIPBOARD_LENGTH.toLocaleString()}
+                                <span className="text-[10px] font-mono mr-2 text-zinc-500">
+                                    {content.length.toLocaleString()} chars
                                 </span>
                             )}
                             <Button
@@ -493,7 +484,7 @@ export default function UniversalClipboard() {
                     {/* Text Area */}
                     <div className="relative flex-1 group">
                         <Textarea
-                            className={`w-full h-full min-h-[350px] bg-transparent border-0 resize-none p-6 text-base md:text-lg font-mono leading-relaxed focus-visible:ring-0 transition-colors placeholder:text-zinc-700 ${!showContent ? 'text-security-disc' : 'text-zinc-200'}`}
+                            className={`w-full h-full min-h-[350px] overflow-y-auto overscroll-contain bg-transparent border-0 resize-none p-6 text-base md:text-lg font-mono leading-relaxed focus-visible:ring-0 transition-colors placeholder:text-zinc-700 custom-scrollbar ${!showContent ? 'text-security-disc' : 'text-zinc-200'}`}
                             style={!showContent ? { WebkitTextSecurity: 'disc' } as any : {}}
                             placeholder={mode === 'draft' ? "Paste or type your sensitive text here..." : "Typing syncs instantly across connected devices..."}
                             value={content}
@@ -524,16 +515,7 @@ export default function UniversalClipboard() {
                             </div>
                         )}
 
-                        {/* Char Progress Bar */}
-                        {content.length > 0 && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-800/50">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${charPercentage}%` }}
-                                    className={`h-full transition-colors ${charPercentage > 90 ? 'bg-red-500' : charPercentage > 70 ? 'bg-amber-500' : 'bg-emerald-500/30'}`}
-                                />
-                            </div>
-                        )}
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-800/50" />
                     </div>
                 </motion.div>
 

@@ -78,8 +78,19 @@
   <!-- Google Fonts (Optimized) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
 
-  <!-- Privacy-respecting analytics -->
-  <script defer="" data-domain="vaultbridge.org" src="https://plausible.io/js/script.outbound-links.js"></script>
+  <!-- Privacy-respecting analytics (only on production domains) -->
+  <script>
+    (function () {
+      const analyticsHosts = new Set(["vaultbridge.org", "www.vaultbridge.org"]);
+      if (!analyticsHosts.has(window.location.hostname)) return;
+
+      const script = document.createElement("script");
+      script.defer = true;
+      script.setAttribute("data-domain", "vaultbridge.org");
+      script.src = "https://plausible.io/js/script.outbound-links.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 
   <!-- JSON-LD Structured Data: WebApplication -->
   <script type="application/ld+json">
@@ -239,9 +250,9 @@
   <!-- Preload Critical Assets -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-  <script type="module" crossorigin="" src="/assets/index-Bp-iVgYV.js"></script>
+  <script type="module" crossorigin="" src="/assets/index-CjvZq1Jz.js"></script>
   <link rel="stylesheet" crossorigin="" href="/assets/index-mQkNEeE1.css">
-<link rel="modulepreload" as="script" crossorigin="" href="/assets/privacy-BoTtqVFu.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/chevron-up-Doy9BICj.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/shield-check-DyT0YqmR.js"></head>
+<link rel="modulepreload" as="script" crossorigin="" href="/assets/privacy-BomJJRuv.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/chevron-up-BWHGQi3n.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/shield-check-m9zfrrXF.js"></head>
 
 <body>
   <!-- Noscript fallback for SEO -->
