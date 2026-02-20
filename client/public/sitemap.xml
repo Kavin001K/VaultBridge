@@ -5,64 +5,64 @@
   
   <!-- Homepage -->
   <url>
-    <loc>https://vaultbridge.io/</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   
   <!-- Upload & Encrypt -->
   <url>
-    <loc>https://vaultbridge.io/upload</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/upload</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   
   <!-- Access Vault -->
   <url>
-    <loc>https://vaultbridge.io/access</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/access</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <!-- Get it Mailed (Secure Email) -->
   <url>
-    <loc>https://vaultbridge.io/get-it-mailed</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/get-it-mailed</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <!-- Universal Clipboard -->
   <url>
-    <loc>https://vaultbridge.io/clipboard</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/clipboard</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   
   <!-- How It Works -->
   <url>
-    <loc>https://vaultbridge.io/how-it-works</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/how-it-works</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   
   <!-- Terms of Service -->
   <url>
-    <loc>https://vaultbridge.io/terms</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/terms</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   
   <!-- Privacy Policy -->
   <url>
-    <loc>https://vaultbridge.io/privacy</loc>
-    <lastmod>2026-02-18</lastmod>
+    <loc>https://vaultbridge.org/privacy</loc>
+    <lastmod>2026-02-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

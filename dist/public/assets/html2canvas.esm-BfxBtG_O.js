@@ -2326,7 +2326,7 @@ var qi = 1, Ur = 2, Fr = 3, Tt = 4, St = 5, ji = 7, Ot = 8, hr = 9, dr = 10, Mt 
         var i = (t = A.getContext("webgl2")) !== null && t !== void 0 ? t : A.getContext("webgl");
         if (i) {
           var a = i.getContextAttributes();
-          (a == null ? void 0 : a.preserveDrawingBuffer) === false && this.context.logger.warn("Unable to clone WebGL context as it has preserveDrawingBuffer=false", A);
+          a?.preserveDrawingBuffer === false && this.context.logger.warn("Unable to clone WebGL context as it has preserveDrawingBuffer=false", A);
         }
         s.drawImage(A, 0, 0);
       }

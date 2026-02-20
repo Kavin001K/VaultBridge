@@ -615,12 +615,24 @@ export default function DownloadPage() {
                     )}
                   </Button>
                   <p className="text-[10px] md:text-xs text-center text-muted-foreground mt-4 opacity-70">
-                    By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
                   </p>
                 </>
               )}
             </>
           )}
+        </div>
+
+        {/* Attribution Footer */}
+        <div className="mt-12 text-center pb-8 opacity-70 hover:opacity-100 transition-opacity">
+          <div className="inline-flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <p className="text-sm font-medium text-zinc-300">Securely shared via VaultBridge</p>
+            </div>
+            <a href="/" className="text-xs text-primary hover:underline hover:text-emerald-400 transition-colors font-mono">
+              Free encrypted file sharing
+            </a>
+          </div>
         </div>
       </div>
     </div>
