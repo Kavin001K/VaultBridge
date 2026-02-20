@@ -1074,6 +1074,7 @@ export default function AccessPage() {
                                                                 fileKey={fileKey!}
                                                                 wrappedKey={vaultData.wrappedKey}
                                                                 initialContent={clipboardContent}
+                                                                size="large"
                                                             />
                                                         </div>
                                                     )}

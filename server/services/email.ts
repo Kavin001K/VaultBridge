@@ -8,9 +8,26 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { log } from "../index";
+import { getEmailProvider, incrementEmailUsage, type EmailProvider } from "./emailQuota";
 
 // Resend Configuration
-const resend = new Resend(process.env.RESEND_API_KEY || "re_Cmka1787_2LURzpiKv1pMVXU3GwziPHny");
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+const SMTP_FROM_FALLBACK = "VaultBridge <delivery@acedigital.space>";
+
+function extractEmailFromFromHeader(fromValue?: string): string | null {
+  if (!fromValue) return null;
+  const angleMatch = fromValue.match(/<([^>]+)>/);
+  if (angleMatch?.[1]) return angleMatch[1].trim();
+  if (fromValue.includes("@")) return fromValue.trim();
+  return null;
+}
+
+const BREVO_SENDER_EMAIL =
+  process.env.SMTP_FROM_EMAIL ||
+  extractEmailFromFromHeader(process.env.SMTP_FROM) ||
+  "delivery@acedigital.space";
+const ENABLE_MSG91 = process.env.ENABLE_MSG91 === "true";
 
 // Rate limit tracking per vault
 const emailsSentPerVault: Map<string, number> = new Map();
@@ -481,14 +498,13 @@ export interface SendDirectEmailInput {
   }[];
 }
 
+export interface DirectEmailSendResult extends SendEmailResult {
+  provider?: "RESEND" | "BREVO" | "MSG91" | "SMTP";
+}
+
 // ============================================
 // VAULT ACCESS EMAIL
 // ============================================
-
-// ... imports
-import { getEmailProvider, incrementEmailUsage } from "./emailQuota";
-
-// ... existing code ...
 
 // ============================================
 // BREVO (BRAVO) API CLIENT
@@ -519,8 +535,7 @@ async function sendViaBrevo(input: BrevoEmailInput): Promise<{ success: boolean;
       body: JSON.stringify({
         sender: {
           name: input.senderName || "VaultBridge",
-          email: process.env.SMTP_FROM_EMAIL || "delivery@acedigital.space" // Extract email from "Name <email>" if needed, but Brevo prefers strict struct. 
-          // Note: SMTP_FROM usually is "Name <email>". Let's handle clean extraction or fallback.
+          email: BREVO_SENDER_EMAIL
         },
         to: [{ email: input.to }],
         replyTo: input.replyTo ? { email: input.replyTo } : undefined,
@@ -556,7 +571,8 @@ interface Msg91EmailInput {
 }
 
 async function sendViaMsg91(input: Msg91EmailInput): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  const authKey = process.env.MSG91_AUTH_KEY || "480091AbJuma92Ie692de24aP1";
+  const authKey = process.env.MSG91_AUTH_KEY;
+  if (!authKey) return { success: false, error: "MSG91 auth key missing" };
 
   try {
     // Construct payload for MSG91
@@ -625,12 +641,6 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
       return { success: false, error: "Invalid email address." };
     }
 
-    // Determine Provider
-    const provider = await getEmailProvider();
-    if (!provider) {
-      return { success: false, error: "Daily email limit reached. Please try again tomorrow." };
-    }
-
     const baseUrl = process.env.APP_URL || "https://vaultbridge.org";
     const accessLink = `${baseUrl}/access`;
     const displayCode = input.fullCode || input.shortCode;
@@ -687,63 +697,110 @@ ACCESS LINK: ${accessLink}
 Expires: ${expiryFormatted}
     `;
 
-    // SEND LOGIC
-    let result: SendEmailResult;
+    const preferredProvider = await getEmailProvider();
+    const providerOrder = getProviderOrder(preferredProvider, false);
+    const providerErrors: string[] = [];
+    const subjectLine = `🔐 ${input.senderName || "Someone"} shared encrypted files with you`;
 
-    if (provider === "RESEND") {
-      const { data, error } = await resend.emails.send({
-        from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-        to: [normalizedTo], // Use normalized lowercase email
-        replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
-        subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
-        text: textContent,
-        html,
-      });
+    for (const provider of providerOrder) {
+      if (provider === "RESEND") {
+        if (!resend) {
+          providerErrors.push("RESEND: Resend API key missing");
+          continue;
+        }
 
-      if (error) {
-        log(`Resend Error: ${error.message}`, "email");
-        // Failover to Brevo immediately if Resend fails? 
-        // The prompt says switch on LIMIT. But error handling is good.
-        // Let's strictly follow quota logic first to avoid double counting if error is not quota related.
-        return { success: false, error: error.message };
+        const { data, error } = await resend.emails.send({
+          from: process.env.SMTP_FROM || SMTP_FROM_FALLBACK,
+          to: [normalizedTo],
+          replyTo: process.env.CONTACT_EMAIL || "team@vaultbridge.org",
+          subject: subjectLine,
+          text: textContent,
+          html,
+        });
+
+        if (error) {
+          providerErrors.push(`RESEND: ${error.message}`);
+          continue;
+        }
+
+        await incrementEmailUsage("RESEND");
+        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+        log(`Vault email sent to ${normalizedTo} via RESEND`, "email");
+        return { success: true, messageId: data?.id };
       }
-      result = { success: true, messageId: data?.id };
-    } else if (provider === "BREVO") {
-      // BREVO
-      const res = await sendViaBrevo({
-        to: normalizedTo, // Use normalized lowercase email
-        subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
-        htmlContent: html,
-        textContent: textContent,
-        senderName: "VaultBridge",
-        replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com'
-      });
 
-      if (!res.success) {
-        return { success: false, error: res.error };
+      if (provider === "BREVO") {
+        if (!process.env.BRAVO_API_KEY) {
+          providerErrors.push("BREVO: Brevo API key missing");
+          continue;
+        }
+
+        const result = await sendViaBrevo({
+          to: normalizedTo,
+          subject: subjectLine,
+          htmlContent: html,
+          textContent: textContent,
+          senderName: "VaultBridge",
+          replyTo: process.env.CONTACT_EMAIL || "team@vaultbridge.org",
+        });
+
+        if (!result.success) {
+          providerErrors.push(`BREVO: ${result.error || "Unknown Brevo error"}`);
+          continue;
+        }
+
+        await incrementEmailUsage("BREVO");
+        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+        log(`Vault email sent to ${normalizedTo} via BREVO`, "email");
+        return { success: true, messageId: result.messageId };
       }
-      result = { success: true, messageId: res.messageId };
-    } else {
-      // MSG91
-      const res = await sendViaMsg91({
+
+      if (!ENABLE_MSG91 || !process.env.MSG91_AUTH_KEY) {
+        providerErrors.push("MSG91: disabled or auth key missing");
+        continue;
+      }
+
+      const result = await sendViaMsg91({
         to: normalizedTo,
-        subject: `🔐 ${input.senderName || "Someone"} shared encrypted files with you`,
-        htmlContent: html, // Sending full HTML
-        senderName: "VaultBridge"
+        subject: subjectLine,
+        htmlContent: html,
+        senderName: "VaultBridge",
       });
 
-      if (!res.success) {
-        return { success: false, error: res.error };
+      if (!result.success) {
+        providerErrors.push(`MSG91: ${result.error || "Unknown MSG91 error"}`);
+        continue;
       }
-      result = { success: true, messageId: res.messageId };
+
+      await incrementEmailUsage("MSG91");
+      emailsSentPerVault.set(input.vaultId, sentCount + 1);
+      log(`Vault email sent to ${normalizedTo} via MSG91`, "email");
+      return { success: true, messageId: result.messageId };
     }
 
-    // Update Quota and Limit
-    await incrementEmailUsage(provider);
-    emailsSentPerVault.set(input.vaultId, sentCount + 1);
-    log(`Vault email sent to ${normalizedTo} via ${provider}`, "email");
+    const shouldTrySmtpFallback = process.env.NODE_ENV !== "production" || Boolean(process.env.SMTP_HOST);
+    if (shouldTrySmtpFallback) {
+      const smtpResult = await sendViaSmtpFallback({
+        to: normalizedTo,
+        subject: subjectLine,
+        text: textContent,
+        html,
+        files: [],
+      });
 
-    return result;
+      if (smtpResult.success) {
+        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+        log(`Vault email sent to ${normalizedTo} via SMTP fallback`, "email");
+        return smtpResult;
+      }
+
+      providerErrors.push(`SMTP: ${smtpResult.error || "Unknown SMTP error"}`);
+    }
+
+    return {
+      success: false,
+      error: providerErrors[0] || "No email providers are available. Configure RESEND_API_KEY or BRAVO_API_KEY.",
+    };
 
   } catch (error) {
     log(`Failed to send vault email: ${error}`, "email");
@@ -755,40 +812,88 @@ Expires: ${expiryFormatted}
 // DIRECT ATTACHMENT EMAIL (Zero-Knowledge Relay)
 // ============================================
 
-export async function sendDirectAttachment(input: SendDirectEmailInput): Promise<boolean> {
+const BREVO_UNSUPPORTED_EXTENSIONS = new Set([
+  "json", "yml", "yaml", "xml", "toml", "ini", "cfg", "conf",
+  "js", "ts", "jsx", "tsx", "py", "rb", "go", "rs", "java", "c", "cpp", "h", "hpp",
+  "sh", "bash", "zsh", "ps1", "bat", "cmd",
+  "sql", "graphql", "prisma",
+  "env", "lock", "log", "md", "mdx", "rst", "tex",
+  "wasm", "map", "min",
+]);
+
+function getProviderOrder(
+  preferredProvider: EmailProvider,
+  hasUnsupportedForBrevo: boolean
+): Array<Exclude<EmailProvider, null>> {
+  const ordered: Array<Exclude<EmailProvider, null>> = [];
+  const availableProviders = (ENABLE_MSG91
+    ? ["BREVO", "RESEND", "MSG91"]
+    : ["BREVO", "RESEND"]) as Array<Exclude<EmailProvider, null>>;
+
+  if (preferredProvider) {
+    ordered.push(preferredProvider);
+  }
+
+  for (const provider of availableProviders) {
+    if (!ordered.includes(provider)) {
+      ordered.push(provider);
+    }
+  }
+
+  return hasUnsupportedForBrevo
+    ? ordered.filter((provider) => provider !== "BREVO")
+    : ordered;
+}
+
+async function sendViaSmtpFallback(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  files: { filename: string; content: Buffer }[];
+}): Promise<SendEmailResult> {
   try {
-    // Normalize email to lowercase for case-insensitive handling
+    const smtp = await getTransporter();
+    const info = await smtp.sendMail({
+      from: process.env.SMTP_FROM || SMTP_FROM_FALLBACK,
+      to: input.to,
+      replyTo: process.env.CONTACT_EMAIL || "team@vaultbridge.org",
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+      attachments: input.files.map((file) => ({
+        filename: file.filename,
+        content: file.content,
+      })),
+    });
+
+    const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
+    if (previewUrl) {
+      log(`Direct email preview URL: ${previewUrl}`, "email");
+    }
+
+    return {
+      success: true,
+      messageId: typeof info.messageId === "string" ? info.messageId : undefined,
+      previewUrl,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "SMTP delivery failed",
+    };
+  }
+}
+
+export async function sendDirectAttachment(input: SendDirectEmailInput): Promise<DirectEmailSendResult> {
+  try {
     const normalizedTo = input.to.trim().toLowerCase();
     const { subject, text, files } = input;
 
-    // File extensions that Brevo doesn't support - force fallback to Resend
-    const brevoUnsupportedExtensions = [
-      'json', 'yml', 'yaml', 'xml', 'toml', 'ini', 'cfg', 'conf',
-      'js', 'ts', 'jsx', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp',
-      'sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd',
-      'sql', 'graphql', 'prisma',
-      'env', 'lock', 'log', 'md', 'mdx', 'rst', 'tex',
-      'wasm', 'map', 'min'
-    ];
-
-    // Check if any files have unsupported extensions for Brevo
-    const hasUnsupportedForBrevo = files.some(f => {
-      const ext = f.filename.split('.').pop()?.toLowerCase() || '';
-      return brevoUnsupportedExtensions.includes(ext);
+    const hasUnsupportedForBrevo = files.some((file) => {
+      const extension = file.filename.split(".").pop()?.toLowerCase() || "";
+      return BREVO_UNSUPPORTED_EXTENSIONS.has(extension);
     });
-
-    // Determine Provider - force Resend if files contain Brevo-unsupported types
-    let provider = await getEmailProvider();
-    if (!provider) {
-      log(`Direct email blocked: Quota exceeded`, "email");
-      return false;
-    }
-
-    // Override to Resend if Brevo can't handle these file types
-    if (provider === "BREVO" && hasUnsupportedForBrevo) {
-      log(`Brevo doesn't support some file types, trying Resend instead`, "email");
-      provider = "RESEND"; // Force Resend for unsupported file types
-    }
 
     const totalSize = files.reduce((acc, f) => acc + f.content.length, 0);
     const formatSize = (bytes: number) => {
@@ -797,11 +902,8 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
       return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
 
-    // Helper to determine file type and get inline styles for icon background
     const getFileTypeInfo = (filename: string) => {
       const ext = filename.split('.').pop()?.toLowerCase() || '';
-
-      // Icon backgrounds by file type (inline styles for email compatibility)
       const iconStyles = {
         pdf: 'background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);',
         doc: 'background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);',
@@ -814,39 +916,16 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
         default: 'background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);'
       };
 
-      // PDF files
-      if (ext === 'pdf') {
-        return { bgStyle: iconStyles.pdf, type: 'PDF', emoji: '📕' };
-      }
-      // Documents  
-      if (['doc', 'docx', 'rtf', 'odt', 'txt'].includes(ext)) {
-        return { bgStyle: iconStyles.doc, type: ext.toUpperCase(), emoji: '📘' };
-      }
-      // Images
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'heic'].includes(ext)) {
-        return { bgStyle: iconStyles.image, type: ext.toUpperCase(), emoji: '🖼️' };
-      }
-      // Videos
-      if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'].includes(ext)) {
-        return { bgStyle: iconStyles.video, type: ext.toUpperCase(), emoji: '🎬' };
-      }
-      // Audio
-      if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'].includes(ext)) {
-        return { bgStyle: iconStyles.audio, type: ext.toUpperCase(), emoji: '🎵' };
-      }
-      // Archives
-      if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) {
-        return { bgStyle: iconStyles.archive, type: ext.toUpperCase(), emoji: '📦' };
-      }
-      // Code files
+      if (ext === 'pdf') return { bgStyle: iconStyles.pdf, type: 'PDF', emoji: '📕' };
+      if (['doc', 'docx', 'rtf', 'odt', 'txt'].includes(ext)) return { bgStyle: iconStyles.doc, type: ext.toUpperCase(), emoji: '📘' };
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'heic'].includes(ext)) return { bgStyle: iconStyles.image, type: ext.toUpperCase(), emoji: '🖼️' };
+      if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'].includes(ext)) return { bgStyle: iconStyles.video, type: ext.toUpperCase(), emoji: '🎬' };
+      if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'].includes(ext)) return { bgStyle: iconStyles.audio, type: ext.toUpperCase(), emoji: '🎵' };
+      if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) return { bgStyle: iconStyles.archive, type: ext.toUpperCase(), emoji: '📦' };
       if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'html', 'css', 'json', 'xml', 'sql', 'php', 'rb', 'go', 'rs', 'swift'].includes(ext)) {
         return { bgStyle: iconStyles.code, type: ext.toUpperCase(), emoji: '💻' };
       }
-      // Spreadsheets
-      if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) {
-        return { bgStyle: iconStyles.spreadsheet, type: ext.toUpperCase(), emoji: '📊' };
-      }
-      // Default
+      if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return { bgStyle: iconStyles.spreadsheet, type: ext.toUpperCase(), emoji: '📊' };
       return { bgStyle: iconStyles.default, type: ext ? ext.toUpperCase() : 'FILE', emoji: '📄' };
     };
 
@@ -946,69 +1025,125 @@ ATTACHMENTS:
 ${files.map(f => `• ${f.filename}`).join('\n')}
     `;
 
-    if (provider === "RESEND") {
-      const data = await resend.emails.send({
-        from: process.env.SMTP_FROM || 'VaultBridge <delivery@acedigital.space>',
-        to: [normalizedTo], // Use normalized lowercase email
-        replyTo: process.env.CONTACT_EMAIL || 'kavinbalaji365@icloud.com',
-        subject: `📬 ${subject}`,
-        text: textPayload,
-        html,
-        attachments: files,
-      });
+    const preferredProvider = await getEmailProvider();
+    const providerOrder = getProviderOrder(preferredProvider, hasUnsupportedForBrevo);
+    const providerErrors: string[] = [];
 
-      if (data.error) {
-        log(`Resend Error (Direct): ${data.error.message}`, "email");
-        return false;
+    for (const provider of providerOrder) {
+      if (provider === "RESEND" && !resend) {
+        providerErrors.push("RESEND: Resend API key missing");
+        continue;
       }
-    } else if (provider === "BREVO") {
-      // PREVO
-      // Prepare attachments for Brevo (Base64)
-      const brevoAttachments = files.map(f => ({
-        name: f.filename,
-        content: f.content.toString('base64')
+      if (provider === "BREVO" && !process.env.BRAVO_API_KEY) {
+        providerErrors.push("BREVO: Brevo API key missing");
+        continue;
+      }
+      if (provider === "MSG91" && (!ENABLE_MSG91 || !process.env.MSG91_AUTH_KEY)) {
+        providerErrors.push("MSG91: disabled or auth key missing");
+        continue;
+      }
+
+      if (provider === "RESEND") {
+        const data = await resend!.emails.send({
+          from: process.env.SMTP_FROM || SMTP_FROM_FALLBACK,
+          to: [normalizedTo],
+          replyTo: process.env.CONTACT_EMAIL || "team@vaultbridge.org",
+          subject: `📬 ${subject}`,
+          text: textPayload,
+          html,
+          attachments: files,
+        });
+
+        if (data.error) {
+          providerErrors.push(`RESEND: ${data.error.message}`);
+          continue;
+        }
+
+        await incrementEmailUsage("RESEND");
+        log(`Direct email sent to ${normalizedTo} via RESEND`, "email");
+        return { success: true, provider: "RESEND", messageId: data.data?.id };
+      }
+
+      if (provider === "BREVO") {
+        const brevoAttachments = files.map((file) => ({
+          name: file.filename,
+          content: file.content.toString("base64"),
+        }));
+
+        const result = await sendViaBrevo({
+          to: normalizedTo,
+          subject: `📬 ${subject}`,
+          htmlContent: html,
+          textContent: textPayload,
+          senderName: "VaultBridge",
+          attachments: brevoAttachments,
+          replyTo: process.env.CONTACT_EMAIL || "team@vaultbridge.org",
+        });
+
+        if (!result.success) {
+          providerErrors.push(`BREVO: ${result.error || "Unknown Brevo error"}`);
+          continue;
+        }
+
+        await incrementEmailUsage("BREVO");
+        log(`Direct email sent to ${normalizedTo} via BREVO`, "email");
+        return { success: true, provider: "BREVO", messageId: result.messageId };
+      }
+
+      const msg91Attachments = files.map((file) => ({
+        name: file.filename,
+        content: file.content.toString("base64"),
       }));
 
-      const res = await sendViaBrevo({
-        to: normalizedTo, // Use normalized lowercase email
-        subject: `📬 ${subject}`,
-        htmlContent: html,
-        textContent: textPayload,
-        senderName: "VaultBridge",
-        attachments: brevoAttachments
-      });
-
-      if (!res.success) {
-        log(`Brevo Error (Direct): ${res.error}`, "email");
-        return false;
-      }
-    } else {
-      // MSG91
-      const msg91Attachments = files.map(f => ({
-        name: f.filename,
-        content: f.content.toString('base64')
-      }));
-
-      const res = await sendViaMsg91({
+      const result = await sendViaMsg91({
         to: normalizedTo,
         subject: `📬 ${subject}`,
         htmlContent: html,
         senderName: "VaultBridge",
-        attachments: msg91Attachments
+        attachments: msg91Attachments,
       });
 
-      if (!res.success) {
-        log(`MSG91 Error (Direct): ${res.error}`, "email");
-        return false;
+      if (!result.success) {
+        providerErrors.push(`MSG91: ${result.error || "Unknown MSG91 error"}`);
+        continue;
       }
+
+      await incrementEmailUsage("MSG91");
+      log(`Direct email sent to ${normalizedTo} via MSG91`, "email");
+      return { success: true, provider: "MSG91", messageId: result.messageId };
     }
 
-    await incrementEmailUsage(provider);
-    log(`Direct email sent to ${normalizedTo} via ${provider}`, "email");
-    return true;
+    const shouldTrySmtpFallback = process.env.NODE_ENV !== "production" || Boolean(process.env.SMTP_HOST);
+    if (shouldTrySmtpFallback) {
+      const smtpResult = await sendViaSmtpFallback({
+        to: normalizedTo,
+        subject: `📬 ${subject}`,
+        text: textPayload,
+        html,
+        files,
+      });
+
+      if (smtpResult.success) {
+        log(`Direct email sent to ${normalizedTo} via SMTP fallback`, "email");
+        return {
+          success: true,
+          provider: "SMTP",
+          messageId: smtpResult.messageId,
+          previewUrl: smtpResult.previewUrl,
+        };
+      }
+
+      providerErrors.push(`SMTP: ${smtpResult.error || "Unknown SMTP error"}`);
+    }
+
+    const errorMessage =
+      providerErrors[0] || "No email providers are available. Configure at least one provider key.";
+    log(`Failed to send direct email to ${normalizedTo}: ${errorMessage}`, "email");
+    return { success: false, error: errorMessage };
   } catch (error) {
-    log(`Failed to send direct email: ${error}`, "email");
-    return false;
+    const errorMessage = error instanceof Error ? error.message : "Failed to send direct email";
+    log(`Failed to send direct email: ${errorMessage}`, "email");
+    return { success: false, error: errorMessage };
   }
 }
 

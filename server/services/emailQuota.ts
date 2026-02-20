@@ -9,6 +9,7 @@ import path from "path";
 const RESEND_DAILY_LIMIT = 100;
 const BREVO_DAILY_LIMIT = 300;
 const MSG91_DAILY_LIMIT = 500;
+const ENABLE_MSG91 = process.env.ENABLE_MSG91 === "true";
 
 const FALLBACK_FILE_PATH = path.join(process.cwd(), "storage_data", "email_usage.json");
 
@@ -23,26 +24,32 @@ export type EmailProvider = "RESEND" | "BREVO" | "MSG91" | null;
 
 /**
  * Get current usage and determine which provider to use.
- * Priority: BREVO (300/day) -> RESEND (100/day) -> MSG91 (500/day)
+ * Priority: BREVO (300/day) -> RESEND (100/day) -> MSG91 (500/day, optional)
  */
 export async function getEmailProvider(): Promise<EmailProvider> {
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
     const usage = await getUsage(today);
+    const hasBrevo = Boolean(process.env.BRAVO_API_KEY);
+    const hasResend = Boolean(process.env.RESEND_API_KEY);
+    const hasMsg91 = ENABLE_MSG91 && Boolean(process.env.MSG91_AUTH_KEY);
 
-    // 1. Primary: Bravo (Brevo) - 300 emails/day
-    if (usage.brevo < BREVO_DAILY_LIMIT) {
+    // 1. Primary: Brevo - 300 emails/day
+    if (hasBrevo && usage.brevo < BREVO_DAILY_LIMIT) {
         return "BREVO";
     }
     // 2. Secondary: Resend - 100 emails/day
-    else if (usage.resend < RESEND_DAILY_LIMIT) {
+    else if (hasResend && usage.resend < RESEND_DAILY_LIMIT) {
         return "RESEND";
     }
-    // 3. Tertiary: MSG91 - 500 emails/day (as requested, use last)
-    else if (usage.msg91 < MSG91_DAILY_LIMIT) {
+    // 3. Optional fallback: MSG91 - disabled unless explicitly enabled
+    else if (hasMsg91 && usage.msg91 < MSG91_DAILY_LIMIT) {
         return "MSG91";
     }
     else {
-        log(`[EmailQuota] ALL email quotas exceeded for today (Brevo: ${usage.brevo}, Resend: ${usage.resend}, MSG91: ${usage.msg91}).`, "email");
+        log(
+          `[EmailQuota] No available email provider. Quota usage (Brevo: ${usage.brevo}/${BREVO_DAILY_LIMIT}, Resend: ${usage.resend}/${RESEND_DAILY_LIMIT}, MSG91: ${usage.msg91}/${MSG91_DAILY_LIMIT}, msg91Enabled: ${ENABLE_MSG91}).`,
+          "email"
+        );
         return null;
     }
 }
