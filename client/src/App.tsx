@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSEO } from "@/components/SEO";
+import { generateSEOPages } from "@shared/seo-generator";
 
 import ClipboardPage from "@/pages/clipboard";
 
@@ -66,12 +67,12 @@ function Router() {
       <Route path="/security" component={Security} />
       <Route path="/privacy-manifesto" component={PrivacyManifesto} />
       <Route path="/roadmap" component={Roadmap} />
-      <Route path="/secure-file-sharing-free" component={SEOLandingPage} />
-      <Route path="/encrypted-file-transfer" component={SEOLandingPage} />
-      <Route path="/private-file-sharing" component={SEOLandingPage} />
-      <Route path="/anonymous-file-sharing" component={SEOLandingPage} />
-      <Route path="/free-encrypted-upload" component={SEOLandingPage} />
-      <Route path="/send-files-securely" component={SEOLandingPage} />
+
+      {/* Programmatically Generated SEO Routes */}
+      {Object.keys(generateSEOPages()).map((slug) => (
+        <Route key={slug} path={slug} component={SEOLandingPage} />
+      ))}
+
       <Route component={NotFound} />
     </Switch>
   );
