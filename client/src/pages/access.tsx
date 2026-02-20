@@ -36,7 +36,8 @@ interface FileDownloadState {
     isExhausted: boolean;
 }
 
-const RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
+const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
+const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
 const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
 
 const normalizeVaultPath = (pathname: string) =>
@@ -220,6 +221,7 @@ export default function AccessPage() {
         const cleanInput = rawInput.trim();
         if (cleanInput) {
             localStorage.setItem(RECENT_VAULT_STORAGE_KEY, cleanInput);
+            localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, cleanInput);
             setRecentVaultLink(cleanInput);
         }
 
@@ -266,7 +268,9 @@ export default function AccessPage() {
     useEffect(() => {
         const fromQuery = new URLSearchParams(window.location.search).get("code");
         const fromHash = new URLSearchParams(window.location.hash.replace("#", "")).get("code");
-        const fromRecent = localStorage.getItem(RECENT_VAULT_STORAGE_KEY);
+        const fromRecent =
+            localStorage.getItem(RECENT_VAULT_STORAGE_KEY) ||
+            localStorage.getItem(LEGACY_RECENT_VAULT_STORAGE_KEY);
         const preloadCode = extractAccessCode(fromQuery) || extractAccessCode(fromHash) || extractAccessCode(fromRecent);
 
         if (preloadCode) {
@@ -288,6 +292,11 @@ export default function AccessPage() {
             });
             return;
         }
+
+        const recentAccessValue = `/access?code=${cleanCode}`;
+        localStorage.setItem(RECENT_VAULT_STORAGE_KEY, recentAccessValue);
+        localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, recentAccessValue);
+        setRecentVaultLink(recentAccessValue);
 
         setStage("fetching");
         setStatusText("Looking up vault...");
