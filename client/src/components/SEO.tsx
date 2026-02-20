@@ -16,7 +16,7 @@ const defaultSEO = {
     description: 'Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, direct email relay, encrypted clipboard, zero-knowledge privacy. No account required. Free & open source.',
     keywords: 'secure file transfer, encrypted file sharing, end-to-end encryption, privacy, self-destructing links, zero knowledge, AES-256, anonymous file sharing, encrypted email, secure clipboard',
     image: '/og-image.png',
-    url: 'https://vaultbridge.io',
+    url: 'https://vaultbridge.org',
     type: 'website',
 };
 

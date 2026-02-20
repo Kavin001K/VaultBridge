@@ -631,7 +631,7 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
       return { success: false, error: "Daily email limit reached. Please try again tomorrow." };
     }
 
-    const baseUrl = process.env.APP_URL || "https://vaultbridge.io";
+    const baseUrl = process.env.APP_URL || "https://vaultbridge.org";
     const accessLink = `${baseUrl}/access`;
     const displayCode = input.fullCode || input.shortCode;
 

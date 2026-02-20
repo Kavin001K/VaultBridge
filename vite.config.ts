@@ -13,7 +13,7 @@ export default defineConfig({
   plugins: [
     react(),
     wasm(),
-    topLevelAwait()
+    topLevelAwait(),
   ],
   resolve: {
     alias: {
@@ -26,6 +26,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    target: "safari14",
   },
   server: {
     host: "0.0.0.0",
