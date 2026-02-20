@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -8,13 +8,22 @@ import {
   ServerOff, Globe, Users, Code, Building, GraduationCap, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useSounds } from "@/hooks/useSounds";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
 const hoverSpring = { type: "spring", stiffness: 300, damping: 20 };
-const RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
+const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
+const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
 const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
 
 const normalizeVaultPath = (pathname: string) =>
@@ -39,6 +48,12 @@ export default function Home() {
   const [recentVault, setRecentVault] = useState<string | null>(null);
   const [clipboardVault, setClipboardVault] = useState<string | null>(null);
   const [showClipboardPrompt, setShowClipboardPrompt] = useState(false);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null);
+  const [isRecoverySending, setIsRecoverySending] = useState(false);
+  const vaultAccessPanelRef = useRef<HTMLDivElement | null>(null);
+  const vaultInputRef = useRef<HTMLInputElement | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -55,11 +70,40 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const stored = localStorage.getItem(RECENT_VAULT_STORAGE_KEY);
+    const stored =
+      localStorage.getItem(RECENT_VAULT_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_RECENT_VAULT_STORAGE_KEY);
     if (stored) {
       setRecentVault(stored);
     }
   }, []);
+
+  const extractAccessCode = (value: string | null): string | null => {
+    if (!value) return null;
+    const direct = value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (direct.length === 6) return direct;
+
+    try {
+      const parsed = value.startsWith("http")
+        ? new URL(value)
+        : new URL(value, window.location.origin);
+      const queryCode = parsed.searchParams.get("code");
+      if (queryCode) {
+        const cleaned = queryCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        if (cleaned.length === 6) return cleaned;
+      }
+      const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
+      const hashCode = new URLSearchParams(hash).get("code");
+      if (hashCode) {
+        const cleaned = hashCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        if (cleaned.length === 6) return cleaned;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  };
 
   const normalizeVaultDestination = (rawInput: string): string | null => {
     const trimmed = rawInput.trim();
@@ -100,6 +144,7 @@ export default function Home() {
 
   const saveRecentVault = (value: string) => {
     localStorage.setItem(RECENT_VAULT_STORAGE_KEY, value);
+    localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, value);
     setRecentVault(value);
   };
 
@@ -127,6 +172,57 @@ export default function Home() {
     }
 
     setLocation(destination);
+  };
+
+  const focusVaultAccess = () => {
+    vaultAccessPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => vaultInputRef.current?.focus(), 220);
+  };
+
+  const handleSendRecovery = async () => {
+    const email = recoveryEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setRecoveryStatus("Enter a valid email address.");
+      return;
+    }
+
+    const codeCandidate = extractAccessCode(vaultInput) || extractAccessCode(recentVault) || extractAccessCode(clipboardVault);
+    if (!codeCandidate) {
+      setRecoveryStatus("Paste your vault code or link first, then try recovery.");
+      return;
+    }
+
+    setIsRecoverySending(true);
+    setRecoveryStatus(null);
+
+    try {
+      const lookupId = codeCandidate.slice(0, 3);
+      const lookupRes = await fetch(`/api/vault/code/${lookupId}`);
+      const lookupData = await lookupRes.json();
+      if (!lookupRes.ok || !lookupData?.id) {
+        throw new Error("Vault lookup failed");
+      }
+
+      const emailRes = await fetch(`/api/vaults/${lookupData.id}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: email,
+          fullCode: codeCandidate,
+        }),
+      });
+      const emailData = await emailRes.json();
+      if (!emailRes.ok || !emailData?.success) {
+        throw new Error(emailData?.message || "Unable to send recovery email");
+      }
+
+      setRecoveryStatus("Recovery link sent. Check your inbox and spam folder.");
+      setRecoveryEmail("");
+    } catch (error) {
+      setRecoveryStatus(error instanceof Error ? error.message : "Recovery failed. Please try again.");
+    } finally {
+      setIsRecoverySending(false);
+    }
   };
 
   const handlePasteFromClipboard = async () => {
@@ -206,7 +302,7 @@ export default function Home() {
               size="sm"
               variant="outline"
               className="rounded-full border-zinc-700 bg-zinc-900/50 px-5 text-zinc-200 hover:border-primary/60 hover:bg-zinc-900"
-              onClick={() => setLocation('/access')}
+              onClick={focusVaultAccess}
             >
               Access Vault
             </Button>
@@ -292,20 +388,31 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="mt-6 w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 text-left backdrop-blur-sm sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Vault Access</p>
-              <p className="mt-1 text-sm text-zinc-400">Paste a vault link or 6-character access code.</p>
+            <div
+              ref={vaultAccessPanelRef}
+              className="mt-6 w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-left backdrop-blur-sm sm:p-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Vault Access</p>
+                  <p className="mt-1 text-sm text-zinc-400">Unified retrieval: clipboard, recent vault, email recovery, and manual paste.</p>
+                </div>
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
+                  Unified Retrieval
+                </span>
+              </div>
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <input
+                <Input
+                  ref={vaultInputRef}
                   type="text"
                   value={vaultInput}
                   onChange={(event) => {
                     setVaultInput(event.target.value);
                     if (vaultInputError) setVaultInputError(null);
                   }}
-                  placeholder="https://vaultbridge.org/access or ABC123"
-                  className="h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950/70 px-4 text-sm text-zinc-200 outline-none transition-colors placeholder:text-zinc-500 focus:border-primary/60"
+                  placeholder="Paste vault link or code (example: ABC123)"
+                  className="h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-500 focus-visible:ring-primary/40"
                 />
                 <Button
                   type="button"
@@ -336,6 +443,16 @@ export default function Home() {
                     Open Recent Vault
                   </Button>
                 )}
+                <button
+                  type="button"
+                  className="h-9 rounded-lg px-3 text-xs font-semibold text-cyan-300 transition-colors hover:bg-zinc-800/80 hover:text-cyan-200"
+                  onClick={() => {
+                    setRecoveryStatus(null);
+                    setShowRecoveryDialog(true);
+                  }}
+                >
+                  Didn&apos;t save your link? Recover via email
+                </button>
               </div>
 
               {recentVault && (
@@ -344,6 +461,48 @@ export default function Home() {
               {vaultInputError && (
                 <p className="mt-2 text-xs text-rose-400">{vaultInputError}</p>
               )}
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">Get It Mailed</p>
+                      <p className="mt-1 text-xs text-zinc-400">Send secure vault access details to your email for recovery and handoff.</p>
+                    </div>
+                    <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-cyan-300">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 h-9 w-full rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:bg-zinc-800"
+                    onClick={() => setLocation("/get-it-mailed")}
+                  >
+                    Open Get It Mailed
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">Secure Clipboard</p>
+                      <p className="mt-1 text-xs text-zinc-400">Use encrypted clipboard sync for one-tap cross-device vault retrieval.</p>
+                    </div>
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-300">
+                      <Clipboard className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 h-9 w-full rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:bg-zinc-800"
+                    onClick={() => setLocation("/clipboard")}
+                  >
+                    Open Clipboard
+                  </Button>
+                </div>
+              </div>
             </div>
 
             <Link href="/how-it-works">
@@ -710,6 +869,42 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <Dialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+          <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-left">Recover Vault via Email</DialogTitle>
+              <DialogDescription className="text-left text-zinc-400">
+                Enter your email. VaultBridge will send access details using your latest code/link context.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                type="email"
+                value={recoveryEmail}
+                onChange={(event) => {
+                  setRecoveryEmail(event.target.value);
+                  if (recoveryStatus) setRecoveryStatus(null);
+                }}
+                placeholder="you@example.com"
+                className="h-11 border-zinc-700 bg-zinc-900/70 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-primary/40"
+              />
+              <Button
+                type="button"
+                className="h-11 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                disabled={isRecoverySending}
+                onClick={handleSendRecovery}
+              >
+                {isRecoverySending ? "Sending..." : "Send Recovery Link"}
+              </Button>
+              {recoveryStatus && (
+                <p className={`text-xs ${recoveryStatus.includes("sent") ? "text-emerald-400" : "text-rose-400"}`}>
+                  {recoveryStatus}
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </main>
 
