@@ -66,5 +66,67 @@
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
+
+  <!-- Security Architecture -->
+  <url>
+    <loc>https://vaultbridge.org/security</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Privacy Manifesto -->
+  <url>
+    <loc>https://vaultbridge.org/privacy-manifesto</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Public Roadmap -->
+  <url>
+    <loc>https://vaultbridge.org/roadmap</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Programmatic SEO Pages -->
+  <url>
+    <loc>https://vaultbridge.org/secure-file-sharing-free</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/encrypted-file-transfer</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/private-file-sharing</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/anonymous-file-sharing</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/free-encrypted-upload</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/send-files-securely</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
   
 </urlset>

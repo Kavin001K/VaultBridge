@@ -432,7 +432,7 @@ const getEmailStyles = () => `
 
 const getEmailHeader = () => `
   <div class="header">
-    <img src="https://vault.kavin.cyou/vault-logo.jpg" alt="VaultBridge" style="width: 64px; height: 64px; border-radius: 16px; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;">
+    <img src="https://vaultbridge.org/og-image.png" alt="VaultBridge" style="width: 64px; height: 64px; border-radius: 16px; margin-bottom: 16px; display: block; margin-left: auto; margin-right: auto;">
     <div class="logo">
       <span class="logo-vault">VAULT</span><span class="logo-bridge">BRIDGE</span>
     </div>

@@ -95,6 +95,69 @@ export const pageSEO: Record<string, Partial<SEOConfig>> = {
     keywords:
       "how encryption works, AES-256 explained, zero knowledge architecture, secure file sharing explained, self-destructing vaults, split-key encryption",
   },
+  "/security": {
+    title: "Security Architecture | VaultBridge",
+    description:
+      "Technical security architecture for VaultBridge: encryption model, key flow, file lifecycle, and auto-destruct logic.",
+    keywords:
+      "vaultbridge security architecture, client-side encryption, zero-knowledge file sharing, file lifecycle security, auto-destruct logic",
+  },
+  "/privacy-manifesto": {
+    title: "Privacy Manifesto | VaultBridge",
+    description:
+      "Why VaultBridge exists: privacy-first architecture, minimal data collection, and user-controlled secure transfer.",
+    keywords:
+      "privacy manifesto, privacy-first file sharing, zero tracking philosophy, user controlled security",
+  },
+  "/roadmap": {
+    title: "Public Roadmap | VaultBridge",
+    description:
+      "Transparent roadmap for VaultBridge: upcoming security, privacy, and product milestones.",
+    keywords:
+      "vaultbridge roadmap, secure file sharing roadmap, privacy product roadmap",
+  },
+  "/secure-file-sharing-free": {
+    title: "Secure File Sharing Free | VaultBridge",
+    description:
+      "Secure file sharing without login, tracking, or permanent storage. Encrypted transfers with temporary lifecycle controls.",
+    keywords:
+      "secure file sharing free, private file sharing, no login file sharing, encrypted secure link sharing",
+  },
+  "/encrypted-file-transfer": {
+    title: "Encrypted File Transfer | VaultBridge",
+    description:
+      "Encrypted file transfer with temporary storage and secure access. Built for privacy-conscious sharing.",
+    keywords:
+      "encrypted file transfer, secure transfer links, privacy file transfer, zero tracking file sharing",
+  },
+  "/private-file-sharing": {
+    title: "Private File Sharing | VaultBridge",
+    description:
+      "Private file sharing for teams and individuals who need secure, temporary, encrypted delivery.",
+    keywords:
+      "private file sharing, confidential file transfer, encrypted private upload, secure temporary file storage",
+  },
+  "/anonymous-file-sharing": {
+    title: "Anonymous File Sharing | VaultBridge",
+    description:
+      "Share files anonymously with encrypted transfer and temporary retention controls.",
+    keywords:
+      "anonymous file sharing, no account file sharing, anonymous encrypted sharing, privacy sharing tool",
+  },
+  "/free-encrypted-upload": {
+    title: "Free Encrypted Upload | VaultBridge",
+    description:
+      "Free encrypted upload flow for secure sharing without account friction.",
+    keywords:
+      "free encrypted upload, secure encrypted upload, no login encrypted transfer, privacy-first upload",
+  },
+  "/send-files-securely": {
+    title: "Send Files Securely | VaultBridge",
+    description:
+      "Send files securely with encrypted transfer, temporary vault lifecycle, and zero tracking defaults.",
+    keywords:
+      "send files securely, secure file transfer, encrypted link sharing, temporary secure vault",
+  },
 };
 
 // Public routes safe to pre-render and expose to crawlers
@@ -107,6 +170,15 @@ export const publicRoutesForPreRender = [
   "/how-it-works",
   "/terms",
   "/privacy",
+  "/security",
+  "/privacy-manifesto",
+  "/roadmap",
+  "/secure-file-sharing-free",
+  "/encrypted-file-transfer",
+  "/private-file-sharing",
+  "/anonymous-file-sharing",
+  "/free-encrypted-upload",
+  "/send-files-securely",
 ];
 
 export function resolveSEO(

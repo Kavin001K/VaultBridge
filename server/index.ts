@@ -33,7 +33,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // For Vite HMR in dev
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io"], // For Vite HMR in dev
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
@@ -41,6 +41,7 @@ app.use(
           "'self'",
           "ws:",
           "wss:",
+          "https://plausible.io",
           process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
           "https://*.r2.cloudflarestorage.com",
           "https://*.cloudflarestorage.com",

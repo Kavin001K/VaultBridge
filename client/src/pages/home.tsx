@@ -66,7 +66,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-              <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+              <img src="/og-image.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-bold font-mono tracking-tight">VAULT<span className="text-primary">BRIDGE</span></h1>
@@ -136,6 +136,11 @@ export default function Home() {
             <p className="text-lg sm:text-xl md:text-2xl text-zinc-400 max-w-3xl mb-10 leading-relaxed">
               Send files securely without login. Private, encrypted, and instant. Your files are encrypted in your browser before they ever leave your device.
             </p>
+
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-zinc-200">
+              <Users className="h-4 w-4 text-primary" />
+              Trusted by 1,248+ privacy-conscious users
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
               <Link href="/upload">
@@ -469,7 +474,7 @@ export default function Home() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
-                <img src="/vault-logo.jpg" alt="VaultBridge Logo" className="w-full h-full object-cover p-1" />
+                <img src="/og-image.png" alt="VaultBridge Logo" className="w-full h-full object-cover p-1" />
               </div>
               <span className="font-bold text-xl tracking-tight">VAULTBRIDGE</span>
             </div>
@@ -494,6 +499,9 @@ export default function Home() {
           <div>
             <h4 className="font-bold text-white mb-4">Resources</h4>
             <ul className="space-y-3 text-sm text-zinc-500">
+              <li><Link href="/security"><span className="hover:text-primary cursor-pointer transition-colors">Security</span></Link></li>
+              <li><Link href="/privacy-manifesto"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Manifesto</span></Link></li>
+              <li><Link href="/roadmap"><span className="hover:text-primary cursor-pointer transition-colors">Roadmap</span></Link></li>
               <li><Link href="/how-it-works"><span className="hover:text-primary cursor-pointer transition-colors">How it Works</span></Link></li>
               <li><Link href="/privacy"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Policy</span></Link></li>
               <li><Link href="/terms"><span className="hover:text-primary cursor-pointer transition-colors">Terms of Service</span></Link></li>
