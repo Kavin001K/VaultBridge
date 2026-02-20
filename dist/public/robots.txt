@@ -10,6 +10,11 @@ Allow: /privacy
 Allow: /security
 Allow: /privacy-manifesto
 Allow: /roadmap
+Allow: /blog
+Allow: /blog/secure-file-sharing-best-practices
+Allow: /blog/encrypted-file-transfer-vs-cloud-storage
+Allow: /blog/anonymous-file-sharing-without-login
+Allow: /blog/temporary-file-links-and-auto-destruct
 Allow: /secure-file-sharing-free
 Allow: /encrypted-file-transfer
 Allow: /private-file-sharing

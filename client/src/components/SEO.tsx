@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { generateSEOPages } from '@shared/seo-generator';
+import { blogPosts } from '@shared/blog';
 
 interface SEOProps {
     title?: string;
@@ -21,7 +23,7 @@ const defaultSEO = {
 };
 
 // Page-specific SEO configurations
-const pageSEO: Record<string, SEOProps> = {
+const staticPageSEO: Record<string, SEOProps> = {
     '/': {
         title: 'VaultBridge | Secure Encrypted File Sharing & Transfer',
         description: 'Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, encrypted email relay, secure clipboard sync, and zero-knowledge privacy. No account required.',
@@ -91,6 +93,11 @@ const pageSEO: Record<string, SEOProps> = {
         description: 'Transparent roadmap for VaultBridge: upcoming security, privacy, and product milestones.',
         keywords: 'vaultbridge roadmap, secure file sharing roadmap, privacy product roadmap',
     },
+    '/blog': {
+        title: 'VaultBridge Blog | Privacy and Security Guides',
+        description: 'Technical articles on secure file transfer, encrypted delivery, anonymous sharing, and lifecycle security controls.',
+        keywords: 'vaultbridge blog, secure file sharing guides, encrypted transfer best practices, privacy-first file delivery',
+    },
     '/secure-file-sharing-free': {
         title: 'Secure File Sharing Free | VaultBridge',
         description: 'Secure file sharing without login, tracking, or permanent storage. Encrypted transfers with temporary lifecycle controls.',
@@ -123,13 +130,33 @@ const pageSEO: Record<string, SEOProps> = {
     },
 };
 
+const blogPostSEO: Record<string, SEOProps> = Object.fromEntries(
+    blogPosts.map((post) => [
+        `/blog/${post.slug}`,
+        {
+            title: `${post.title} | VaultBridge Blog`,
+            description: post.description,
+            keywords: post.keywords.join(', '),
+        },
+    ]),
+);
+
+const pageSEO: Record<string, SEOProps> = {
+    ...generateSEOPages(),
+    ...staticPageSEO,
+    ...blogPostSEO,
+};
+
 export function useSEO(customSEO?: SEOProps) {
     const [location] = useLocation();
 
     useEffect(() => {
         // Get page-specific SEO or use defaults
-        const basePath = '/' + location.split('/')[1];
-        const pageConfig = pageSEO[basePath] || pageSEO[location] || {};
+        const normalizedLocation = location.endsWith('/') && location.length > 1
+            ? location.slice(0, -1)
+            : location;
+        const basePath = '/' + normalizedLocation.split('/')[1];
+        const pageConfig = pageSEO[normalizedLocation] || pageSEO[basePath] || {};
 
         const seo = {
             ...defaultSEO,
@@ -159,7 +186,7 @@ export function useSEO(customSEO?: SEOProps) {
         // Open Graph
         updateMeta('meta[property="og:title"]', 'content', seo.title || defaultSEO.title);
         updateMeta('meta[property="og:description"]', 'content', seo.description || defaultSEO.description);
-        updateMeta('meta[property="og:url"]', 'content', `${defaultSEO.url}${location}`);
+        updateMeta('meta[property="og:url"]', 'content', `${defaultSEO.url}${normalizedLocation}`);
         updateMeta('meta[property="og:image"]', 'content', seo.image || defaultSEO.image);
         updateMeta('meta[property="og:type"]', 'content', seo.type || defaultSEO.type);
 
@@ -167,6 +194,7 @@ export function useSEO(customSEO?: SEOProps) {
         updateMeta('meta[name="twitter:title"]', 'content', seo.title || defaultSEO.title);
         updateMeta('meta[name="twitter:description"]', 'content', seo.description || defaultSEO.description);
         updateMeta('meta[name="twitter:image"]', 'content', seo.image || defaultSEO.image);
+        updateMeta('meta[name="twitter:url"]', 'content', `${defaultSEO.url}${normalizedLocation}`);
 
         // Canonical URL
         let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
@@ -175,7 +203,7 @@ export function useSEO(customSEO?: SEOProps) {
             canonical.rel = 'canonical';
             document.head.appendChild(canonical);
         }
-        canonical.href = `${defaultSEO.url}${location}`;
+        canonical.href = `${defaultSEO.url}${normalizedLocation}`;
 
     }, [location, customSEO]);
 }
