@@ -27,6 +27,8 @@ const Security = lazy(() => import("@/pages/security"));
 const PrivacyManifesto = lazy(() => import("@/pages/privacy-manifesto"));
 const Roadmap = lazy(() => import("@/pages/roadmap"));
 const SEOLandingPage = lazy(() => import("@/pages/seo-landing"));
+const BlogsPage = lazy(() => import("@/pages/blogs"));
+const BlogPostPage = lazy(() => import("@/pages/blog-post"));
 
 function LoadingFallback() {
   return (
@@ -59,6 +61,7 @@ function Router() {
       <Route path="/upload" component={UploadPage} />
       <Route path="/access" component={AccessPage} />
       <Route path="/download/:id" component={DownloadPage} />
+      <Route path="/v/:id" component={DownloadPage} />
       <Route path="/success/:id" component={SuccessPage} />
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/get-it-mailed" component={GetItMailed} />
@@ -67,6 +70,8 @@ function Router() {
       <Route path="/security" component={Security} />
       <Route path="/privacy-manifesto" component={PrivacyManifesto} />
       <Route path="/roadmap" component={Roadmap} />
+      <Route path="/blog" component={BlogsPage} />
+      <Route path="/blog/:slug" component={BlogPostPage} />
 
       {/* Programmatically Generated SEO Routes */}
       {Object.keys(generateSEOPages()).map((slug) => (

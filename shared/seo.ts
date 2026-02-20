@@ -9,6 +9,7 @@ export interface SEOConfig {
 }
 
 import { generateSEOPages } from "./seo-generator";
+import { blogPosts } from "./blog";
 
 export const defaultSEO: SEOConfig = {
   siteName: "VaultBridge",
@@ -118,6 +119,13 @@ const staticPageSEO: Record<string, Partial<SEOConfig>> = {
     keywords:
       "vaultbridge roadmap, secure file sharing roadmap, privacy product roadmap",
   },
+  "/blog": {
+    title: "VaultBridge Blog | Privacy and Security Guides",
+    description:
+      "Technical articles on secure file transfer, encrypted delivery, anonymous sharing, and lifecycle security controls.",
+    keywords:
+      "vaultbridge blog, secure file sharing guides, encrypted transfer best practices, privacy-first file delivery",
+  },
   "/secure-file-sharing-free": {
     title: "Secure File Sharing Free | VaultBridge",
     description:
@@ -162,13 +170,29 @@ const staticPageSEO: Record<string, Partial<SEOConfig>> = {
   },
 };
 
+const blogPostSEO: Record<string, Partial<SEOConfig>> = Object.fromEntries(
+  blogPosts.map((post) => [
+    `/blog/${post.slug}`,
+    {
+      title: `${post.title} | VaultBridge Blog`,
+      description: post.description,
+      keywords: post.keywords.join(", "),
+    },
+  ]),
+);
+
+const generatedSEOPages = generateSEOPages();
+
 // Merge static SEO configurations with the dynamically generated programmatic SEO configs
 export const pageSEO: Record<string, Partial<SEOConfig>> = {
+  ...generatedSEOPages,
   ...staticPageSEO,
-  ...generateSEOPages(),
+  ...blogPostSEO,
 };
 
 // Public routes safe to pre-render and expose to crawlers
+const blogRoutes = blogPosts.map((post) => `/blog/${post.slug}`);
+
 export const publicRoutesForPreRender = [
   "/",
   "/upload",
@@ -181,7 +205,9 @@ export const publicRoutesForPreRender = [
   "/security",
   "/privacy-manifesto",
   "/roadmap",
-  ...Object.keys(generateSEOPages()),
+  "/blog",
+  ...Object.keys(generatedSEOPages),
+  ...blogRoutes,
 ];
 
 export function resolveSEO(

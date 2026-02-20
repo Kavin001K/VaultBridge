@@ -91,6 +91,40 @@
     <priority>0.7</priority>
   </url>
 
+  <!-- Blog Hub -->
+  <url>
+    <loc>https://vaultbridge.org/blog</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Blog Articles -->
+  <url>
+    <loc>https://vaultbridge.org/blog/secure-file-sharing-best-practices</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/blog/encrypted-file-transfer-vs-cloud-storage</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/blog/anonymous-file-sharing-without-login</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://vaultbridge.org/blog/temporary-file-links-and-auto-destruct</loc>
+    <lastmod>2026-02-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
   <!-- Programmatic SEO Pages -->
   <url>
     <loc>https://vaultbridge.org/secure-file-sharing-free</loc>
