@@ -149,7 +149,12 @@ async function buildAll() {
   await viteBuild();
 
   console.log("prerendering static marketing routes for SEO...");
-  await prerenderStatic();
+  try {
+    await prerenderStatic();
+  } catch (err) {
+    console.warn("[prerender] ⚠️ Skipping prerendering (Chrome/Puppeteer not available in this environment).");
+    console.warn("[prerender] SEO will be handled at runtime by server/static.ts fallback.");
+  }
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
