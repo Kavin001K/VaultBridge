@@ -13,11 +13,11 @@ import { blogPosts } from "./blog";
 
 export const defaultSEO: SEOConfig = {
   siteName: "VaultBridge",
-  title: "VaultBridge | Secure Encrypted File Sharing & Transfer",
+  title: "VaultBridge – Secure Encrypted File Sharing Without Login",
   description:
-    "Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, direct email relay, encrypted clipboard, zero-knowledge privacy. No account required. Free & open source.",
+    "Share files securely with VaultBridge. End-to-end encrypted file sharing, anonymous uploads, auto-destruct links, and private vault transfer. No login required. Free & open source. The safest way to share files online.",
   keywords:
-    "secure file transfer, encrypted file sharing, end-to-end encryption, privacy, self-destructing links, zero knowledge, AES-256, anonymous file sharing, encrypted email, secure clipboard",
+    "VaultBridge, VaultBridge secure file sharing, secure file sharing, encrypted file sharing, anonymous file sharing, secure file transfer, private file sharing, temporary file sharing, encrypted file upload, share files securely online, upload files without login, secure file sharing free, encrypted file transfer online, auto destruct file sharing, temporary file share link, secure document sharing, send confidential files online, share files anonymously, encrypted vault file sharing, end to end encrypted file sharing, secure alternative to Google Drive, AES-256 encrypted file sharing, zero-knowledge file sharing, browser encrypted file sharing, self destruct file link, burn after read file sharing, no login file sharing, privacy focused file sharing",
   image: "/og-image.png",
   url: "https://vaultbridge.org",
   type: "website",
@@ -25,18 +25,18 @@ export const defaultSEO: SEOConfig = {
 
 const staticPageSEO: Record<string, Partial<SEOConfig>> = {
   "/": {
-    title: "VaultBridge | Secure Encrypted File Sharing & Transfer",
+    title: "VaultBridge – Secure Encrypted File Sharing Without Login | Free & Private",
     description:
-      "Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, encrypted email relay, secure clipboard sync, and zero-knowledge privacy. No account required.",
+      "Share files securely with VaultBridge. End-to-end AES-256 encrypted file sharing, anonymous uploads, auto-destruct links, private vault transfer, encrypted clipboard sync. No login required. Free & open source. The safest way to share files online.",
     keywords:
-      "secure file transfer, encrypted file sharing, end-to-end encryption, privacy, self-destructing links, zero knowledge, AES-256, anonymous file sharing, send files securely, encrypted storage",
+      "VaultBridge, secure file sharing, encrypted file sharing, anonymous file sharing, secure file transfer, private file sharing, temporary file sharing, encrypted file upload, share files securely online free, upload files without login, secure file sharing free, auto destruct file sharing, send confidential files online, encrypted vault file sharing, end to end encrypted file sharing, secure alternative to Google Drive, WeTransfer alternative secure, AES-256 encrypted file sharing, zero-knowledge file sharing, browser encrypted file sharing, no login file sharing, privacy focused file sharing, self destruct file link, temporary vault file sharing, secure document sharing without login, private file transfer online",
   },
   "/upload": {
-    title: "Upload & Encrypt Files Securely | VaultBridge Secure Vault",
+    title: "Upload & Encrypt Files Securely | Free Encrypted Upload | VaultBridge",
     description:
-      "Upload and encrypt your files with military-grade AES-256-GCM encryption. Set custom expiration times, download limits, and burn-on-read. Create self-destructing secure vaults instantly.",
+      "Upload and encrypt your files with military-grade AES-256-GCM encryption. Set custom expiration times, download limits, and burn-on-read. Create self-destructing secure vaults instantly. No login required. Free encrypted file upload.",
     keywords:
-      "secure file upload, encrypt files online, AES-256 encryption, self-destructing vault, secure file storage, burn after read, encrypted upload, file expiry, download limit",
+      "secure file upload, encrypt files online, AES-256 encryption, self-destructing vault, secure file storage, burn after read, encrypted upload, file expiry, download limit, upload files without login, free encrypted upload, encrypted file upload, upload secure files, encrypt and share files, upload confidential files securely, client-side encryption file sharing",
   },
   "/access": {
     title: "Access Secure Vault | Decrypt & Download Files | VaultBridge",
