@@ -978,6 +978,21 @@
    MOBILE OPTIMIZATIONS
    ============================================================================= */
 
+/* iOS safe areas */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Dynamic viewport height */
+:root {
+  --vh: 1vh;
+}
+
 @media screen and (max-width: 768px) {
 
   /* Prevent iOS zoom on focus */
@@ -987,16 +1002,83 @@
     font-size: 16px !important;
   }
 
-  /* Improve tap targets */
-  button,
-  a {
-    min-height: 44px;
-    min-width: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  /* Smarter tap targets — only on action elements, not all links/buttons globally */
+  button:not(.tap-sm),
+  [role="button"]:not(.tap-sm) {
+    min-height: 40px;
     touch-action: manipulation;
-    /* Optimizes tap events */
+  }
+
+  /* Reduce heavy blurs for GPU perf on mobile */
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(12px) !important;
+    backdrop-filter: blur(12px) !important;
+  }
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+  .blur-\[150px\] {
+    filter: blur(60px) !important;
+  }
+
+  /* Smaller grid background on mobile for perf */
+  .grid-bg {
+    background-size: 60px 60px !important;
+    opacity: 0.25 !important;
+  }
+
+  /* Kill heavy scanline on mobile */
+  .scanline {
+    display: none !important;
+  }
+
+  /* Reduce heavy box-shadows */
+  .shadow-2xl {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Smoother scrolling */
+  html {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Prevent pull-to-refresh interfering with scroll */
+  body {
+    overscroll-behavior-y: contain;
+  }
+
+  /* Fix fixed header on iOS */
+  header[class*="fixed"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  /* Reduce motion on mobile for battery & smoothness */
+  .animate-float {
+    animation: none !important;
+  }
+  .animate-pulse-glow {
+    animation: none !important;
+  }
+  .animate-glow-enhanced {
+    animation: none !important;
+  }
+}
+
+/* Small mobile (< 380px) — extra compact */
+@media screen and (max-width: 380px) {
+  .code-input {
+    font-size: 1.5rem !important;
+    letter-spacing: 0.3em !important;
+  }
+}
+
+/* PWA standalone mode — hide browser chrome-specific elements */
+@media (display-mode: standalone) {
+  .pwa-hide {
+    display: none !important;
   }
 }
 
@@ -1007,7 +1089,20 @@
 
 .no-scrollbar {
   -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
+}
+
+/* Custom scrollbar for activity panel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
 }

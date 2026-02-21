@@ -44,7 +44,7 @@ const PulseIndicator = ({ status }: { status: "idle" | "syncing" | "live" }) => 
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${colors[status]}`} />
             </div>
             <span className={`text-[11px] font-mono uppercase tracking-wider ${status === "live" ? "text-emerald-400" :
-                    status === "syncing" ? "text-amber-400" : "text-zinc-500"
+                status === "syncing" ? "text-amber-400" : "text-zinc-500"
                 }`}>{labels[status]}</span>
         </div>
     );
@@ -60,7 +60,7 @@ export default function UniversalClipboard() {
     const [showContent, setShowContent] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [justCopied, setJustCopied] = useState(false);
-    const [expiresIn, setExpiresIn] = useState([24]);
+    const [expiresIn, setExpiresIn] = useState([1]); // Default to 1 hour
     const [showSettings, setShowSettings] = useState(false);
 
     const [vaultData, setVaultData] = useState<{
@@ -219,8 +219,8 @@ export default function UniversalClipboard() {
 
             {/* ── HEADER ── */}
             <header className={`sticky top-0 z-30 transition-all duration-500 border-b ${mode === "live"
-                    ? "bg-[#1C1C1E]/90 border-emerald-500/25 backdrop-blur-xl"
-                    : "bg-[#1C1C1E]/80 border-white/5 backdrop-blur-xl"
+                ? "bg-[#1C1C1E]/90 border-emerald-500/25 backdrop-blur-xl"
+                : "bg-[#1C1C1E]/80 border-white/5 backdrop-blur-xl"
                 }`}>
                 <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
 
@@ -379,8 +379,8 @@ export default function UniversalClipboard() {
                 <motion.div
                     layout
                     className={`flex-1 flex flex-col rounded-2xl border overflow-hidden transition-all duration-500 ${mode === "live"
-                            ? "border-emerald-500/30 bg-zinc-900/50 shadow-[0_0_40px_rgba(16,185,129,0.04)]"
-                            : "border-zinc-800/60 bg-zinc-900/50"
+                        ? "border-emerald-500/30 bg-zinc-900/50 shadow-[0_0_40px_rgba(16,185,129,0.04)]"
+                        : "border-zinc-800/60 bg-zinc-900/50"
                         }`}
                     style={{ minHeight: "calc(100vh - 260px)" }}
                 >
