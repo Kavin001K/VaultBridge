@@ -82,9 +82,9 @@ function Router() {
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
   useEffect(() => {
-    // Keep splash screen visible for at least 1.8s for premium feel,
+    // Keep splash screen visible for 2.5s for premium feel,
     // plus giving react time to initialize components
-    const timer = setTimeout(onFinish, 1800);
+    const timer = setTimeout(onFinish, 2500);
     return () => clearTimeout(timer);
   }, [onFinish]);
 
