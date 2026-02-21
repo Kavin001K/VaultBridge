@@ -192,7 +192,7 @@ export default function Success() {
   // So we just link to /access with the code in the hash fragment.
   // The hash fragment is never sent to the server, preserving zero-knowledge.
   // This allows auto-fill and auto-submit without manual entry.
-  const shareLink = `${window.location.origin}/access#${splitCode}`;
+  const shareLink = `${window.location.origin}/access#code=${splitCode}`;
 
   const handleCopy = async (text: string, type: 'link' | 'code') => {
     await navigator.clipboard.writeText(text);
