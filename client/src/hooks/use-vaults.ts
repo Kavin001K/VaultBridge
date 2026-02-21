@@ -56,11 +56,20 @@ export function useCreateVault() {
       });
 
       if (!res.ok) {
-        if (res.status === 400) {
-          const error = await res.json();
-          throw new Error(error.message || "Validation failed");
+        const errorBody = await res.json().catch(() => null);
+        const message =
+          typeof errorBody?.message === "string"
+            ? errorBody.message
+            : res.status === 400
+              ? "Validation failed"
+              : "Failed to create vault";
+
+        const error = new Error(message) as Error & { status?: number; code?: string };
+        error.status = res.status;
+        if (typeof errorBody?.code === "string") {
+          error.code = errorBody.code;
         }
-        throw new Error("Failed to create vault");
+        throw error;
       }
 
       return api.vaults.create.responses[201].parse(await res.json());
@@ -241,7 +250,15 @@ export function useUpdateClipboard() {
         body: JSON.stringify({ encryptedClipboardText, wrappedKey })
       });
 
-      if (!res.ok) throw new Error("Failed to update clipboard");
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        const message = typeof errorBody?.message === "string"
+          ? errorBody.message
+          : (res.status === 413
+              ? "Clipboard payload too large. Remove some attachments and try again."
+              : "Failed to update clipboard");
+        throw new Error(message);
+      }
       return api.vaults.updateClipboard.responses[200].parse(await res.json());
     }
   });

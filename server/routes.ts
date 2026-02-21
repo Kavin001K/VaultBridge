@@ -10,6 +10,8 @@ import { localStorage } from "./services/local_storage";
 import { logStorageStatus } from "./services/storage_router";
 import multer from "multer";
 
+const MAX_ENCRYPTED_CLIPBOARD_CHARS = 80 * 1024 * 1024; // Keep below API body limit headroom.
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -81,6 +83,15 @@ export async function registerRoutes(
           field: err.errors[0].path.join("."),
         });
       }
+
+      const typedError = err as Error & { status?: number; code?: string };
+      if (typedError.status === 409 && typedError.code === "LOOKUP_ID_CONFLICT") {
+        return res.status(409).json({
+          message: typedError.message,
+          code: typedError.code,
+        });
+      }
+
       // Log the actual error for debugging
       console.error("[Vault Create Error]", err);
       return res.status(500).json({
@@ -307,6 +318,12 @@ export async function registerRoutes(
     try {
       const lookupId = req.params.lookupId as string;
       const { encryptedClipboardText, wrappedKey } = api.vaults.updateClipboard.input.parse(req.body);
+
+      if (encryptedClipboardText.length > MAX_ENCRYPTED_CLIPBOARD_CHARS) {
+        return res.status(413).json({
+          message: "Clipboard payload too large. Remove some attachments and try again.",
+        });
+      }
 
       const vault = await storage.getVaultByLookupId(lookupId);
 
