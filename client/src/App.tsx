@@ -80,13 +80,14 @@ function Router() {
   );
 }
 
-function SplashScreen({ onFinish }: { onFinish: () => void }) {
+function MountNotifier({ onMount }: { onMount: () => void }) {
   useEffect(() => {
-    // Keep splash screen visible for 2.5s for premium feel,
-    // plus giving react time to initialize components
-    const timer = setTimeout(onFinish, 2500);
-    return () => clearTimeout(timer);
-  }, [onFinish]);
+    onMount();
+  }, [onMount]);
+  return null;
+}
+
+function SplashScreen() {
 
   return (
     <motion.div
@@ -158,29 +159,72 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [appMounted, setAppMounted] = useState(false);
+
+  // Enforce minimum splash screen time
+  useEffect(() => {
+    const timer = setTimeout(() => setMinTimeElapsed(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Sync splash screen dismissal with both timer AND react component tree being ready
+  useEffect(() => {
+    if (minTimeElapsed && appMounted) {
+      setShowSplash(false);
+    }
+  }, [minTimeElapsed, appMounted]);
+
+  // Background Route Prefetching (Smart Preloading)
+  useEffect(() => {
+    if (!showSplash) {
+      // Use requestIdleCallback so prefetching absolutely doesn't interfere with main thread interactivity
+      const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000));
+      idleCallback(() => {
+        const prefetch = async () => {
+          try {
+            await Promise.all([
+              import("@/pages/upload"),
+              import("@/pages/access"),
+              import("@/pages/clipboard")
+            ]);
+            console.log("VaultBridge: Heavy routes pre-fetched in background.");
+          } catch (e) {
+            // Ignore prefetch failures
+          }
+        };
+        prefetch();
+      });
+    }
+  }, [showSplash]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <ErrorBoundary>
-          <AnimatePresence mode="wait">
-            {showSplash ? (
-              <SplashScreen key="splash" onFinish={() => setShowSplash(false)} />
-            ) : (
-              <motion.div
-                key="app"
-                initial={{ opacity: 0, filter: "blur(5px)" }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="min-h-screen bg-black text-white"
-              >
-                <Suspense fallback={<LoadingFallback />}>
-                  <Router />
-                </Suspense>
-              </motion.div>
-            )}
+          <AnimatePresence>
+            {showSplash && <SplashScreen key="splash" />}
           </AnimatePresence>
+
+          <div
+            className="min-h-screen bg-black text-white"
+            style={{
+              opacity: showSplash ? 0 : 1,
+              pointerEvents: showSplash ? 'none' : 'auto',
+              transition: 'opacity 0.6s ease-out',
+              // Keep it fixed behind splash so it doesn't mess with scroll while invisible but still mounts
+              position: showSplash ? 'fixed' : 'relative',
+              width: '100%',
+              height: showSplash ? '100vh' : 'auto',
+              overflow: showSplash ? 'hidden' : 'visible'
+            }}
+          >
+            <Suspense fallback={<LoadingFallback />}>
+              <MountNotifier onMount={() => setAppMounted(true)} />
+              <Router />
+            </Suspense>
+          </div>
         </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
