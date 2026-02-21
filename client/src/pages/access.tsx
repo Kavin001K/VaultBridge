@@ -36,6 +36,22 @@ interface FileDownloadState {
     isExhausted: boolean;
 }
 
+const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
+const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
+
+const normalizeVaultPath = (pathname: string) =>
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+const isAllowedVaultPath = (pathname: string) => {
+    const normalized = normalizeVaultPath(pathname);
+    return (
+        normalized === "/access" ||
+        normalized.startsWith("/download/") ||
+        normalized.startsWith("/v/")
+    );
+};
+
 // SVG Filter for Heat Distortion (Heavy on mobile GPU, will be conditional)
 const BurnFilter = () => (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
@@ -111,6 +127,9 @@ export default function AccessPage() {
     const [fileKey, setFileKey] = useState<CryptoKey | null>(null);
     const [isBurned, setIsBurned] = useState(false);
     const [clipboardContent, setClipboardContent] = useState<string | null>(null);
+    const [vaultLinkInput, setVaultLinkInput] = useState("");
+    const [vaultLinkError, setVaultLinkError] = useState<string | null>(null);
+    const [recentVaultLink, setRecentVaultLink] = useState<string | null>(null);
 
     // Per-file download tracking
     const [fileDownloadStates, setFileDownloadStates] = useState<Map<string, FileDownloadState>>(new Map());
@@ -126,6 +145,142 @@ export default function AccessPage() {
     const trackDownload = useTrackDownload();
     const trackFileDownload = useTrackFileDownload();
 
+    const extractAccessCode = (value: string | null): string | null => {
+        if (!value) return null;
+        const direct = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+        if (direct.length === 6) return direct;
+
+        try {
+            const parsed = value.startsWith("http")
+                ? new URL(value)
+                : new URL(value, window.location.origin);
+            const queryCode = parsed.searchParams.get("code");
+            if (queryCode) {
+                const cleaned = queryCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                if (cleaned.length === 6) return cleaned;
+            }
+
+            const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
+            const hashCode = new URLSearchParams(hash).get("code");
+            if (hashCode) {
+                const cleaned = hashCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                if (cleaned.length === 6) return cleaned;
+            }
+        } catch {
+            return null;
+        }
+
+        return null;
+    };
+
+    const resolveVaultDestination = (rawInput: string): string | null => {
+        const trimmed = rawInput.trim();
+        if (!trimmed) return null;
+
+        if (ACCESS_CODE_PATTERN.test(trimmed)) {
+            const code = trimmed.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+            return `/access?code=${code}`;
+        }
+
+        const candidates = [trimmed];
+        if (/^(access|download\/|v\/)/i.test(trimmed)) {
+            candidates.push(`/${trimmed}`);
+        }
+        if (/^(vaultbridge\.org|www\.vaultbridge\.org)/i.test(trimmed)) {
+            candidates.push(`https://${trimmed}`);
+        }
+
+        for (const candidate of candidates) {
+            try {
+                const parsed = candidate.startsWith("/")
+                    ? new URL(candidate, window.location.origin)
+                    : new URL(candidate);
+
+                if (isAllowedVaultPath(parsed.pathname)) {
+                    if (parsed.origin === window.location.origin) {
+                        return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+                    }
+                    return parsed.toString();
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        return null;
+    };
+
+    const openVaultLink = (rawInput: string) => {
+        const destination = resolveVaultDestination(rawInput);
+        if (!destination) {
+            setVaultLinkError("Paste a valid vault link or 6-character access code.");
+            return;
+        }
+
+        setVaultLinkError(null);
+        const cleanInput = rawInput.trim();
+        if (cleanInput) {
+            localStorage.setItem(RECENT_VAULT_STORAGE_KEY, cleanInput);
+            localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, cleanInput);
+            setRecentVaultLink(cleanInput);
+        }
+
+        const localAccessCode = extractAccessCode(destination);
+        if (destination.startsWith("/access") && localAccessCode) {
+            setAccessCode(localAccessCode);
+            return;
+        }
+
+        if (destination.startsWith("http://") || destination.startsWith("https://")) {
+            const parsed = new URL(destination);
+            if (parsed.origin === window.location.origin) {
+                const localDestination = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+                const code = extractAccessCode(localDestination);
+                if (normalizeVaultPath(parsed.pathname) === "/access" && code) {
+                    setAccessCode(code);
+                    return;
+                }
+                setLocation(localDestination);
+            } else {
+                window.location.href = destination;
+            }
+            return;
+        }
+
+        setLocation(destination);
+    };
+
+    const handlePasteVaultLink = async () => {
+        if (!navigator.clipboard?.readText) {
+            setVaultLinkError("Clipboard access is not available in this browser.");
+            return;
+        }
+
+        try {
+            const text = await navigator.clipboard.readText();
+            setVaultLinkInput(text.trim());
+            setVaultLinkError(null);
+        } catch {
+            setVaultLinkError("Clipboard read is blocked. Paste manually.");
+        }
+    };
+
+    useEffect(() => {
+        const fromQuery = new URLSearchParams(window.location.search).get("code");
+        const fromHash = new URLSearchParams(window.location.hash.replace("#", "")).get("code");
+        const fromRecent =
+            localStorage.getItem(RECENT_VAULT_STORAGE_KEY) ||
+            localStorage.getItem(LEGACY_RECENT_VAULT_STORAGE_KEY);
+        const preloadCode = extractAccessCode(fromQuery) || extractAccessCode(fromHash) || extractAccessCode(fromRecent);
+
+        if (preloadCode) {
+            setAccessCode(preloadCode);
+        }
+        if (fromRecent) {
+            setRecentVaultLink(fromRecent);
+        }
+    }, []);
+
     const handleCodeSubmit = async () => {
         // Validate 6-char alphanumeric code
         const cleanCode = accessCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -137,6 +292,11 @@ export default function AccessPage() {
             });
             return;
         }
+
+        const recentAccessValue = `/access?code=${cleanCode}`;
+        localStorage.setItem(RECENT_VAULT_STORAGE_KEY, recentAccessValue);
+        localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, recentAccessValue);
+        setRecentVaultLink(recentAccessValue);
 
         setStage("fetching");
         setStatusText("Looking up vault...");
@@ -587,6 +747,54 @@ export default function AccessPage() {
                                             </p>
                                         </div>
 
+                                        <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                                            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                                                Paste Vault Link
+                                            </p>
+                                            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                                <Input
+                                                    type="text"
+                                                    value={vaultLinkInput}
+                                                    onChange={(event) => {
+                                                        setVaultLinkInput(event.target.value);
+                                                        if (vaultLinkError) setVaultLinkError(null);
+                                                    }}
+                                                    placeholder="https://vaultbridge.org/v/... or ABC123"
+                                                    className="h-10 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-500 focus-visible:ring-cyan-500/40"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-10 border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800"
+                                                    onClick={handlePasteVaultLink}
+                                                >
+                                                    Paste
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    className="h-10 bg-gradient-to-r from-cyan-600 to-emerald-600 text-white hover:from-cyan-500 hover:to-emerald-500"
+                                                    onClick={() => openVaultLink(vaultLinkInput)}
+                                                >
+                                                    Open Vault
+                                                </Button>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                {recentVaultLink && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        className="h-8 px-2 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                                                        onClick={() => openVaultLink(recentVaultLink)}
+                                                    >
+                                                        Open recent vault
+                                                    </Button>
+                                                )}
+                                                {vaultLinkError && (
+                                                    <p className="text-xs text-rose-400">{vaultLinkError}</p>
+                                                )}
+                                            </div>
+                                        </div>
+
                                         {/* Access Card */}
                                         <div className="relative">
                                             {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-xl opacity-50" />}
@@ -866,6 +1074,7 @@ export default function AccessPage() {
                                                                 fileKey={fileKey!}
                                                                 wrappedKey={vaultData.wrappedKey}
                                                                 initialContent={clipboardContent}
+                                                                size="large"
                                                             />
                                                         </div>
                                                     )}

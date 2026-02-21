@@ -12,6 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateClipboard, useClipboardSync } from "@/hooks/use-vaults";
 import { decryptClipboardText, encryptClipboardText } from "@/lib/crypto";
+import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
 
 interface LiveClipboardProps {
@@ -19,9 +20,10 @@ interface LiveClipboardProps {
     fileKey: CryptoKey;
     wrappedKey: string;
     initialContent: string | null;
+    size?: "default" | "large";
 }
 
-export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent }: LiveClipboardProps) {
+export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent, size = "default" }: LiveClipboardProps) {
     const { toast } = useToast();
     const [clipboardContent, setClipboardContent] = useState<string | null>(initialContent);
     const [isEditing, setIsEditing] = useState(false);
@@ -103,7 +105,10 @@ export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent }:
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden shadow-sm"
+            className={cn(
+                "mb-6 bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden shadow-sm flex flex-col",
+                size === "large" ? "h-[360px] sm:h-[460px] lg:h-[520px]" : "h-[260px] sm:h-[320px]"
+            )}
         >
             {/* Header */}
             <div className="flex items-center justify-between p-3 border-b border-zinc-800 bg-zinc-900/80">
@@ -169,7 +174,7 @@ export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent }:
             </div>
 
             {/* Live Editor */}
-            <div className="relative">
+            <div className="relative flex-1 min-h-0">
                 <Textarea
                     value={clipboardContent || ""}
                     onChange={(e) => {
@@ -180,7 +185,7 @@ export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent }:
                         setIsEditing(false);
                         if (clipboardContent) handleSaveClipboard(clipboardContent);
                     }}
-                    className="min-h-[120px] bg-transparent border-0 resize-none focus-visible:ring-0 text-zinc-300 font-mono text-sm leading-relaxed p-4 custom-scrollbar"
+                    className="h-full min-h-0 overflow-y-auto overscroll-contain bg-transparent border-0 resize-none focus-visible:ring-0 text-zinc-300 font-mono text-sm leading-relaxed p-4 custom-scrollbar"
                     placeholder="Type shared content here..."
                 />
                 {isEditing && (

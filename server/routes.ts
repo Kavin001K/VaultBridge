@@ -444,21 +444,48 @@ export async function registerRoutes(
       // Send to all recipients in parallel
       const results = await Promise.allSettled(
         recipients.map(async (recipientEmail) => {
-          return sendDirectAttachment({
+          const result = await sendDirectAttachment({
             to: recipientEmail,
             subject,
             text: body,
             files: attachments
           });
+          return { recipientEmail, result };
         })
       );
 
-      // Count successes and failures
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
-      const failCount = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)).length;
+      const successful = results.filter(
+        (entry): entry is PromiseFulfilledResult<{ recipientEmail: string; result: Awaited<ReturnType<typeof sendDirectAttachment>> }> =>
+          entry.status === "fulfilled" && entry.value.result.success
+      );
+
+      const failed = results
+        .map((entry) => {
+          if (entry.status === "rejected") {
+            const reason = entry.reason instanceof Error ? entry.reason.message : "Unexpected send failure";
+            return { recipient: "unknown", reason };
+          }
+
+          if (!entry.value.result.success) {
+            return {
+              recipient: entry.value.recipientEmail,
+              reason: entry.value.result.error || "Delivery failed",
+            };
+          }
+
+          return null;
+        })
+        .filter((entry): entry is { recipient: string; reason: string } => Boolean(entry));
+
+      const successCount = successful.length;
+      const failCount = failed.length;
 
       if (successCount === 0) {
-        return res.status(500).json({ message: "Failed to send emails to all recipients." });
+        const firstFailure = failed[0];
+        const message = firstFailure
+          ? `Failed to send email to ${firstFailure.recipient}: ${firstFailure.reason}`
+          : "Failed to send emails to all recipients.";
+        return res.status(500).json({ message, failed: failed.slice(0, 3) });
       }
 
       if (failCount > 0) {
@@ -466,7 +493,8 @@ export async function registerRoutes(
           success: true,
           message: `Sent to ${successCount}/${recipients.length} recipients. ${failCount} failed.`,
           delivered: successCount,
-          failed: failCount
+          failed: failCount,
+          failures: failed.slice(0, 3)
         });
       }
 

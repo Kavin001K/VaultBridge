@@ -31,8 +31,9 @@ interface DecryptedFile {
 }
 
 export default function DownloadPage() {
-  const [, params] = useRoute("/v/:id");
-  const vaultId = params?.id;
+  const [, paramsV] = useRoute("/v/:id");
+  const [, paramsDownload] = useRoute("/download/:id");
+  const vaultId = paramsV?.id || paramsDownload?.id;
   const [decryptionKey, setDecryptionKey] = useState<CryptoKey | null>(null);
   const [files, setFiles] = useState<DecryptedFile[]>([]);
   const [isDecrypting, setIsDecrypting] = useState(true);
@@ -485,7 +486,7 @@ export default function DownloadPage() {
           <Link href="/">
             <div className="flex items-center gap-3 cursor-pointer">
               <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
-                <img src="/og-image.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+                <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
               </div>
               <div>
                 <h1 className="text-lg md:text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
