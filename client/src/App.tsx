@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSEO } from "@/components/SEO";
 import { generateSEOPages } from "@shared/seo-generator";
 import { motion, AnimatePresence } from "framer-motion";
+import { useHaptics } from "@/hooks/useHaptics";
 
 import ClipboardPage from "@/pages/clipboard";
 
@@ -161,6 +162,9 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [appMounted, setAppMounted] = useState(false);
+
+  // Initialize Global Haptics Engine for touch devices
+  useHaptics();
 
   // Enforce minimum splash screen time
   useEffect(() => {
