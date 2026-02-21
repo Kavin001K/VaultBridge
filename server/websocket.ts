@@ -24,6 +24,11 @@ export function setupWebsocketSignaling(server: Server) {
         }
     });
 
+    // Prevent unhandled WebSocket server errors from crashing the whole app.
+    wss.on("error", (error: Error) => {
+        console.error("[WS-Signal] Server error:", error.message);
+    });
+
     // Map: roomId -> Set<WebSocket>
     const rooms = new Map<string, Set<WebSocket>>();
     // Map: WebSocket -> roomId (for cleanup)

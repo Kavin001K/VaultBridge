@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -8,18 +8,52 @@ import {
   ServerOff, Globe, Users, Code, Building, GraduationCap, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useSounds } from "@/hooks/useSounds";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
 const hoverSpring = { type: "spring", stiffness: 300, damping: 20 };
+const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
+const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
+
+const normalizeVaultPath = (pathname: string) =>
+  pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+const isAllowedVaultPath = (pathname: string) => {
+  const normalized = normalizeVaultPath(pathname);
+  return (
+    normalized === "/access" ||
+    normalized.startsWith("/download/") ||
+    normalized.startsWith("/v/")
+  );
+};
 
 export default function Home() {
   const { play: playSound, isEnabled: isSoundEnabled, toggle: toggleSound } = useSounds();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [, setLocation] = useLocation();
   const [githubStars, setGithubStars] = useState<number | null>(null);
+  const [vaultInput, setVaultInput] = useState("");
+  const [vaultInputError, setVaultInputError] = useState<string | null>(null);
+  const [recentVault, setRecentVault] = useState<string | null>(null);
+  const [clipboardVault, setClipboardVault] = useState<string | null>(null);
+  const [showClipboardPrompt, setShowClipboardPrompt] = useState(false);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null);
+  const [isRecoverySending, setIsRecoverySending] = useState(false);
+  const vaultAccessPanelRef = useRef<HTMLDivElement | null>(null);
+  const vaultInputRef = useRef<HTMLInputElement | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -33,6 +67,196 @@ export default function Home() {
         }
       })
       .catch(err => console.error("Failed to fetch Github stars", err));
+  }, []);
+
+  useEffect(() => {
+    const stored =
+      localStorage.getItem(RECENT_VAULT_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_RECENT_VAULT_STORAGE_KEY);
+    if (stored) {
+      setRecentVault(stored);
+    }
+  }, []);
+
+  const extractAccessCode = (value: string | null): string | null => {
+    if (!value) return null;
+    const direct = value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (direct.length === 6) return direct;
+
+    try {
+      const parsed = value.startsWith("http")
+        ? new URL(value)
+        : new URL(value, window.location.origin);
+      const queryCode = parsed.searchParams.get("code");
+      if (queryCode) {
+        const cleaned = queryCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        if (cleaned.length === 6) return cleaned;
+      }
+      const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
+      const hashCode = new URLSearchParams(hash).get("code");
+      if (hashCode) {
+        const cleaned = hashCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        if (cleaned.length === 6) return cleaned;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  };
+
+  const normalizeVaultDestination = (rawInput: string): string | null => {
+    const trimmed = rawInput.trim();
+    if (!trimmed) return null;
+
+    if (ACCESS_CODE_PATTERN.test(trimmed)) {
+      const code = trimmed.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      return `/access?code=${code}`;
+    }
+
+    const candidates = [trimmed];
+    if (/^(access|download\/|v\/)/i.test(trimmed)) {
+      candidates.push(`/${trimmed}`);
+    }
+    if (/^(vaultbridge\.org|www\.vaultbridge\.org)/i.test(trimmed)) {
+      candidates.push(`https://${trimmed}`);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const parsed = candidate.startsWith("/")
+          ? new URL(candidate, window.location.origin)
+          : new URL(candidate);
+
+        if (isAllowedVaultPath(parsed.pathname)) {
+          if (parsed.origin === window.location.origin) {
+            return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          }
+          return parsed.toString();
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  };
+
+  const saveRecentVault = (value: string) => {
+    localStorage.setItem(RECENT_VAULT_STORAGE_KEY, value);
+    localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, value);
+    setRecentVault(value);
+  };
+
+  const openVault = (rawInput: string) => {
+    const destination = normalizeVaultDestination(rawInput);
+    if (!destination) {
+      setVaultInputError("Paste a valid vault link or a 6-character access code.");
+      return;
+    }
+
+    setVaultInputError(null);
+    const cleanInput = rawInput.trim();
+    if (cleanInput) {
+      saveRecentVault(cleanInput);
+    }
+
+    if (destination.startsWith("http://") || destination.startsWith("https://")) {
+      const parsed = new URL(destination);
+      if (parsed.origin === window.location.origin) {
+        setLocation(`${parsed.pathname}${parsed.search}${parsed.hash}`);
+      } else {
+        window.location.href = destination;
+      }
+      return;
+    }
+
+    setLocation(destination);
+  };
+
+  const focusVaultAccess = () => {
+    vaultAccessPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => vaultInputRef.current?.focus(), 220);
+  };
+
+  const handleSendRecovery = async () => {
+    const email = recoveryEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setRecoveryStatus("Enter a valid email address.");
+      return;
+    }
+
+    const codeCandidate = extractAccessCode(vaultInput) || extractAccessCode(recentVault) || extractAccessCode(clipboardVault);
+    if (!codeCandidate) {
+      setRecoveryStatus("Paste your vault code or link first, then try recovery.");
+      return;
+    }
+
+    setIsRecoverySending(true);
+    setRecoveryStatus(null);
+
+    try {
+      const lookupId = codeCandidate.slice(0, 3);
+      const lookupRes = await fetch(`/api/vault/code/${lookupId}`);
+      const lookupData = await lookupRes.json();
+      if (!lookupRes.ok || !lookupData?.id) {
+        throw new Error("Vault lookup failed");
+      }
+
+      const emailRes = await fetch(`/api/vaults/${lookupData.id}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: email,
+          fullCode: codeCandidate,
+        }),
+      });
+      const emailData = await emailRes.json();
+      if (!emailRes.ok || !emailData?.success) {
+        throw new Error(emailData?.message || "Unable to send recovery email");
+      }
+
+      setRecoveryStatus("Recovery link sent. Check your inbox and spam folder.");
+      setRecoveryEmail("");
+    } catch (error) {
+      setRecoveryStatus(error instanceof Error ? error.message : "Recovery failed. Please try again.");
+    } finally {
+      setIsRecoverySending(false);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    if (!navigator.clipboard?.readText) {
+      setVaultInputError("Clipboard access is not available in this browser.");
+      return;
+    }
+
+    try {
+      const text = await navigator.clipboard.readText();
+      setVaultInput(text.trim());
+      setVaultInputError(null);
+    } catch {
+      setVaultInputError("Clipboard read is blocked. Paste the link manually.");
+    }
+  };
+
+  useEffect(() => {
+    if (!window.isSecureContext || !navigator.clipboard?.readText) return;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const clipText = (await navigator.clipboard.readText()).trim();
+        if (!clipText) return;
+        const detectedDestination = normalizeVaultDestination(clipText);
+        if (!detectedDestination) return;
+        setClipboardVault(clipText);
+        setShowClipboardPrompt(true);
+      } catch {
+        // Ignore permission denials and unsupported clipboard read cases.
+      }
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Animation Variants
@@ -66,7 +290,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-              <img src="/og-image.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+              <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-bold font-mono tracking-tight">VAULT<span className="text-primary">BRIDGE</span></h1>
@@ -74,18 +298,17 @@ export default function Home() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3">
-            <motion.button
-              onClick={() => {
-                const newState = toggleSound();
-                setSoundEnabled(newState);
-                if (newState) playSound('click');
-              }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-primary/50 transition-all text-muted-foreground hover:text-primary"
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full border-zinc-700 bg-zinc-900/50 px-5 text-zinc-200 hover:border-primary/60 hover:bg-zinc-900"
+              onClick={focusVaultAccess}
             >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </motion.button>
+              Access Vault
+            </Button>
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full px-6" onClick={() => setLocation('/upload')}>
+              Upload
+            </Button>
             <a
               href="https://github.com/Kavin001K/VaultBridge"
               target="_blank"
@@ -103,9 +326,18 @@ export default function Home() {
                 )}
               </span>
             </a>
-            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full px-6" onClick={() => setLocation('/upload')}>
-              Upload
-            </Button>
+            <motion.button
+              onClick={() => {
+                const newState = toggleSound();
+                setSoundEnabled(newState);
+                if (newState) playSound('click');
+              }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-primary/50 transition-all text-muted-foreground hover:text-primary"
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </motion.button>
           </motion.div>
         </div>
       </header>
@@ -149,12 +381,135 @@ export default function Home() {
                   Upload File Securely
                 </Button>
               </Link>
-              <Link href="/how-it-works">
+              <Link href="/access">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 transition-all backdrop-blur-sm" onClick={() => playSound('click')}>
-                  How it works
+                  Access Vault
                 </Button>
               </Link>
             </div>
+
+            <div
+              ref={vaultAccessPanelRef}
+              className="mt-6 w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-left backdrop-blur-sm sm:p-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Vault Access</p>
+                  <p className="mt-1 text-sm text-zinc-400">Unified retrieval: clipboard, recent vault, email recovery, and manual paste.</p>
+                </div>
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
+                  Unified Retrieval
+                </span>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <Input
+                  ref={vaultInputRef}
+                  type="text"
+                  value={vaultInput}
+                  onChange={(event) => {
+                    setVaultInput(event.target.value);
+                    if (vaultInputError) setVaultInputError(null);
+                  }}
+                  placeholder="Paste vault link or code (example: ABC123)"
+                  className="h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-500 focus-visible:ring-primary/40"
+                />
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90"
+                  onClick={() => openVault(vaultInput)}
+                >
+                  Open Vault
+                </Button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800"
+                  onClick={handlePasteFromClipboard}
+                >
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  Paste from Clipboard
+                </Button>
+                {recentVault && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800"
+                    onClick={() => openVault(recentVault)}
+                  >
+                    Open Recent Vault
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  className="h-9 rounded-lg px-3 text-xs font-semibold text-cyan-300 transition-colors hover:bg-zinc-800/80 hover:text-cyan-200"
+                  onClick={() => {
+                    setRecoveryStatus(null);
+                    setShowRecoveryDialog(true);
+                  }}
+                >
+                  Didn&apos;t save your link? Recover via email
+                </button>
+              </div>
+
+              {recentVault && (
+                <p className="mt-2 truncate text-xs text-zinc-500">Recent: {recentVault}</p>
+              )}
+              {vaultInputError && (
+                <p className="mt-2 text-xs text-rose-400">{vaultInputError}</p>
+              )}
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">Get It Mailed</p>
+                      <p className="mt-1 text-xs text-zinc-400">Send secure vault access details to your email for recovery and handoff.</p>
+                    </div>
+                    <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-cyan-300">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 h-9 w-full rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:bg-zinc-800"
+                    onClick={() => setLocation("/get-it-mailed")}
+                  >
+                    Open Get It Mailed
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">Secure Clipboard</p>
+                      <p className="mt-1 text-xs text-zinc-400">Use encrypted clipboard sync for one-tap cross-device vault retrieval.</p>
+                    </div>
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-300">
+                      <Clipboard className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 h-9 w-full rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:bg-zinc-800"
+                    onClick={() => setLocation("/clipboard")}
+                  >
+                    Open Clipboard
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <Link href="/how-it-works">
+              <span className="mt-4 inline-flex cursor-pointer text-sm text-zinc-400 underline-offset-4 transition-colors hover:text-zinc-200 hover:underline">
+                Learn how VaultBridge works
+              </span>
+            </Link>
 
             <div className="mt-12 flex flex-wrap justify-center items-center gap-6 sm:gap-12 text-sm font-medium text-zinc-500">
               <div className="flex items-center gap-2">
@@ -466,15 +821,100 @@ export default function Home() {
           </motion.div>
         </section>
 
+        <AnimatePresence>
+          {showClipboardPrompt && clipboardVault && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              className="fixed bottom-4 left-4 right-4 z-[60] mx-auto max-w-xl rounded-xl border border-emerald-500/30 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-300">Vault link detected in clipboard</p>
+                  <p className="mt-1 truncate text-xs text-zinc-400">{clipboardVault}</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Dismiss clipboard prompt"
+                  className="rounded-md p-1 text-zinc-500 transition-colors hover:text-zinc-200"
+                  onClick={() => setShowClipboardPrompt(false)}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-lg bg-primary px-4 font-semibold text-primary-foreground hover:bg-primary/90"
+                  onClick={() => {
+                    openVault(clipboardVault);
+                    setShowClipboardPrompt(false);
+                  }}
+                >
+                  Open Vault
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg border-zinc-700 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800"
+                  onClick={() => {
+                    setVaultInput(clipboardVault);
+                    setShowClipboardPrompt(false);
+                  }}
+                >
+                  Use in Access Box
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <Dialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+          <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-left">Recover Vault via Email</DialogTitle>
+              <DialogDescription className="text-left text-zinc-400">
+                Enter your email. VaultBridge will send access details using your latest code/link context.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                type="email"
+                value={recoveryEmail}
+                onChange={(event) => {
+                  setRecoveryEmail(event.target.value);
+                  if (recoveryStatus) setRecoveryStatus(null);
+                }}
+                placeholder="you@example.com"
+                className="h-11 border-zinc-700 bg-zinc-900/70 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-primary/40"
+              />
+              <Button
+                type="button"
+                className="h-11 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                disabled={isRecoverySending}
+                onClick={handleSendRecovery}
+              >
+                {isRecoverySending ? "Sending..." : "Send Recovery Link"}
+              </Button>
+              {recoveryStatus && (
+                <p className={`text-xs ${recoveryStatus.includes("sent") ? "text-emerald-400" : "text-rose-400"}`}>
+                  {recoveryStatus}
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
       </main>
 
       {/* SECTION 9 — Footer (SEO Critical) */}
       <footer className="relative z-10 border-t border-zinc-800 bg-zinc-950 pt-16 pb-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
-                <img src="/og-image.png" alt="VaultBridge Logo" className="w-full h-full object-cover p-1" />
+                <img src="/icon-192x192.png" alt="VaultBridge Logo" className="w-full h-full object-cover p-1" />
               </div>
               <span className="font-bold text-xl tracking-tight">VAULTBRIDGE</span>
             </div>
@@ -499,12 +939,23 @@ export default function Home() {
           <div>
             <h4 className="font-bold text-white mb-4">Resources</h4>
             <ul className="space-y-3 text-sm text-zinc-500">
+              <li><Link href="/blog"><span className="hover:text-primary cursor-pointer transition-colors">Blog Hub</span></Link></li>
               <li><Link href="/security"><span className="hover:text-primary cursor-pointer transition-colors">Security</span></Link></li>
               <li><Link href="/privacy-manifesto"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Manifesto</span></Link></li>
               <li><Link href="/roadmap"><span className="hover:text-primary cursor-pointer transition-colors">Roadmap</span></Link></li>
               <li><Link href="/how-it-works"><span className="hover:text-primary cursor-pointer transition-colors">How it Works</span></Link></li>
               <li><Link href="/privacy"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Policy</span></Link></li>
               <li><Link href="/terms"><span className="hover:text-primary cursor-pointer transition-colors">Terms of Service</span></Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white mb-4">Blogs</h4>
+            <ul className="space-y-3 text-sm text-zinc-500">
+              <li><Link href="/blog/secure-file-sharing-best-practices"><span className="hover:text-primary cursor-pointer transition-colors">Secure File Sharing Best Practices</span></Link></li>
+              <li><Link href="/blog/encrypted-file-transfer-vs-cloud-storage"><span className="hover:text-primary cursor-pointer transition-colors">Encrypted Transfer vs Cloud Storage</span></Link></li>
+              <li><Link href="/blog/anonymous-file-sharing-without-login"><span className="hover:text-primary cursor-pointer transition-colors">Anonymous Sharing Without Login</span></Link></li>
+              <li><Link href="/blog/temporary-file-links-and-auto-destruct"><span className="hover:text-primary cursor-pointer transition-colors">Temporary Links & Auto-Destruct</span></Link></li>
             </ul>
           </div>
         </div>

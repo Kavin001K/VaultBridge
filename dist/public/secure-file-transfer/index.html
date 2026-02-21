@@ -59,13 +59,15 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
 
   <!-- Favicons & Icons -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/og-image.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/og-image.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/og-image.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="mask-icon" href="/og-image.png" color="#10b981">
   <meta name="msapplication-TileColor" content="#0a0a0f">
-  <meta name="msapplication-TileImage" content="/og-image.png">
+  <meta name="msapplication-TileImage" content="/mstile-150x150.png">
 
   <!-- Preconnect for Performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -76,8 +78,19 @@
   <!-- Google Fonts (Optimized) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
 
-  <!-- Privacy-respecting analytics -->
-  <script defer="" data-domain="vaultbridge.org" src="https://plausible.io/js/script.outbound-links.js"></script>
+  <!-- Privacy-respecting analytics (only on production domains) -->
+  <script>
+    (function () {
+      const analyticsHosts = new Set(["vaultbridge.org", "www.vaultbridge.org"]);
+      if (!analyticsHosts.has(window.location.hostname)) return;
+
+      const script = document.createElement("script");
+      script.defer = true;
+      script.setAttribute("data-domain", "vaultbridge.org");
+      script.src = "https://plausible.io/js/script.outbound-links.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 
   <!-- JSON-LD Structured Data: WebApplication -->
   <script type="application/ld+json">
@@ -237,8 +250,8 @@
   <!-- Preload Critical Assets -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-  <script type="module" crossorigin="" src="/assets/index-CzGRSC1U.js"></script>
-  <link rel="stylesheet" crossorigin="" href="/assets/index-D8y8nksX.css">
+  <script type="module" crossorigin="" src="/assets/index-CjvZq1Jz.js"></script>
+  <link rel="stylesheet" crossorigin="" href="/assets/index-mQkNEeE1.css">
 </head>
 
 <body>
@@ -251,7 +264,7 @@
     </div>
   </noscript>
 
-  <div id="root"><div role="region" aria-label="Notifications (F8)" tabindex="-1" style="pointer-events: none;"><ol tabindex="-1" class="fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]"></ol></div><div class="flex items-center justify-center min-h-screen bg-black/90 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-circle w-10 h-10 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg></div></div>
+  <div id="root"><div role="region" aria-label="Notifications (F8)" tabindex="-1" style="pointer-events: none;"><ol tabindex="-1" class="fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]"></ol></div><div class="min-h-screen bg-zinc-950 text-zinc-100"><main class="mx-auto max-w-5xl space-y-10 px-4 py-14"><section class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 text-center md:p-10"><h1 class="text-3xl font-bold md:text-5xl">Secure File Transfer</h1><p class="mx-auto mt-4 max-w-3xl text-zinc-400">VaultBridge provides secure file transfer with privacy-first architecture.</p><div class="mt-6"><a href="/upload"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg]:size-4 [&amp;_svg]:shrink-0 hover-elevate active-elevate-2 border border-primary-border min-h-9 py-2 h-11 rounded-full bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90">Upload Secure File<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right ml-2 h-4 w-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button></a></div></section><section class="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6"><h2 class="text-2xl font-semibold">How It Works</h2><p class="mt-3 text-zinc-300">Secure File Transfer securely with VaultBridge using end-to-end encryption. Files remain private, automatically expire, and require no account. Built for users who need temporary, zero-tracking storage.</p></section><section class="grid gap-4 md:grid-cols-2"><div class="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6"><h2 class="text-xl font-semibold">Why VaultBridge</h2><ul class="mt-3 list-disc space-y-1 pl-5 text-zinc-300"><li>No login required</li><li>Zero tracking</li><li>Encrypted transfers</li><li>Temporary file lifecycle</li></ul></div><div class="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6"><h2 class="text-xl font-semibold">Use Cases</h2><ul class="mt-3 list-disc space-y-1 pl-5 text-zinc-300"><li>Confidential team collaboration</li><li>Secure document exchange</li><li>Privacy-first file transfers</li></ul></div></section><section class="rounded-xl border border-primary/30 bg-primary/10 p-6"><h2 class="text-xl font-semibold">SEO Context</h2><p class="mt-2 text-zinc-200">Start secure file transfer today. VaultBridge offers no-login encryption, temporary file storage, and minimal data collection.</p></section></main></div></div>
 
 
 

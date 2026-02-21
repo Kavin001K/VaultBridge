@@ -17,6 +17,25 @@ import { registerSeoRoutes } from "./seo-routes";
 
 const app = express();
 const httpServer = createServer(app);
+const isProduction = process.env.NODE_ENV === "production";
+const cspConnectSrc = [
+  "'self'",
+  "ws:",
+  "wss:",
+  "https://api.github.com",
+  "https://plausible.io",
+  process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
+  "https://*.r2.cloudflarestorage.com",
+  "https://*.cloudflarestorage.com",
+  process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : "",
+  // Dev-only tooling and local services (Vite fallback ping, localhost APIs)
+  ...(isProduction ? [] : [
+    "http://127.0.0.1:*",
+    "http://localhost:*",
+    "ws://127.0.0.1:*",
+    "ws://localhost:*",
+  ]),
+].filter(Boolean) as string[];
 
 declare module "http" {
   interface IncomingMessage {
@@ -38,16 +57,7 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: [
-          "'self'",
-          "ws:",
-          "wss:",
-          "https://plausible.io",
-          process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
-          "https://*.r2.cloudflarestorage.com",
-          "https://*.cloudflarestorage.com",
-          process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : ""
-        ].filter(Boolean) as string[], // WebSocket for HMR + Supabase + R2
+        connectSrc: cspConnectSrc, // API + storage + local dev tooling
       },
     },
     crossOriginEmbedderPolicy: false, // Required for some features
@@ -93,13 +103,14 @@ export const uploadLimiter = rateLimit({
 
 app.use(
   express.json({
+    limit: "25mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "25mb" }));
 
 // =============================================================================
 // REQUEST LOGGING
