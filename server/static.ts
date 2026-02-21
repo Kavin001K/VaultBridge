@@ -180,6 +180,7 @@ export function serveStatic(app: Express) {
       req.path.endsWith(".json") ||
       req.path.endsWith(".txt") ||
       req.path.endsWith(".xml") ||
+      req.path.endsWith(".xsl") ||
       req.path.endsWith(".ico") ||
       req.path.endsWith(".png") ||
       req.path.endsWith(".jpg") ||
