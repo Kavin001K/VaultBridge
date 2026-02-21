@@ -128,6 +128,17 @@ export function serveStatic(app: Express) {
     return html;
   };
 
+  // Serve .well-known files for PWA URL handlers and Android asset links
+  // Express static blocks dotfiles by default, so this explicit mount is required
+  app.use("/.well-known", express.static(path.join(distPath, ".well-known"), {
+    dotfiles: "allow",
+    maxAge: "1d",
+    setHeaders: (res, filePath) => {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+  }));
+
   // Serve static assets with proper cache headers
   // Assets have hashed filenames so can be cached long-term
   app.use("/assets", express.static(path.join(distPath, "assets"), {
@@ -159,8 +170,9 @@ export function serveStatic(app: Express) {
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
 
-    // Skip asset-like requests
+    // Skip asset-like requests and .well-known paths
     if (req.path.startsWith("/assets/") ||
+      req.path.startsWith("/.well-known/") ||
       req.path.endsWith(".js") ||
       req.path.endsWith(".css") ||
       req.path.endsWith(".wasm") ||
