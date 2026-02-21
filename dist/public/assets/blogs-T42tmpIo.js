@@ -1,0 +1,14 @@
+import { c as t, j as e, L as r, B as a, p as i, aN as c, w as l } from "./index-CjvZq1Jz.js";
+/**
+* @license lucide-react v0.453.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+const n = t("BookOpen", [["path", { d: "M12 7v14", key: "1akyts" }], ["path", { d: "M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z", key: "ruj8y" }]]);
+function x() {
+  return e.jsxs("div", { className: "min-h-screen bg-zinc-950 text-zinc-100", children: [e.jsx("header", { className: "sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur", children: e.jsxs("div", { className: "mx-auto flex h-16 max-w-6xl items-center justify-between px-4", children: [e.jsx(r, { href: "/", children: e.jsxs("div", { className: "cursor-pointer font-mono text-lg font-bold tracking-tight", children: ["VAULT", e.jsx("span", { className: "text-primary", children: "BRIDGE" })] }) }), e.jsx(r, { href: "/", children: e.jsxs(a, { variant: "ghost", size: "sm", className: "gap-2 text-zinc-300", children: [e.jsx(i, { className: "h-4 w-4" }), "Home"] }) })] }) }), e.jsxs("main", { className: "mx-auto max-w-6xl px-4 py-12", children: [e.jsxs("section", { className: "rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 md:p-10", children: [e.jsxs("div", { className: "mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary", children: [e.jsx(n, { className: "h-3.5 w-3.5" }), "VaultBridge Blog"] }), e.jsx("h1", { className: "text-3xl font-bold md:text-5xl", children: "Privacy and Security Guides" }), e.jsx("p", { className: "mt-4 max-w-3xl text-zinc-400", children: "Technical write-ups focused on secure file transfer, encrypted workflows, and privacy-first sharing operations." })] }), e.jsx("section", { className: "mt-8 grid gap-4 md:grid-cols-2", children: c.map((s) => e.jsxs("article", { className: "rounded-xl border border-zinc-800 bg-zinc-900/30 p-6", children: [e.jsx("p", { className: "text-xs uppercase tracking-wider text-primary", children: s.readTime }), e.jsx("h2", { className: "mt-2 text-2xl font-semibold", children: s.title }), e.jsx("p", { className: "mt-3 text-sm text-zinc-400", children: s.excerpt }), e.jsxs("p", { className: "mt-4 text-xs text-zinc-500", children: ["Updated: ", s.lastUpdated] }), e.jsx("div", { className: "mt-5", children: e.jsx(r, { href: `/blog/${s.slug}`, children: e.jsxs(a, { className: "h-10 rounded-full bg-primary px-5 font-semibold text-primary-foreground hover:bg-primary/90", children: ["Read article", e.jsx(l, { className: "ml-2 h-4 w-4" })] }) }) })] }, s.slug)) })] })] });
+}
+export {
+  x as default
+};

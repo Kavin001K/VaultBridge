@@ -13,9 +13,30 @@ import { createServer } from "http";
 import { startCleanupWorker } from "./cron/cleanup";
 import { storage } from "./storage";
 import { logStorageStatus } from "./services/storage_router";
+import { registerSeoRoutes } from "./seo-routes";
 
 const app = express();
 const httpServer = createServer(app);
+const isProduction = process.env.NODE_ENV === "production";
+const apiBodyLimit = process.env.API_BODY_LIMIT || "100mb";
+const cspConnectSrc = [
+  "'self'",
+  "ws:",
+  "wss:",
+  "https://api.github.com",
+  "https://plausible.io",
+  process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
+  "https://*.r2.cloudflarestorage.com",
+  "https://*.cloudflarestorage.com",
+  process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : "",
+  // Dev-only tooling and local services (Vite fallback ping, localhost APIs)
+  ...(isProduction ? [] : [
+    "http://127.0.0.1:*",
+    "http://localhost:*",
+    "ws://127.0.0.1:*",
+    "ws://localhost:*",
+  ]),
+].filter(Boolean) as string[];
 
 declare module "http" {
   interface IncomingMessage {
@@ -33,19 +54,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // For Vite HMR in dev
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io"], // For Vite HMR in dev
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: [
-          "'self'",
-          "ws:",
-          "wss:",
-          process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
-          "https://*.r2.cloudflarestorage.com",
-          "https://*.cloudflarestorage.com",
-          process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : ""
-        ].filter(Boolean) as string[], // WebSocket for HMR + Supabase + R2
+        connectSrc: cspConnectSrc, // API + storage + local dev tooling
       },
     },
     crossOriginEmbedderPolicy: false, // Required for some features
@@ -91,13 +104,14 @@ export const uploadLimiter = rateLimit({
 
 app.use(
   express.json({
+    limit: apiBodyLimit,
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: apiBodyLimit }));
 
 // =============================================================================
 // REQUEST LOGGING
@@ -169,6 +183,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+  registerSeoRoutes(app);
 
   // Reconcile storage usage from DB (count existing bytes per provider)
   try {
@@ -183,6 +198,12 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 
   // Error handling middleware
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === "entity.too.large") {
+      return res.status(413).json({
+        message: "Payload too large. Reduce clipboard attachments and try again.",
+      });
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
@@ -210,11 +231,49 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   const { setupWebsocketSignaling } = await import("./websocket");
   setupWebsocketSignaling(httpServer);
 
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "8080", 10);
   const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+
+  httpServer.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `[startup] Port ${port} is already in use. Stop the existing server process before running npm run dev.`
+      );
+      process.exit(1);
+    }
+    console.error("[startup] HTTP server failed to start:", error);
+    process.exit(1);
+  });
 
   httpServer.listen(port, host, () => {
     log(`🔐 VaultBridge server running on http://${host}:${port}`);
+    log(`📦 API body limit: ${apiBodyLimit}`);
     log(`🧹 Cleanup worker active (10 min interval)`);
   });
+
+  // =============================================================================
+  // GOOGLE CLOUD RUN OPTIMIZATIONS — GRACEFUL SHUTDOWN
+  // =============================================================================
+  const gracefulShutdown = (signal: string) => {
+    log(`[Cloud Run] 🛑 Received ${signal}, initiating graceful shutdown for zero-downtime scaling...`);
+
+    // Stop accepting new connections
+    httpServer.close((err) => {
+      if (err) {
+        console.error("[Cloud Run] Error during HTTP server close:", err);
+        process.exit(1);
+      }
+      log("[Cloud Run] ✅ HTTP Server closed cleanly.");
+      process.exit(0);
+    });
+
+    // Force shutdown if connections are hanging for too long (Cloud Run usually gives 10s)
+    setTimeout(() => {
+      console.error("[Cloud Run] ⚠️ Forced shutdown due to hanging connections.");
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 })();

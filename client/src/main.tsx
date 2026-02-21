@@ -2,6 +2,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// Initialize MobileSDK (sets up --vh, battery, network listeners)
+import { MobileSDK } from "./lib/mobile-sdk";
+if (typeof window !== 'undefined') {
+    (window as any).__mobileSDK = MobileSDK;
+}
+
 // Suppress "Download the React DevTools" message
 if (import.meta.env.DEV) {
     const originalInfo = console.info;

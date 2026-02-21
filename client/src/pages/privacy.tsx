@@ -66,8 +66,9 @@ When utilizing the Universal Live Clipboard feature:
 * **Memory-Only Mode**: During database outages, the system fails over to volatile RAM. Metadata stored in this state is lost instantly upon server restart.
 
 ### What We DO NOT Collect
-* **Your Decryption Keys**: The full 6-digit PIN never leaves your device.
+* **Your Decryption Keys**: The full 6-digit PIN never leaves your device. Even when sharing via QR Codes or direct links, the PIN is passed exclusively via URL hash fragments (#code), ensuring it is completely invisible to our servers and network logs.
 * **Your Content**: Streaming decryption ensures even large files are never realized on our server's disk in plaintext.
+* **Lost Codes / PINs**: We offer **absolutely no code recovery options**. If you lose your 6-digit access PIN, your encrypted data is permanently inaccessible. We cannot recover it for you because we never had it to begin with.
 * **Your Identity**: No accounts. No emails.
 * **Analytics**: No Google Analytics. No Facebook Pixels. No tracking cookies.
             `
@@ -78,6 +79,7 @@ When utilizing the Universal Live Clipboard feature:
             content: `
 Our servers act as a blind courier. They take a locked briefcase (your encrypted data) from Point A and hand it to Point B. They do not have the key to the briefcase, nor do they care what is inside.
 
+* **Hardware-Accelerated Edge Loading**: We use dynamic ultra-fast edge loading with native splash screens to minimize time-to-interact to near zero milliseconds. No data rests in these edge caches.
 * **Adaptive Streaming**: Large files are piped directly to your browser without caching fully on our side.
 * **Volatile Fallback**: We maintain a "break-glass" in-memory database that activates automatically if our primary storage goes dark, ensuring uptime without persistence.
             `

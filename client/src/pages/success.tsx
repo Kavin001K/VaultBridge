@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { useGetVault } from "@/hooks/use-vaults";
 import { useToast } from "@/hooks/use-toast";
+import { useVaultHistory } from "@/hooks/useVaultHistory";
 
 // SVG Filter for Heat Distortion
 const BurnFilter = () => (
@@ -98,6 +99,8 @@ export default function Success() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [uploadStats, setUploadStats] = useState<{ time: number, speed: number } | null>(null);
   const [showSpamAlert, setShowSpamAlert] = useState(false);
+  const { addRecord, updateRecord } = useVaultHistory();
+  const historySavedRef = useRef(false);
 
   const handleBurn = async () => {
     if (!params?.id) return;
@@ -114,6 +117,11 @@ export default function Success() {
         description: "Protocol activated. Vaporizing data...",
         className: "bg-rose-950/50 border-rose-500 text-rose-400 font-mono",
       });
+
+      // Mark as burned in vault history
+      if (splitCode) {
+        updateRecord(splitCode, "sent", { status: "burned" });
+      }
 
       // Trigger Animation
       setIsBurned(true);
@@ -154,12 +162,37 @@ export default function Success() {
     }
   }, []);
 
+  // Save vault to browser history when vault data is loaded
+  useEffect(() => {
+    if (vault && splitCode && !historySavedRef.current) {
+      historySavedRef.current = true;
+
+      const fileNames = vault.files?.map((f: any) => f.originalName || f.fileName || `File ${f.fileId?.slice(0, 6)}`) || [];
+      const totalSize = vault.files?.reduce((acc: number, f: any) => acc + (f.totalSize || f.size || 0), 0) || 0;
+
+      addRecord({
+        type: vault.encryptedClipboardText ? "clipboard" : "vault",
+        action: "sent",
+        accessCode: splitCode,
+        vaultId: vault.id,
+        fileNames,
+        fileCount: vault.files?.length || 0,
+        totalSize,
+        hasClipboard: !!vault.encryptedClipboardText,
+        createdAt: Date.now(),
+        expiresAt: new Date(vault.expiresAt).getTime(),
+        maxDownloads: vault.maxDownloads || 0,
+        downloadCount: vault.downloadCount || 0,
+      });
+    }
+  }, [vault, splitCode, addRecord]);
+
   // Share Link logic
   // User Requested: "give only the link to pave for entering the pin"
-  // So we just link to /access. The user must communicate the PIN separately (or we provide it).
-  // The "Split Code" (e.g. 123-456) IS the PIN + Lookup.
-  // So we can just give them the link to the site/access.
-  const shareLink = `${window.location.origin}/access`;
+  // So we just link to /access with the code in the hash fragment.
+  // The hash fragment is never sent to the server, preserving zero-knowledge.
+  // This allows auto-fill and auto-submit without manual entry.
+  const shareLink = `${window.location.origin}/access#code=${splitCode}`;
 
   const handleCopy = async (text: string, type: 'link' | 'code') => {
     await navigator.clipboard.writeText(text);
@@ -226,6 +259,11 @@ export default function Success() {
       setShowSpamAlert(true);
 
       toast({ title: "✅ Email Sent", description: "Recipient notified securely.", className: "bg-emerald-900/90 border-emerald-500" });
+
+      // Track email in vault history
+      if (splitCode) {
+        updateRecord(splitCode, "sent", { lastEmailedTo: normalizedEmail, lastEmailedAt: Date.now() });
+      }
 
       setEmail("");
     } catch (e: any) {

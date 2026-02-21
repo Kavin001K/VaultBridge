@@ -27,6 +27,16 @@ export class MemoryStorage implements IStorage {
             if (!this.getVaultByShortCodeSync(shortCode)) isUnique = true;
         }
 
+        if (data.lookupId && (await this.getVaultByLookupId(data.lookupId))) {
+            const conflictError = new Error("Lookup ID collision. Retrying with a new access code is required.") as Error & {
+                status?: number;
+                code?: string;
+            };
+            conflictError.status = 409;
+            conflictError.code = "LOOKUP_ID_CONFLICT";
+            throw conflictError;
+        }
+
         const expiresAt = new Date(Date.now() + data.expiresIn * 60 * 60 * 1000);
 
         const vault: Vault = {

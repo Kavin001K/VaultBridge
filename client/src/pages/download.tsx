@@ -31,8 +31,9 @@ interface DecryptedFile {
 }
 
 export default function DownloadPage() {
-  const [, params] = useRoute("/v/:id");
-  const vaultId = params?.id;
+  const [, paramsV] = useRoute("/v/:id");
+  const [, paramsDownload] = useRoute("/download/:id");
+  const vaultId = paramsV?.id || paramsDownload?.id;
   const [decryptionKey, setDecryptionKey] = useState<CryptoKey | null>(null);
   const [files, setFiles] = useState<DecryptedFile[]>([]);
   const [isDecrypting, setIsDecrypting] = useState(true);
@@ -485,7 +486,7 @@ export default function DownloadPage() {
           <Link href="/">
             <div className="flex items-center gap-3 cursor-pointer">
               <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/50 overflow-hidden">
-                <img src="/vault-logo.jpg" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+                <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
               </div>
               <div>
                 <h1 className="text-lg md:text-xl font-bold font-mono tracking-tighter">VAULT<span className="text-primary">BRIDGE</span></h1>
@@ -615,12 +616,24 @@ export default function DownloadPage() {
                     )}
                   </Button>
                   <p className="text-[10px] md:text-xs text-center text-muted-foreground mt-4 opacity-70">
-                    By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
                   </p>
                 </>
               )}
             </>
           )}
+        </div>
+
+        {/* Attribution Footer */}
+        <div className="mt-12 text-center pb-8 opacity-70 hover:opacity-100 transition-opacity">
+          <div className="inline-flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <p className="text-sm font-medium text-zinc-300">Securely shared via VaultBridge</p>
+            </div>
+            <a href="/" className="text-xs text-primary hover:underline hover:text-emerald-400 transition-colors font-mono">
+              Free encrypted file sharing
+            </a>
+          </div>
         </div>
       </div>
     </div>

@@ -7,6 +7,20 @@ Allow: /clipboard
 Allow: /how-it-works
 Allow: /terms
 Allow: /privacy
+Allow: /security
+Allow: /privacy-manifesto
+Allow: /roadmap
+Allow: /blog
+Allow: /blog/secure-file-sharing-best-practices
+Allow: /blog/encrypted-file-transfer-vs-cloud-storage
+Allow: /blog/anonymous-file-sharing-without-login
+Allow: /blog/temporary-file-links-and-auto-destruct
+Allow: /secure-file-sharing-free
+Allow: /encrypted-file-transfer
+Allow: /private-file-sharing
+Allow: /anonymous-file-sharing
+Allow: /free-encrypted-upload
+Allow: /send-files-securely
 
 # Disallow temporary/dynamic sensitive pages
 Disallow: /download/
@@ -17,4 +31,5 @@ Disallow: /live/
 Crawl-delay: 1
 
 # Sitemaps
-Sitemap: https://vaultbridge.io/sitemap.xml
+Sitemap: https://vaultbridge.org/sitemap.xml
+Sitemap: https://vaultbridge.org/sitemap-index.xml

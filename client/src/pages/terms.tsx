@@ -47,6 +47,7 @@ VaultBridge provides ephemeral, encrypted data transfer focused on Zero-Knowledg
 * **Secure Vaults**: Time-limited encrypted file storage with adaptive streaming decryption and **Dual-Provider Storage Routing** (R2/Supabase).
 * **The "Burn" Protocol**: A manual override to instantly incinerate session data from our volatile memory.
 * **Burn-on-Read**: Option to auto-destruct a vault immediately after its first successful download.
+* **Instant Auto-Access**: When sharing vaulted content via Direct Links or QR codes, the Access PIN serves strictly as a URL hash fragment (e.g., #code). This is processed strictly via your browser's client-side memory; we absolutely never log or retain it.
             `
         },
         {
@@ -77,7 +78,7 @@ This software is provided "as is."
             id: "liability",
             title: "5. Liability",
             content: `
-You acknowledge that you are solely responsible for the custody of your encryption keys (PINs/Links). If you lose them, we cannot help you. If you share them with the wrong person, we cannot stop them. We possess **Zero Knowledge** of your keys.
+You acknowledge that you are solely responsible for the custody of your encryption keys (PINs/Links). If you lose them, we cannot help you. We have explicitly removed all traditional "Lost Code / Recovery" functionality. We possess **Zero Knowledge** of your keys. If you share them with the wrong person, we cannot stop them.
             `
         },
         {
@@ -271,7 +272,7 @@ Code is Law. But for the lawyers: These terms are governed by the laws of the St
                 <div className="container px-4 text-center max-w-4xl mx-auto relative z-10">
                     <ShieldAlert className="w-12 h-12 text-zinc-900 mx-auto mb-6" />
                     <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
-                        VaultBridge Legal Protocol • Binding Agreement
+                        VaultBridge Legal Protocol • Binding Agreement • <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-red-400 transition-colors">Sitemap</a>
                     </p>
 
                     <motion.div

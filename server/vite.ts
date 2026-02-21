@@ -57,7 +57,12 @@ export async function setupVite(server: Server, app: Express) {
         `src="/src/main.tsx?v=${SERVER_START_TIME}"`,
       );
 
-      const page = await vite.transformIndexHtml(url, template);
+      let page = await vite.transformIndexHtml(url, template);
+
+      // We run dev with HMR disabled; remove Vite client injection to avoid
+      // retry/ping noise and CSP warnings for unreachable HMR ports.
+      page = page.replace(/<script\s+type="module"\s+src="\/@vite\/client"><\/script>\s*/g, "");
+
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);

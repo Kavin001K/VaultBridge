@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { generateSEOPages } from '@shared/seo-generator';
+import { blogPosts } from '@shared/blog';
 
 interface SEOProps {
     title?: string;
@@ -16,12 +18,12 @@ const defaultSEO = {
     description: 'Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, direct email relay, encrypted clipboard, zero-knowledge privacy. No account required. Free & open source.',
     keywords: 'secure file transfer, encrypted file sharing, end-to-end encryption, privacy, self-destructing links, zero knowledge, AES-256, anonymous file sharing, encrypted email, secure clipboard',
     image: '/og-image.png',
-    url: 'https://vaultbridge.io',
+    url: 'https://vaultbridge.org',
     type: 'website',
 };
 
 // Page-specific SEO configurations
-const pageSEO: Record<string, SEOProps> = {
+const staticPageSEO: Record<string, SEOProps> = {
     '/': {
         title: 'VaultBridge | Secure Encrypted File Sharing & Transfer',
         description: 'Share sensitive files securely with end-to-end AES-256 encryption. Self-destructing vaults, encrypted email relay, secure clipboard sync, and zero-knowledge privacy. No account required.',
@@ -76,6 +78,73 @@ const pageSEO: Record<string, SEOProps> = {
         description: 'Understand the security architecture behind VaultBridge. Learn how AES-256 encryption, split-key access codes, and self-destructing vaults keep your files safe.',
         keywords: 'how encryption works, AES-256 explained, zero knowledge architecture, secure file sharing explained, self-destructing vaults, split-key encryption',
     },
+    '/security': {
+        title: 'Security Architecture | VaultBridge',
+        description: 'Technical security architecture for VaultBridge: encryption model, key flow, file lifecycle, and auto-destruct logic.',
+        keywords: 'vaultbridge security architecture, client-side encryption, zero-knowledge file sharing, file lifecycle security, auto-destruct logic',
+    },
+    '/privacy-manifesto': {
+        title: 'Privacy Manifesto | VaultBridge',
+        description: 'Why VaultBridge exists: privacy-first architecture, minimal data collection, and user-controlled secure transfer.',
+        keywords: 'privacy manifesto, privacy-first file sharing, zero tracking philosophy, user controlled security',
+    },
+    '/roadmap': {
+        title: 'Public Roadmap | VaultBridge',
+        description: 'Transparent roadmap for VaultBridge: upcoming security, privacy, and product milestones.',
+        keywords: 'vaultbridge roadmap, secure file sharing roadmap, privacy product roadmap',
+    },
+    '/blog': {
+        title: 'VaultBridge Blog | Privacy and Security Guides',
+        description: 'Technical articles on secure file transfer, encrypted delivery, anonymous sharing, and lifecycle security controls.',
+        keywords: 'vaultbridge blog, secure file sharing guides, encrypted transfer best practices, privacy-first file delivery',
+    },
+    '/secure-file-sharing-free': {
+        title: 'Secure File Sharing Free | VaultBridge',
+        description: 'Secure file sharing without login, tracking, or permanent storage. Encrypted transfers with temporary lifecycle controls.',
+        keywords: 'secure file sharing free, private file sharing, no login file sharing, encrypted secure link sharing',
+    },
+    '/encrypted-file-transfer': {
+        title: 'Encrypted File Transfer | VaultBridge',
+        description: 'Encrypted file transfer with temporary storage and secure access. Built for privacy-conscious sharing.',
+        keywords: 'encrypted file transfer, secure transfer links, privacy file transfer, zero tracking file sharing',
+    },
+    '/private-file-sharing': {
+        title: 'Private File Sharing | VaultBridge',
+        description: 'Private file sharing for teams and individuals who need secure, temporary, encrypted delivery.',
+        keywords: 'private file sharing, confidential file transfer, encrypted private upload, secure temporary file storage',
+    },
+    '/anonymous-file-sharing': {
+        title: 'Anonymous File Sharing | VaultBridge',
+        description: 'Share files anonymously with encrypted transfer and temporary retention controls.',
+        keywords: 'anonymous file sharing, no account file sharing, anonymous encrypted sharing, privacy sharing tool',
+    },
+    '/free-encrypted-upload': {
+        title: 'Free Encrypted Upload | VaultBridge',
+        description: 'Free encrypted upload flow for secure sharing without account friction.',
+        keywords: 'free encrypted upload, secure encrypted upload, no login encrypted transfer, privacy-first upload',
+    },
+    '/send-files-securely': {
+        title: 'Send Files Securely | VaultBridge',
+        description: 'Send files securely with encrypted transfer, temporary vault lifecycle, and zero tracking defaults.',
+        keywords: 'send files securely, secure file transfer, encrypted link sharing, temporary secure vault',
+    },
+};
+
+const blogPostSEO: Record<string, SEOProps> = Object.fromEntries(
+    blogPosts.map((post) => [
+        `/blog/${post.slug}`,
+        {
+            title: `${post.title} | VaultBridge Blog`,
+            description: post.description,
+            keywords: post.keywords.join(', '),
+        },
+    ]),
+);
+
+const pageSEO: Record<string, SEOProps> = {
+    ...generateSEOPages(),
+    ...staticPageSEO,
+    ...blogPostSEO,
 };
 
 export function useSEO(customSEO?: SEOProps) {
@@ -83,8 +152,11 @@ export function useSEO(customSEO?: SEOProps) {
 
     useEffect(() => {
         // Get page-specific SEO or use defaults
-        const basePath = '/' + location.split('/')[1];
-        const pageConfig = pageSEO[basePath] || pageSEO[location] || {};
+        const normalizedLocation = location.endsWith('/') && location.length > 1
+            ? location.slice(0, -1)
+            : location;
+        const basePath = '/' + normalizedLocation.split('/')[1];
+        const pageConfig = pageSEO[normalizedLocation] || pageSEO[basePath] || {};
 
         const seo = {
             ...defaultSEO,
@@ -114,7 +186,7 @@ export function useSEO(customSEO?: SEOProps) {
         // Open Graph
         updateMeta('meta[property="og:title"]', 'content', seo.title || defaultSEO.title);
         updateMeta('meta[property="og:description"]', 'content', seo.description || defaultSEO.description);
-        updateMeta('meta[property="og:url"]', 'content', `${defaultSEO.url}${location}`);
+        updateMeta('meta[property="og:url"]', 'content', `${defaultSEO.url}${normalizedLocation}`);
         updateMeta('meta[property="og:image"]', 'content', seo.image || defaultSEO.image);
         updateMeta('meta[property="og:type"]', 'content', seo.type || defaultSEO.type);
 
@@ -122,6 +194,7 @@ export function useSEO(customSEO?: SEOProps) {
         updateMeta('meta[name="twitter:title"]', 'content', seo.title || defaultSEO.title);
         updateMeta('meta[name="twitter:description"]', 'content', seo.description || defaultSEO.description);
         updateMeta('meta[name="twitter:image"]', 'content', seo.image || defaultSEO.image);
+        updateMeta('meta[name="twitter:url"]', 'content', `${defaultSEO.url}${normalizedLocation}`);
 
         // Canonical URL
         let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
@@ -130,7 +203,7 @@ export function useSEO(customSEO?: SEOProps) {
             canonical.rel = 'canonical';
             document.head.appendChild(canonical);
         }
-        canonical.href = `${defaultSEO.url}${location}`;
+        canonical.href = `${defaultSEO.url}${normalizedLocation}`;
 
     }, [location, customSEO]);
 }
