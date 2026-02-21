@@ -851,6 +851,10 @@ export default function AccessPage() {
                                                                 onChange={(e) => {
                                                                     const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
                                                                     setAccessCode(val);
+                                                                    // Auto-submit when user types 6th digit
+                                                                    if (val.length === 6 && stage === "input") {
+                                                                        setTimeout(() => submitCode(val), 50);
+                                                                    }
                                                                 }}
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter' && accessCode.length === 6) {
