@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,9 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
 import { LiveClipboard } from "@/components/LiveClipboard";
 import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload, useTrackFileDownload } from "@/hooks/use-vaults";
-import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardText } from "@/lib/crypto";
+import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardPayload, type ClipboardPayload } from "@/lib/crypto";
 import { initiateStreamDownload } from "@/lib/downloadStream";
 import { useIsMobile } from "@/hooks/use-mobile"; // Installed Mobile SDK
+import { useVaultHistory } from "@/hooks/useVaultHistory";
+import { RecentActivity } from "@/components/RecentActivity";
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
@@ -35,6 +37,22 @@ interface FileDownloadState {
     remainingDownloads: number;
     isExhausted: boolean;
 }
+
+const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
+const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
+
+const normalizeVaultPath = (pathname: string) =>
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+const isAllowedVaultPath = (pathname: string) => {
+    const normalized = normalizeVaultPath(pathname);
+    return (
+        normalized === "/access" ||
+        normalized.startsWith("/download/") ||
+        normalized.startsWith("/v/")
+    );
+};
 
 // SVG Filter for Heat Distortion (Heavy on mobile GPU, will be conditional)
 const BurnFilter = () => (
@@ -110,13 +128,20 @@ export default function AccessPage() {
     const [vaultData, setVaultData] = useState<any>(null);
     const [fileKey, setFileKey] = useState<CryptoKey | null>(null);
     const [isBurned, setIsBurned] = useState(false);
-    const [clipboardContent, setClipboardContent] = useState<string | null>(null);
+    const [clipboardPayload, setClipboardPayload] = useState<ClipboardPayload | null>(null);
+    const [vaultLinkInput, setVaultLinkInput] = useState("");
+    const [vaultLinkError, setVaultLinkError] = useState<string | null>(null);
+    const [recentVaultLink, setRecentVaultLink] = useState<string | null>(null);
 
     // Per-file download tracking
     const [fileDownloadStates, setFileDownloadStates] = useState<Map<string, FileDownloadState>>(new Map());
 
     // Derived lookupId for sync
     const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
+    const hasClipboardData = Boolean(
+        clipboardPayload &&
+        (clipboardPayload.plainText.trim().length > 0 || clipboardPayload.attachments.length > 0)
+    );
 
     const [, setLocation] = useLocation();
     const { toast } = useToast();
@@ -125,10 +150,153 @@ export default function AccessPage() {
     const getChunkUrl = useGetChunkDownloadUrl();
     const trackDownload = useTrackDownload();
     const trackFileDownload = useTrackFileDownload();
+    const { addRecord, updateRecord } = useVaultHistory();
+    const accessHistorySavedRef = useRef(false);
 
-    const handleCodeSubmit = async () => {
+    const extractAccessCode = (value: string | null): string | null => {
+        if (!value) return null;
+        const direct = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+        if (direct.length === 6) return direct;
+
+        try {
+            const parsed = value.startsWith("http")
+                ? new URL(value)
+                : new URL(value, window.location.origin);
+            const queryCode = parsed.searchParams.get("code");
+            if (queryCode) {
+                const cleaned = queryCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                if (cleaned.length === 6) return cleaned;
+            }
+
+            const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
+            const hashCode = new URLSearchParams(hash).get("code");
+            if (hashCode) {
+                const cleaned = hashCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                if (cleaned.length === 6) return cleaned;
+            }
+        } catch {
+            return null;
+        }
+
+        return null;
+    };
+
+    const resolveVaultDestination = (rawInput: string): string | null => {
+        const trimmed = rawInput.trim();
+        if (!trimmed) return null;
+
+        if (ACCESS_CODE_PATTERN.test(trimmed)) {
+            const code = trimmed.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+            return `/access?code=${code}`;
+        }
+
+        const candidates = [trimmed];
+        if (/^(access|download\/|v\/)/i.test(trimmed)) {
+            candidates.push(`/${trimmed}`);
+        }
+        if (/^(vaultbridge\.org|www\.vaultbridge\.org)/i.test(trimmed)) {
+            candidates.push(`https://${trimmed}`);
+        }
+
+        for (const candidate of candidates) {
+            try {
+                const parsed = candidate.startsWith("/")
+                    ? new URL(candidate, window.location.origin)
+                    : new URL(candidate);
+
+                if (isAllowedVaultPath(parsed.pathname)) {
+                    if (parsed.origin === window.location.origin) {
+                        return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+                    }
+                    return parsed.toString();
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        return null;
+    };
+
+    const openVaultLink = (rawInput: string) => {
+        const destination = resolveVaultDestination(rawInput);
+        if (!destination) {
+            setVaultLinkError("Paste a valid vault link or 6-character access code.");
+            return;
+        }
+
+        setVaultLinkError(null);
+        const cleanInput = rawInput.trim();
+        if (cleanInput) {
+            localStorage.setItem(RECENT_VAULT_STORAGE_KEY, cleanInput);
+            localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, cleanInput);
+            setRecentVaultLink(cleanInput);
+        }
+
+        const localAccessCode = extractAccessCode(destination);
+        if (destination.startsWith("/access") && localAccessCode) {
+            setAccessCode(localAccessCode);
+            return;
+        }
+
+        if (destination.startsWith("http://") || destination.startsWith("https://")) {
+            const parsed = new URL(destination);
+            if (parsed.origin === window.location.origin) {
+                const localDestination = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+                const code = extractAccessCode(localDestination);
+                if (normalizeVaultPath(parsed.pathname) === "/access" && code) {
+                    setAccessCode(code);
+                    return;
+                }
+                setLocation(localDestination);
+            } else {
+                window.location.href = destination;
+            }
+            return;
+        }
+
+        setLocation(destination);
+    };
+
+    const handlePasteVaultLink = async () => {
+        if (!navigator.clipboard?.readText) {
+            setVaultLinkError("Clipboard access is not available in this browser.");
+            return;
+        }
+
+        try {
+            const text = await navigator.clipboard.readText();
+            setVaultLinkInput(text.trim());
+            setVaultLinkError(null);
+        } catch {
+            setVaultLinkError("Clipboard read is blocked. Paste manually.");
+        }
+    };
+
+    useEffect(() => {
+        const fromQuery = new URLSearchParams(window.location.search).get("code");
+        const fromHash = new URLSearchParams(window.location.hash.replace("#", "")).get("code");
+        const fromRecent =
+            localStorage.getItem(RECENT_VAULT_STORAGE_KEY) ||
+            localStorage.getItem(LEGACY_RECENT_VAULT_STORAGE_KEY);
+        const preloadCode = extractAccessCode(fromQuery) || extractAccessCode(fromHash) || extractAccessCode(fromRecent);
+
+        if (preloadCode) {
+            setAccessCode(preloadCode);
+            // Auto-submit instantly if accessed via share link or QR (Hash/Query)
+            if (extractAccessCode(fromQuery) || extractAccessCode(fromHash)) {
+                setTimeout(() => submitCode(preloadCode), 50);
+            }
+        }
+        if (fromRecent) {
+            setRecentVaultLink(fromRecent);
+        }
+    }, []);
+
+    const submitCode = async (overrideCode?: string) => {
         // Validate 6-char alphanumeric code
-        const cleanCode = accessCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        const codeToProcess = overrideCode || accessCode;
+        const cleanCode = codeToProcess.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
         if (cleanCode.length !== 6) {
             toast({
                 variant: "destructive",
@@ -138,8 +306,14 @@ export default function AccessPage() {
             return;
         }
 
+        const recentAccessValue = `/access?code=${cleanCode}`;
+        localStorage.setItem(RECENT_VAULT_STORAGE_KEY, recentAccessValue);
+        localStorage.setItem(LEGACY_RECENT_VAULT_STORAGE_KEY, recentAccessValue);
+        setRecentVaultLink(recentAccessValue);
+
         setStage("fetching");
         setStatusText("Looking up vault...");
+        setClipboardPayload(null);
 
         try {
             // Split the code into lookupId (first 3) and PIN (last 3)
@@ -180,8 +354,8 @@ export default function AccessPage() {
             if (vault.encryptedClipboardText) {
                 setStatusText("Decrypting clipboard content...");
                 try {
-                    const clipText = await decryptClipboardText(vault.encryptedClipboardText, key);
-                    setClipboardContent(clipText);
+                    const decryptedPayload = await decryptClipboardPayload(vault.encryptedClipboardText, key);
+                    setClipboardPayload(decryptedPayload);
                 } catch (clipErr) {
                     console.error("Failed to decrypt clipboard:", clipErr);
                 }
@@ -201,6 +375,27 @@ export default function AccessPage() {
                         ? "Secure clipboard content available."
                         : "Vault accessed successfully.",
             });
+
+            // Save to vault history (received)
+            if (!accessHistorySavedRef.current) {
+                accessHistorySavedRef.current = true;
+                const clipPreview = clipboardPayload?.plainText?.trim().slice(0, 80) || undefined;
+                addRecord({
+                    type: hasClipboard && !hasFiles ? "clipboard" : "vault",
+                    action: "received",
+                    accessCode: cleanCode,
+                    vaultId: vault.id,
+                    fileNames: metadata.map((f: any) => f.name || "Unknown"),
+                    fileCount: metadata.length,
+                    totalSize: metadata.reduce((acc: number, f: any) => acc + (f.size || 0), 0),
+                    hasClipboard: !!hasClipboard,
+                    clipboardPreview: clipPreview,
+                    createdAt: Date.now(),
+                    expiresAt: new Date(vault.expiresAt).getTime(),
+                    maxDownloads: vault.maxDownloads || 0,
+                    downloadCount: vault.downloadCount || 0,
+                });
+            }
 
         } catch (err) {
             playSound('error');
@@ -587,6 +782,54 @@ export default function AccessPage() {
                                             </p>
                                         </div>
 
+                                        <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                                            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                                                Paste Vault Link
+                                            </p>
+                                            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                                <Input
+                                                    type="text"
+                                                    value={vaultLinkInput}
+                                                    onChange={(event) => {
+                                                        setVaultLinkInput(event.target.value);
+                                                        if (vaultLinkError) setVaultLinkError(null);
+                                                    }}
+                                                    placeholder="https://vaultbridge.org/v/... or ABC123"
+                                                    className="h-10 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-500 focus-visible:ring-cyan-500/40"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-10 border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800"
+                                                    onClick={handlePasteVaultLink}
+                                                >
+                                                    Paste
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    className="h-10 bg-gradient-to-r from-cyan-600 to-emerald-600 text-white hover:from-cyan-500 hover:to-emerald-500"
+                                                    onClick={() => openVaultLink(vaultLinkInput)}
+                                                >
+                                                    Open Vault
+                                                </Button>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                {recentVaultLink && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        className="h-8 px-2 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                                                        onClick={() => openVaultLink(recentVaultLink)}
+                                                    >
+                                                        Open recent vault
+                                                    </Button>
+                                                )}
+                                                {vaultLinkError && (
+                                                    <p className="text-xs text-rose-400">{vaultLinkError}</p>
+                                                )}
+                                            </div>
+                                        </div>
+
                                         {/* Access Card */}
                                         <div className="relative">
                                             {!isMobile && <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-cyan-500/20 rounded-3xl blur-xl opacity-50" />}
@@ -608,10 +851,14 @@ export default function AccessPage() {
                                                                 onChange={(e) => {
                                                                     const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
                                                                     setAccessCode(val);
+                                                                    // Auto-submit when user types 6th digit
+                                                                    if (val.length === 6 && stage === "input") {
+                                                                        setTimeout(() => submitCode(val), 50);
+                                                                    }
                                                                 }}
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter' && accessCode.length === 6) {
-                                                                        handleCodeSubmit();
+                                                                        submitCode();
                                                                     }
                                                                 }}
                                                                 className="absolute inset-0 opacity-0 cursor-pointer z-10 h-20 w-full"
@@ -708,7 +955,7 @@ export default function AccessPage() {
                                                     </div>
 
                                                     <Button
-                                                        onClick={handleCodeSubmit}
+                                                        onClick={() => submitCode()}
                                                         disabled={accessCode.length !== 6}
                                                         className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 6
                                                             ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40" // Removed hover scale on mobile
@@ -752,6 +999,11 @@ export default function AccessPage() {
                                                 </div>
                                             </div>
                                         </motion.div>
+
+                                        {/* Recent Activity */}
+                                        <div className="mt-6 mx-4 sm:mx-0">
+                                            <RecentActivity />
+                                        </div>
                                     </div>
                                 )}
 
@@ -852,20 +1104,21 @@ export default function AccessPage() {
                                                 <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-5 sm:p-6 md:p-8">
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <span className="flex items-center justify-center w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/30">
-                                                            {fileMetadata.length + (clipboardContent ? 1 : 0)}
+                                                            {fileMetadata.length + (hasClipboardData ? 1 : 0)}
                                                         </span>
                                                         <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">
                                                             {fileMetadata.length > 0 ? "Available Content" : "Secure Clipboard"}
                                                         </h3>
                                                     </div>
 
-                                                    {(clipboardContent !== null || !!vaultData.encryptedClipboardText) && (
+                                                    {(hasClipboardData || !!vaultData.encryptedClipboardText) && (
                                                         <div className="mb-6">
                                                             <LiveClipboard
                                                                 lookupId={lookupId}
                                                                 fileKey={fileKey!}
                                                                 wrappedKey={vaultData.wrappedKey}
-                                                                initialContent={clipboardContent}
+                                                                initialContent={clipboardPayload?.plainText || null}
+                                                                size="large"
                                                             />
                                                         </div>
                                                     )}
@@ -943,7 +1196,7 @@ export default function AccessPage() {
                                                                 )}
                                                             </Button>
                                                             <p className="text-[10px] md:text-xs text-center text-muted-foreground mt-4 opacity-70">
-                                                                By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
+                                                                By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link>, <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link> & <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">Sitemap</a>.
                                                             </p>
                                                         </>
                                                     )}
@@ -974,6 +1227,19 @@ export default function AccessPage() {
                             </motion.div>
                         )}
                     </AnimatePresence>
+
+                    {/* Attribution Footer */}
+                    <div className="mt-12 text-center pb-8 opacity-70 hover:opacity-100 transition-opacity">
+                        <div className="inline-flex flex-col items-center">
+                            <div className="flex items-center gap-2 mb-1">
+                                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                                <p className="text-sm font-medium text-zinc-300">Securely shared via VaultBridge</p>
+                            </div>
+                            <a href="/" className="text-xs text-cyan-400 hover:underline hover:text-cyan-300 transition-colors font-mono">
+                                Free encrypted file sharing
+                            </a>
+                        </div>
+                    </div>
                 </main>
             </div>
         </div>

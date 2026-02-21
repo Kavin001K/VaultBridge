@@ -28,6 +28,10 @@ export const api = {
           directLink: z.string(),
         }),
         400: errorSchemas.validation,
+        409: z.object({
+          message: z.string(),
+          code: z.string().optional(),
+        }),
       },
     },
     get: {

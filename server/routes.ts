@@ -10,6 +10,8 @@ import { localStorage } from "./services/local_storage";
 import { logStorageStatus } from "./services/storage_router";
 import multer from "multer";
 
+const MAX_ENCRYPTED_CLIPBOARD_CHARS = 80 * 1024 * 1024; // Keep below API body limit headroom.
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -81,6 +83,15 @@ export async function registerRoutes(
           field: err.errors[0].path.join("."),
         });
       }
+
+      const typedError = err as Error & { status?: number; code?: string };
+      if (typedError.status === 409 && typedError.code === "LOOKUP_ID_CONFLICT") {
+        return res.status(409).json({
+          message: typedError.message,
+          code: typedError.code,
+        });
+      }
+
       // Log the actual error for debugging
       console.error("[Vault Create Error]", err);
       return res.status(500).json({
@@ -308,6 +319,12 @@ export async function registerRoutes(
       const lookupId = req.params.lookupId as string;
       const { encryptedClipboardText, wrappedKey } = api.vaults.updateClipboard.input.parse(req.body);
 
+      if (encryptedClipboardText.length > MAX_ENCRYPTED_CLIPBOARD_CHARS) {
+        return res.status(413).json({
+          message: "Clipboard payload too large. Remove some attachments and try again.",
+        });
+      }
+
       const vault = await storage.getVaultByLookupId(lookupId);
 
       if (!vault) {
@@ -444,21 +461,48 @@ export async function registerRoutes(
       // Send to all recipients in parallel
       const results = await Promise.allSettled(
         recipients.map(async (recipientEmail) => {
-          return sendDirectAttachment({
+          const result = await sendDirectAttachment({
             to: recipientEmail,
             subject,
             text: body,
             files: attachments
           });
+          return { recipientEmail, result };
         })
       );
 
-      // Count successes and failures
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
-      const failCount = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)).length;
+      const successful = results.filter(
+        (entry): entry is PromiseFulfilledResult<{ recipientEmail: string; result: Awaited<ReturnType<typeof sendDirectAttachment>> }> =>
+          entry.status === "fulfilled" && entry.value.result.success
+      );
+
+      const failed = results
+        .map((entry) => {
+          if (entry.status === "rejected") {
+            const reason = entry.reason instanceof Error ? entry.reason.message : "Unexpected send failure";
+            return { recipient: "unknown", reason };
+          }
+
+          if (!entry.value.result.success) {
+            return {
+              recipient: entry.value.recipientEmail,
+              reason: entry.value.result.error || "Delivery failed",
+            };
+          }
+
+          return null;
+        })
+        .filter((entry): entry is { recipient: string; reason: string } => Boolean(entry));
+
+      const successCount = successful.length;
+      const failCount = failed.length;
 
       if (successCount === 0) {
-        return res.status(500).json({ message: "Failed to send emails to all recipients." });
+        const firstFailure = failed[0];
+        const message = firstFailure
+          ? `Failed to send email to ${firstFailure.recipient}: ${firstFailure.reason}`
+          : "Failed to send emails to all recipients.";
+        return res.status(500).json({ message, failed: failed.slice(0, 3) });
       }
 
       if (failCount > 0) {
@@ -466,7 +510,8 @@ export async function registerRoutes(
           success: true,
           message: `Sent to ${successCount}/${recipients.length} recipients. ${failCount} failed.`,
           delivered: successCount,
-          failed: failCount
+          failed: failCount,
+          failures: failed.slice(0, 3)
         });
       }
 

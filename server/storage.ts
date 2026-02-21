@@ -43,17 +43,37 @@ export class DatabaseStorage implements IStorage {
 
         const expiresAt = new Date(Date.now() + data.expiresIn * 60 * 60 * 1000);
 
-        const [vault] = await db.insert(vaults).values({
-            shortCode,
-            lookupId: data.lookupId,
-            wrappedKey: data.wrappedKey,
-            encryptedMetadata: data.encryptedMetadata,
-            encryptedClipboardText: data.encryptedClipboardText,
-            expiresAt,
-            maxDownloads: data.maxDownloads,
-            downloadCount: 0,
-            isDeleted: false
-        }).returning();
+        let vault: Vault;
+        try {
+            [vault] = await db.insert(vaults).values({
+                shortCode,
+                lookupId: data.lookupId,
+                wrappedKey: data.wrappedKey,
+                encryptedMetadata: data.encryptedMetadata,
+                encryptedClipboardText: data.encryptedClipboardText,
+                expiresAt,
+                maxDownloads: data.maxDownloads,
+                downloadCount: 0,
+                isDeleted: false
+            }).returning();
+        } catch (error: any) {
+            const isLookupConflict =
+                error?.code === "23505" &&
+                (String(error?.constraint || "").includes("lookup_id") ||
+                    String(error?.message || "").includes("lookup_id"));
+
+            if (isLookupConflict) {
+                const conflictError = new Error("Lookup ID collision. Retrying with a new access code is required.") as Error & {
+                    status?: number;
+                    code?: string;
+                };
+                conflictError.status = 409;
+                conflictError.code = "LOOKUP_ID_CONFLICT";
+                throw conflictError;
+            }
+
+            throw error;
+        }
 
         for (const f of data.files) {
             const fileMaxDownloads = f.maxDownloads ?? data.maxDownloads;
@@ -356,6 +376,15 @@ class FallbackStorage implements IStorage {
                 console.error("═══════════════════════════════════════════════════════════");
                 console.error("❌ DATABASE UNAVAILABLE — SWITCHING TO MEMORY STORAGE");
                 console.error("   Reason:", err.message);
+
+                if (err.message?.includes('ENETUNREACH') || err.message?.includes('ENOTFOUND') || err.message?.includes('supabase')) {
+                    console.error("   ⚠️ SUPABASE IPv6 CONNECTION ERROR DETECTED!");
+                    console.error("   Supabase has phased out IPv4 on direct connections (`db.[ref].supabase.co`).");
+                    console.error("   Render instances often fail to connect via IPv6 by default.");
+                    console.error("   FIX: Update your DATABASE_URL in Render to use the Connection Pooler URL.");
+                    console.error("   Go to Supabase -> Database -> Connection Pooler and copy the Session URL.");
+                }
+
                 console.error("   Note: Data will be lost when server restarts.");
                 console.error("═══════════════════════════════════════════════════════════");
                 this.usingMemory = true;
