@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "npx tsx script/build.ts",
+    "sitemap": "npx tsx script/generate-sitemap.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "test": "npx tsx tests/encryption.test.ts"
+    "test": "npx tsx tests/encryption.test.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.992.0",
@@ -105,6 +107,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@prerenderer/prerenderer": "^1.2.5",
+    "@prerenderer/renderer-puppeteer": "^1.2.4",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
@@ -120,10 +124,9 @@
     "@types/react-dom": "^18.3.1",
     "@types/sharedworker": "^0.0.210",
     "@types/ws": "^8.18.1",
-    "@prerenderer/prerenderer": "^1.2.5",
-    "@prerenderer/renderer-puppeteer": "^1.2.4",
     "@vitejs/plugin-legacy": "^5.2.1",
     "drizzle-kit": "^0.31.8",
+    "husky": "^9.1.7",
     "typescript": "5.6.3",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0"
