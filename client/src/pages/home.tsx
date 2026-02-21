@@ -49,10 +49,6 @@ export default function Home() {
   const [recentVault, setRecentVault] = useState<string | null>(null);
   const [clipboardVault, setClipboardVault] = useState<string | null>(null);
   const [showClipboardPrompt, setShowClipboardPrompt] = useState(false);
-  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
-  const [recoveryEmail, setRecoveryEmail] = useState("");
-  const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null);
-  const [isRecoverySending, setIsRecoverySending] = useState(false);
   const vaultAccessPanelRef = useRef<HTMLDivElement | null>(null);
   const vaultInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -178,52 +174,6 @@ export default function Home() {
   const focusVaultAccess = () => {
     vaultAccessPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     window.setTimeout(() => vaultInputRef.current?.focus(), 220);
-  };
-
-  const handleSendRecovery = async () => {
-    const email = recoveryEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setRecoveryStatus("Enter a valid email address.");
-      return;
-    }
-
-    const codeCandidate = extractAccessCode(vaultInput) || extractAccessCode(recentVault) || extractAccessCode(clipboardVault);
-    if (!codeCandidate) {
-      setRecoveryStatus("Paste your vault code or link first, then try recovery.");
-      return;
-    }
-
-    setIsRecoverySending(true);
-    setRecoveryStatus(null);
-
-    try {
-      const lookupId = codeCandidate.slice(0, 3);
-      const lookupRes = await fetch(`/api/vault/code/${lookupId}`);
-      const lookupData = await lookupRes.json();
-      if (!lookupRes.ok || !lookupData?.id) {
-        throw new Error("Vault lookup failed");
-      }
-
-      const emailRes = await fetch(`/api/vaults/${lookupData.id}/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: email,
-          fullCode: codeCandidate,
-        }),
-      });
-      const emailData = await emailRes.json();
-      if (!emailRes.ok || !emailData?.success) {
-        throw new Error(emailData?.message || "Unable to send recovery email");
-      }
-
-      setRecoveryStatus("Recovery link sent. Check your inbox and spam folder.");
-      setRecoveryEmail("");
-    } catch (error) {
-      setRecoveryStatus(error instanceof Error ? error.message : "Recovery failed. Please try again.");
-    } finally {
-      setIsRecoverySending(false);
-    }
   };
 
   const handlePasteFromClipboard = async () => {
@@ -469,13 +419,6 @@ export default function Home() {
                   >
                     <Mail className="h-3.5 w-3.5" />
                     Get It Mailed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setRecoveryStatus(null); setShowRecoveryDialog(true); }}
-                    className="h-8 px-3 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-                  >
-                    Lost your code?
                   </button>
                 </div>
 
@@ -855,43 +798,6 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        <Dialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
-          <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-left">Recover Vault via Email</DialogTitle>
-              <DialogDescription className="text-left text-zinc-400">
-                Enter your email. VaultBridge will send access details using your latest code/link context.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <Input
-                type="email"
-                value={recoveryEmail}
-                onChange={(event) => {
-                  setRecoveryEmail(event.target.value);
-                  if (recoveryStatus) setRecoveryStatus(null);
-                }}
-                placeholder="you@example.com"
-                className="h-11 border-zinc-700 bg-zinc-900/70 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-primary/40"
-              />
-              <Button
-                type="button"
-                className="h-11 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-                disabled={isRecoverySending}
-                onClick={handleSendRecovery}
-              >
-                {isRecoverySending ? "Sending..." : "Send Recovery Link"}
-              </Button>
-              {recoveryStatus && (
-                <p className={`text-xs ${recoveryStatus.includes("sent") ? "text-emerald-400" : "text-rose-400"}`}>
-                  {recoveryStatus}
-                </p>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
       </main>
 
       {/* SECTION 9 — Footer (SEO Critical) */}
