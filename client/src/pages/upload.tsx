@@ -74,8 +74,8 @@ const formatExpiry = (hours: number) => {
 export default function UploadPage() {
     const [step, setStep] = useState(1);
     const [files, setFiles] = useState<File[]>([]);
-    const [expiresIn, setExpiresIn] = useState([24]);
-    const [maxDownloads, setMaxDownloads] = useState([5]);
+    const [expiresIn, setExpiresIn] = useState([1]); // Default to 1 hour
+    const [maxDownloads, setMaxDownloads] = useState([5]); // Default to 5 downloads
     const [stage, setStage] = useState<UploadStage>("idle");
     const [currentStep, setCurrentStep] = useState<ProgressStep>("keys");
     const [progress, setProgress] = useState(0);
