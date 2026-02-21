@@ -33,6 +33,22 @@ const ENABLE_MSG91 = process.env.ENABLE_MSG91 === "true";
 const emailsSentPerVault: Map<string, number> = new Map();
 const MAX_EMAILS_PER_VAULT = 3;
 
+// Production domain resolution — NEVER allow localhost in production emails
+const PRODUCTION_DOMAIN = "https://vaultbridge.org";
+
+function resolveBaseUrl(): string {
+  const envUrl = process.env.APP_URL;
+  // In production, forcefully reject localhost/127.0.0.1 to prevent broken email links
+  if (process.env.NODE_ENV === "production") {
+    if (!envUrl || envUrl.includes("localhost") || envUrl.includes("127.0.0.1")) {
+      return PRODUCTION_DOMAIN;
+    }
+    return envUrl;
+  }
+  // In development, use whatever is configured or fallback
+  return envUrl || PRODUCTION_DOMAIN;
+}
+
 // Create transporter (using Ethereal for development)
 let transporter: nodemailer.Transporter | null = null;
 
@@ -463,7 +479,7 @@ const getEmailFooter = () => `
     <div class="footer-logo">VAULTBRIDGE</div>
     <div class="footer-text">
       End-to-end encrypted file transfer<br>
-      <a href="https://vault.kavin.cyou" class="footer-link">vault.kavin.cyou</a>
+      <a href="${resolveBaseUrl()}" class="footer-link">vaultbridge.org</a>
     </div>
   </div>
 `;
@@ -641,7 +657,7 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
       return { success: false, error: "Invalid email address." };
     }
 
-    const baseUrl = process.env.APP_URL || "https://vaultbridge.org";
+    const baseUrl = resolveBaseUrl();
     const accessLink = `${baseUrl}/access`;
     const displayCode = input.fullCode || input.shortCode;
 
@@ -991,7 +1007,7 @@ export async function sendDirectAttachment(input: SendDirectEmailInput): Promise
     <div class="container">
       ${getEmailHeader()}
       
-      <img src="https://vault.kavin.cyou/vault-icon.png" style="width: 120px; height: 120px; display: block; margin: -10px auto 24px auto; object-fit: contain; filter: drop-shadow(0 0 40px rgba(16,185,129,0.25));" alt="Secure Assets" />
+      <img src="https://vaultbridge.org/vault-icon.png" style="width: 120px; height: 120px; display: block; margin: -10px auto 24px auto; object-fit: contain; filter: drop-shadow(0 0 40px rgba(16,185,129,0.25));" alt="Secure Assets" />
       <h1 class="title">Your Secure Files are Ready!</h1>
       <p class="subtitle">Zero-Knowledge Relay • End-to-End Encrypted</p>
       
