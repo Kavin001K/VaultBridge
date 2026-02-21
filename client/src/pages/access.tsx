@@ -283,15 +283,20 @@ export default function AccessPage() {
 
         if (preloadCode) {
             setAccessCode(preloadCode);
+            // Auto-submit instantly if accessed via share link or QR (Hash/Query)
+            if (extractAccessCode(fromQuery) || extractAccessCode(fromHash)) {
+                setTimeout(() => submitCode(preloadCode), 50);
+            }
         }
         if (fromRecent) {
             setRecentVaultLink(fromRecent);
         }
     }, []);
 
-    const handleCodeSubmit = async () => {
+    const submitCode = async (overrideCode?: string) => {
         // Validate 6-char alphanumeric code
-        const cleanCode = accessCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        const codeToProcess = overrideCode || accessCode;
+        const cleanCode = codeToProcess.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
         if (cleanCode.length !== 6) {
             toast({
                 variant: "destructive",
@@ -846,10 +851,14 @@ export default function AccessPage() {
                                                                 onChange={(e) => {
                                                                     const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
                                                                     setAccessCode(val);
+                                                                    // Auto-submit when user types 6th digit
+                                                                    if (val.length === 6 && stage === "input") {
+                                                                        setTimeout(() => submitCode(val), 50);
+                                                                    }
                                                                 }}
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter' && accessCode.length === 6) {
-                                                                        handleCodeSubmit();
+                                                                        submitCode();
                                                                     }
                                                                 }}
                                                                 className="absolute inset-0 opacity-0 cursor-pointer z-10 h-20 w-full"
@@ -946,7 +955,7 @@ export default function AccessPage() {
                                                     </div>
 
                                                     <Button
-                                                        onClick={handleCodeSubmit}
+                                                        onClick={() => submitCode()}
                                                         disabled={accessCode.length !== 6}
                                                         className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 6
                                                             ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40" // Removed hover scale on mobile

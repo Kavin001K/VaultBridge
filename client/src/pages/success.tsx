@@ -189,10 +189,10 @@ export default function Success() {
 
   // Share Link logic
   // User Requested: "give only the link to pave for entering the pin"
-  // So we just link to /access. The user must communicate the PIN separately (or we provide it).
-  // The "Split Code" (e.g. 123-456) IS the PIN + Lookup.
-  // So we can just give them the link to the site/access.
-  const shareLink = `${window.location.origin}/access`;
+  // So we just link to /access with the code in the hash fragment.
+  // The hash fragment is never sent to the server, preserving zero-knowledge.
+  // This allows auto-fill and auto-submit without manual entry.
+  const shareLink = `${window.location.origin}/access#code=${splitCode}`;
 
   const handleCopy = async (text: string, type: 'link' | 'code') => {
     await navigator.clipboard.writeText(text);

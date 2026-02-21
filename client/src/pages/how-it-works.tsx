@@ -241,8 +241,9 @@ export default function HowItWorksPage() {
                                             "Brotli (Wasm) Compression before encryption.",
                                             "Client-side AES-256-GCM chunking.",
                                             "Partial Key Routing (Server sees 3 digits, you hold 6).",
+                                            "QR & Link Auto-Unlock: Decryption PIN is embedded as a URL hash fragment (#code) so it is NEVER transmitted to the server.",
                                             "Multi-Cloud Routing: Encrypted blobs in Cloudflare R2 / Supabase.",
-                                            "Zero-Knowledge storage (we strictly store blobs)."
+                                            "Zero-Knowledge storage (we strictly store blobs and removed all code recovery options)."
                                         ].map((point, i) => (
                                             <li key={i} className="flex items-start gap-3">
                                                 <CheckCircle2 className="w-5 h-5 text-cyan-500 shrink-0 mt-0.5" />
@@ -376,7 +377,7 @@ export default function HowItWorksPage() {
                 <div className="text-center border-t border-white/5 pt-24">
                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-12">Cryptographic Primitives & Stack</h3>
                     <div className="flex flex-wrap justify-center gap-3 md:gap-6 max-w-3xl mx-auto">
-                        {['AES-256-GCM', 'PBKDF2 SHA-256', 'Web Crypto API', 'WebSockets', 'React', 'Drizzle ORM'].map((tech, i) => (
+                        {['AES-256-GCM', 'PBKDF2 SHA-256', 'Web Crypto API', 'WebSockets', 'React + Framer Motion', 'Hardware-Accelerated Edge Loading', 'Drizzle ORM'].map((tech, i) => (
                             <motion.div
                                 key={tech}
                                 initial={{ opacity: 0, scale: 0.9 }}

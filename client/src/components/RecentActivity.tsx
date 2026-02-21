@@ -6,7 +6,7 @@ import {
     ExternalLink, Copy, Check, Trash2, Mail, X,
     Monitor, Smartphone, Globe, ChevronDown, ChevronUp,
     Shield, FileText, Zap, AlertTriangle, Activity,
-    HardDrive, Timer
+    HardDrive, Timer, Loader2, Flame
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useVaultHistory, type VaultHistoryRecord, type VaultRecordStatus } from "@/hooks/useVaultHistory";
@@ -90,13 +90,17 @@ function RecordCard({
     record,
     onRemove,
     onCopy,
+    onDeleteVault,
 }: {
     record: VaultHistoryRecord;
     onRemove: (id: string) => void;
     onCopy: (text: string) => void;
+    onDeleteVault: (record: VaultHistoryRecord) => Promise<void>;
 }) {
     const [copied, setCopied] = useState(false);
     const [expanded, setExpanded] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
     const isSent = record.action === "sent";
     const isClipboard = record.type === "clipboard";
     const statusCfg = statusConfig[record.status];
@@ -112,6 +116,21 @@ function RecordCard({
         ? Math.min(100, Math.round((record.downloadCount / record.maxDownloads) * 100))
         : 0;
 
+    const handleDeleteVault = async () => {
+        if (!confirmDelete) {
+            setConfirmDelete(true);
+            setTimeout(() => setConfirmDelete(false), 5000); // auto-reset after 5s
+            return;
+        }
+        setIsDeleting(true);
+        try {
+            await onDeleteVault(record);
+        } finally {
+            setIsDeleting(false);
+            setConfirmDelete(false);
+        }
+    };
+
     return (
         <motion.div
             layout
@@ -120,8 +139,8 @@ function RecordCard({
             exit={{ opacity: 0, scale: 0.95, y: -8 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className={`group relative rounded-2xl border backdrop-blur-lg transition-all duration-300 ${record.status === "active"
-                    ? "border-zinc-800/60 bg-zinc-900/50 hover:border-cyan-500/30 hover:bg-zinc-900/70"
-                    : "border-zinc-800/30 bg-zinc-950/30 opacity-70 hover:opacity-90"
+                ? "border-zinc-800/60 bg-zinc-900/50 hover:border-cyan-500/30 hover:bg-zinc-900/70"
+                : "border-zinc-800/30 bg-zinc-950/30 opacity-70 hover:opacity-90"
                 }`}
         >
             <div className="p-4">
@@ -130,10 +149,10 @@ function RecordCard({
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                         {/* Type icon */}
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${isClipboard
-                                ? "bg-violet-500/10 border-violet-500/25"
-                                : isSent
-                                    ? "bg-cyan-500/10 border-cyan-500/25"
-                                    : "bg-emerald-500/10 border-emerald-500/25"
+                            ? "bg-violet-500/10 border-violet-500/25"
+                            : isSent
+                                ? "bg-cyan-500/10 border-cyan-500/25"
+                                : "bg-emerald-500/10 border-emerald-500/25"
                             }`}>
                             {isClipboard
                                 ? <Clipboard className="w-4 h-4 text-violet-400" />
@@ -286,11 +305,39 @@ function RecordCard({
                                     </Link>
                                     <Button
                                         variant="ghost" size="sm"
-                                        className="h-7 text-[10px] text-zinc-500 hover:text-red-400 hover:bg-red-500/10 gap-1.5 ml-auto"
+                                        className="h-7 text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 gap-1.5"
                                         onClick={() => onRemove(record.id)}
                                     >
-                                        <Trash2 className="w-3 h-3" /> Remove
+                                        <X className="w-3 h-3" /> Dismiss
                                     </Button>
+                                    {record.status === "active" && record.action === "sent" && (
+                                        <Button
+                                            variant="ghost" size="sm"
+                                            className={`h-7 text-[10px] gap-1.5 ml-auto transition-all ${confirmDelete
+                                                ? "text-white bg-red-600 hover:bg-red-700 border border-red-500 font-bold"
+                                                : "text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                }`}
+                                            onClick={handleDeleteVault}
+                                            disabled={isDeleting}
+                                        >
+                                            {isDeleting ? (
+                                                <><Loader2 className="w-3 h-3 animate-spin" /> Destroying...</>
+                                            ) : confirmDelete ? (
+                                                <><Flame className="w-3 h-3" /> Confirm Destroy</>
+                                            ) : (
+                                                <><Trash2 className="w-3 h-3" /> Delete Vault</>
+                                            )}
+                                        </Button>
+                                    )}
+                                    {record.status !== "active" && (
+                                        <Button
+                                            variant="ghost" size="sm"
+                                            className="h-7 text-[10px] text-zinc-600 hover:text-red-400 hover:bg-red-500/10 gap-1.5 ml-auto"
+                                            onClick={() => onRemove(record.id)}
+                                        >
+                                            <Trash2 className="w-3 h-3" /> Remove
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>
@@ -316,15 +363,61 @@ function RecordCard({
 type FilterTab = "all" | "sent" | "received" | "clipboard";
 
 export function RecentActivity() {
-    const { records, removeRecord, clearAll } = useVaultHistory();
+    const { records, removeRecord, updateRecord, clearAll } = useVaultHistory();
     const [filter, setFilter] = useState<FilterTab>("all");
     const [collapsed, setCollapsed] = useState(false);
     const [copiedToast, setCopiedToast] = useState<string | null>(null);
+    const [deleteToast, setDeleteToast] = useState<string | null>(null);
 
     const handleCopy = async (code: string) => {
         await navigator.clipboard.writeText(code);
         setCopiedToast(code);
         setTimeout(() => setCopiedToast(null), 1500);
+    };
+
+    const handleDeleteVault = async (record: VaultHistoryRecord) => {
+        try {
+            // First look up the vault ID via the access code
+            const lookupId = record.accessCode.slice(0, 3);
+            const lookupRes = await fetch(`/api/vault/code/${lookupId}`);
+
+            if (!lookupRes.ok) {
+                // Vault may already be deleted — just remove from local history
+                removeRecord(record.id);
+                setDeleteToast("Vault already expired or deleted.");
+                setTimeout(() => setDeleteToast(null), 3000);
+                return;
+            }
+
+            const lookupData = await lookupRes.json();
+            const vaultId = lookupData.id || record.vaultId;
+
+            if (!vaultId) {
+                removeRecord(record.id);
+                setDeleteToast("Vault not found — removed from history.");
+                setTimeout(() => setDeleteToast(null), 3000);
+                return;
+            }
+
+            // Delete the vault from the server
+            const deleteRes = await fetch(`/api/vaults/${vaultId}`, { method: "DELETE" });
+
+            if (deleteRes.ok) {
+                // Mark as burned then remove
+                updateRecord(record.accessCode, record.action, { status: "burned" });
+                setTimeout(() => removeRecord(record.id), 800); // brief delay for animation
+                setDeleteToast("Vault destroyed permanently.");
+            } else {
+                // Still remove from local history if server says it's gone
+                removeRecord(record.id);
+                setDeleteToast("Vault removed from history.");
+            }
+        } catch (err) {
+            console.error("[RecentActivity] Delete failed:", err);
+            removeRecord(record.id);
+            setDeleteToast("Error deleting — removed from history.");
+        }
+        setTimeout(() => setDeleteToast(null), 3000);
     };
 
     if (records.length === 0) return null;
@@ -404,8 +497,8 @@ export function RecentActivity() {
                                         key={tab.key}
                                         onClick={() => setFilter(tab.key)}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${filter === tab.key
-                                                ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/25"
-                                                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent"
+                                            ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/25"
+                                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent"
                                             }`}
                                     >
                                         {tab.label}
@@ -428,6 +521,7 @@ export function RecentActivity() {
                                                 record={record}
                                                 onRemove={removeRecord}
                                                 onCopy={handleCopy}
+                                                onDeleteVault={handleDeleteVault}
                                             />
                                         ))
                                     ) : (
@@ -469,6 +563,21 @@ export function RecentActivity() {
                     >
                         <Check className="w-3 h-3 inline mr-1.5" />
                         Code copied: {copiedToast.slice(0, 3)}-{copiedToast.slice(3)}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Delete toast */}
+            <AnimatePresence>
+                {deleteToast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 border border-red-500/30 text-red-400 text-xs font-mono py-2 px-4 rounded-full shadow-2xl"
+                    >
+                        <Flame className="w-3 h-3 inline mr-1.5" />
+                        {deleteToast}
                     </motion.div>
                 )}
             </AnimatePresence>

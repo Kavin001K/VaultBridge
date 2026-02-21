@@ -231,7 +231,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   const { setupWebsocketSignaling } = await import("./websocket");
   setupWebsocketSignaling(httpServer);
 
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "8080", 10);
   const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
 
   httpServer.on("error", (error: NodeJS.ErrnoException) => {
@@ -250,4 +250,30 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
     log(`📦 API body limit: ${apiBodyLimit}`);
     log(`🧹 Cleanup worker active (10 min interval)`);
   });
+
+  // =============================================================================
+  // GOOGLE CLOUD RUN OPTIMIZATIONS — GRACEFUL SHUTDOWN
+  // =============================================================================
+  const gracefulShutdown = (signal: string) => {
+    log(`[Cloud Run] 🛑 Received ${signal}, initiating graceful shutdown for zero-downtime scaling...`);
+
+    // Stop accepting new connections
+    httpServer.close((err) => {
+      if (err) {
+        console.error("[Cloud Run] Error during HTTP server close:", err);
+        process.exit(1);
+      }
+      log("[Cloud Run] ✅ HTTP Server closed cleanly.");
+      process.exit(0);
+    });
+
+    // Force shutdown if connections are hanging for too long (Cloud Run usually gives 10s)
+    setTimeout(() => {
+      console.error("[Cloud Run] ⚠️ Forced shutdown due to hanging connections.");
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 })();
