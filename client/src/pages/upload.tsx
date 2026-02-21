@@ -343,49 +343,49 @@ export default function UploadPage() {
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
 
             {/* Header */}
-            <header className="relative z-10 px-6 py-6 border-b border-white/5">
+            <header className="relative z-10 px-4 sm:px-6 py-4 sm:py-6 border-b border-white/5 safe-top">
                 <div className="max-w-5xl mx-auto flex items-center justify-between">
                     <Link href="/">
                         <motion.div
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center gap-2 cursor-pointer group"
+                            className="flex items-center gap-2 cursor-pointer group shrink-0"
                         >
-                            <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:border-amber-500/50 transition-colors">
-                                <Lock className="w-5 h-5 text-amber-500" />
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:border-amber-500/50 transition-colors">
+                                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
                             </div>
-                            <h1 className="text-xl font-bold font-mono tracking-tight group-hover:text-amber-500 transition-colors">
+                            <h1 className="text-lg sm:text-xl font-bold font-mono tracking-tight group-hover:text-amber-500 transition-colors">
                                 VAULT<span className="text-amber-500">BRIDGE</span>
                             </h1>
                         </motion.div>
                     </Link>
 
                     <Link href="/">
-                        <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5">
-                            <ArrowLeft className="w-4 h-4" />
-                            Back
+                        <Button variant="ghost" size="sm" className="gap-1.5 sm:gap-2 text-zinc-400 hover:text-white hover:bg-white/5 px-2 sm:px-3 text-xs sm:text-sm">
+                            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span className="hidden sm:inline">Back</span>
                         </Button>
                     </Link>
                 </div>
             </header>
 
             {/* Main Content */}
-            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-6 py-12">
+            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-3 sm:px-6 py-6 sm:py-12 safe-bottom">
 
                 {/* Title Area */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-8"
+                    className="text-center mb-6 sm:mb-8"
                 >
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/8 border border-amber-500/15 text-amber-400 text-xs font-mono tracking-widest uppercase mb-4">
-                        <Shield className="w-3.5 h-3.5" />
+                    <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-amber-500/8 border border-amber-500/15 text-amber-400 text-[10px] sm:text-xs font-mono tracking-widest uppercase mb-3 sm:mb-4">
+                        <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         End-to-End Encrypted Vault
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-bold mb-3 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 bg-clip-text text-transparent">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 bg-clip-text text-transparent">
                         Secure Upload
                     </h2>
-                    <p className="text-zinc-400 text-sm max-w-md mx-auto">
+                    <p className="text-zinc-400 text-xs sm:text-sm max-w-md mx-auto px-2">
                         Select files, configure vault settings, then encrypt & upload — all client-side, zero-knowledge.
                     </p>
                 </motion.div>
@@ -395,7 +395,7 @@ export default function UploadPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="flex items-center justify-center gap-3 mb-8"
+                    className="flex items-center justify-center gap-1.5 sm:gap-3 mb-6 sm:mb-8"
                 >
                     {STEPS.map((s, i) => {
                         const isCompleted = step > s.id;
@@ -403,24 +403,24 @@ export default function UploadPage() {
                         const StepIcon = s.icon;
 
                         return (
-                            <div key={s.id} className="flex items-center gap-3">
+                            <div key={s.id} className="flex items-center gap-1.5 sm:gap-3">
                                 <button
                                     onClick={() => {
                                         if (isCompleted) setStep(s.id);
                                     }}
                                     disabled={!isCompleted && !isCurrent}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${isCompleted
+                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${isCompleted
                                         ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20"
                                         : isCurrent
                                             ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                                             : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 cursor-not-allowed"
                                         }`}
                                 >
-                                    {isCompleted ? <Check className="w-3.5 h-3.5" /> : <StepIcon className="w-3.5 h-3.5" />}
-                                    {s.label}
+                                    {isCompleted ? <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <StepIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                                    <span className="hidden sm:inline">{s.label}</span>
                                 </button>
                                 {i < STEPS.length - 1 && (
-                                    <ChevronRight className={`w-4 h-4 ${step > s.id ? "text-emerald-500/50" : "text-zinc-700"}`} />
+                                    <ChevronRight className={`w-3 h-3 sm:w-4 sm:h-4 ${step > s.id ? "text-emerald-500/50" : "text-zinc-700"}`} />
                                 )}
                             </div>
                         );
@@ -472,7 +472,7 @@ export default function UploadPage() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -30 }}
                                 transition={{ duration: 0.25 }}
-                                className="p-8 space-y-6"
+                                className="p-4 sm:p-8 space-y-4 sm:space-y-6"
                             >
                                 <FileDropzone
                                     onFilesSelected={handleFilesSelected}
@@ -544,10 +544,10 @@ export default function UploadPage() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 30 }}
                                 transition={{ duration: 0.25 }}
-                                className="p-8 space-y-6"
+                                className="p-4 sm:p-8 space-y-4 sm:space-y-6"
                             >
                                 {/* Files Summary Card */}
-                                <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-5 space-y-3">
+                                <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-4 sm:p-5 space-y-2 sm:space-y-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Paperclip className="w-4 h-4 text-amber-400" />
@@ -573,9 +573,9 @@ export default function UploadPage() {
                                 </div>
 
                                 {/* Settings Grid */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                                     {/* Expiry Slider */}
-                                    <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-5 space-y-4">
+                                    <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-4 sm:p-5 space-y-3 sm:space-y-4">
                                         <div className="flex justify-between items-center">
                                             <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                                                 <Clock className="w-4 h-4 text-amber-400" />
@@ -599,7 +599,7 @@ export default function UploadPage() {
                                     </div>
 
                                     {/* Download Limit */}
-                                    <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-5 space-y-4">
+                                    <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-4 sm:p-5 space-y-3 sm:space-y-4">
                                         <div className="flex justify-between items-center">
                                             <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                                                 <Zap className="w-4 h-4 text-emerald-400" />
@@ -635,7 +635,7 @@ export default function UploadPage() {
                                 </div>
 
                                 {/* Zero-Knowledge Note */}
-                                <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 flex items-start gap-3">
+                                <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-3 sm:p-4 flex items-start gap-3">
                                     <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
                                         <Shield className="w-4.5 h-4.5 text-amber-400" />
                                     </div>
@@ -656,13 +656,13 @@ export default function UploadPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="mt-6 flex gap-3"
+                    className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3"
                 >
                     {step > 1 && (
                         <Button
                             onClick={() => setStep(step - 1)}
                             variant="outline"
-                            className="flex-1 h-14 text-base border-zinc-700 text-zinc-300 hover:bg-zinc-800/50 rounded-xl"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base border-zinc-700 text-zinc-300 hover:bg-zinc-800/50 rounded-xl"
                         >
                             <ArrowLeft className="w-4 h-4 mr-2" />
                             Back
@@ -673,7 +673,7 @@ export default function UploadPage() {
                         <Button
                             onClick={() => setStep(2)}
                             disabled={!canProceed}
-                            className="flex-1 h-14 text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
                         >
                             Continue
                             <ArrowRight className="w-4 h-4 ml-2" />
@@ -684,7 +684,7 @@ export default function UploadPage() {
                         <Button
                             onClick={() => setShowConfirmDialog(true)}
                             disabled={files.length === 0 || stage !== "idle" || !!uploadError}
-                            className="flex-1 h-14 text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
                         >
                             <Lock className="w-4 h-4 mr-2" />
                             Encrypt & Upload

@@ -287,34 +287,38 @@ export default function Home() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
 
       {/* Header */}
-      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md safe-top">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <div className="w-8 h-8 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
               <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
             </div>
-            <div>
-              <h1 className="text-lg md:text-xl font-bold font-mono tracking-tight">VAULT<span className="text-primary">BRIDGE</span></h1>
-            </div>
+            <h1 className="text-base sm:text-lg md:text-xl font-bold font-mono tracking-tight">VAULT<span className="text-primary">BRIDGE</span></h1>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 sm:gap-3">
+            {!isMobile && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full border-zinc-700 bg-zinc-900/50 px-5 text-zinc-200 hover:border-primary/60 hover:bg-zinc-900"
+                onClick={focusVaultAccess}
+              >
+                Access Vault
+              </Button>
+            )}
             <Button
               size="sm"
-              variant="outline"
-              className="rounded-full border-zinc-700 bg-zinc-900/50 px-5 text-zinc-200 hover:border-primary/60 hover:bg-zinc-900"
-              onClick={focusVaultAccess}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full px-4 sm:px-6 text-xs sm:text-sm"
+              onClick={() => setLocation('/upload')}
             >
-              Access Vault
-            </Button>
-            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full px-6" onClick={() => setLocation('/upload')}>
               Upload
             </Button>
             <a
               href="https://github.com/Kavin001K/VaultBridge"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 hover:border-primary/50 transition-all group"
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 hover:border-primary/50 transition-all group"
             >
               <Github className="w-4 h-4 text-zinc-400 group-hover:text-white" />
               <span className="text-xs font-mono font-medium text-zinc-300 group-hover:text-white flex items-center gap-1">
@@ -333,9 +337,8 @@ export default function Home() {
                 setSoundEnabled(newState);
                 if (newState) playSound('click');
               }}
-              whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-primary/50 transition-all text-muted-foreground hover:text-primary"
+              className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-primary/50 transition-all text-muted-foreground hover:text-primary tap-sm"
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </motion.button>
@@ -343,10 +346,10 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1 relative z-10 pt-24">
+      <main className="flex-1 relative z-10 pt-20 sm:pt-24">
 
         {/* SECTION 1 — Hero (simplified, action-first) */}
-        <section className="relative pt-10 pb-20 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center">
+        <section className="relative pt-24 sm:pt-32 pb-10 sm:pb-20 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -354,72 +357,69 @@ export default function Home() {
             className="flex flex-col items-center w-full"
           >
             {/* Compact headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-3 leading-tight">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-2 sm:mb-3 leading-[1.15]">
               Share Securely.{" "}
               <span style={{ backgroundImage: "linear-gradient(to right, #10b981, #0ea5e9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>
                 No Login.
               </span>
             </h1>
-            <p className="text-base sm:text-lg text-zinc-400 max-w-xl mb-8">
+            <p className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-xl mb-5 sm:mb-8">
               Encrypt files in your browser and share with a 6-digit code. Gone after first read.
             </p>
 
             {/* ── 3 Big Action Cards ── */}
-            <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div className="w-full grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
               {/* Upload */}
-              <Link href="/upload">
+              <Link href="/upload" className="h-full">
                 <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => playSound('click')}
-                  className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-primary/50 hover:bg-zinc-900 transition-all p-5 text-left cursor-pointer overflow-hidden"
+                  className="group relative flex flex-col items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/80 hover:border-primary/30 transition-all p-4 py-6 sm:p-6 sm:py-8 cursor-pointer overflow-hidden h-full aspect-square sm:aspect-auto sm:min-h-[140px]"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center mb-3">
-                    <Upload className="w-5 h-5 text-primary" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
+                    <Upload className="w-5 h-5 sm:w-7 sm:h-7 text-primary" />
                   </div>
-                  <p className="text-base font-bold text-zinc-100">Upload File</p>
-                  <p className="text-xs text-zinc-500 mt-1">Encrypt & share with a secure link</p>
-                  <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-zinc-700 group-hover:text-primary transition-colors" />
+                  <p className="relative text-sm sm:text-base font-bold text-zinc-100 group-hover:text-primary transition-colors">Upload</p>
+                  <p className="relative text-[10px] sm:text-xs text-zinc-500 mt-1 hidden sm:block text-center">Encrypt & Share</p>
                 </motion.div>
               </Link>
 
               {/* Access Vault */}
               <motion.div
                 ref={vaultAccessPanelRef}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => { playSound('click'); focusVaultAccess(); }}
-                className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-cyan-500/40 hover:bg-zinc-900 transition-all p-5 text-left cursor-pointer overflow-hidden"
+                className="group relative flex flex-col items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/80 hover:border-cyan-500/30 transition-all p-4 py-6 sm:p-6 sm:py-8 cursor-pointer overflow-hidden h-full aspect-square sm:aspect-auto sm:min-h-[140px]"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center mb-3">
-                  <KeyRound className="w-5 h-5 text-cyan-400" />
+                <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all duration-300">
+                  <KeyRound className="w-5 h-5 sm:w-7 sm:h-7 text-cyan-400" />
                 </div>
-                <p className="text-base font-bold text-zinc-100">Access Vault</p>
-                <p className="text-xs text-zinc-500 mt-1">Enter code to retrieve files</p>
-                <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-zinc-700 group-hover:text-cyan-400 transition-colors" />
+                <p className="relative text-sm sm:text-base font-bold text-zinc-100 group-hover:text-cyan-400 transition-colors">Access</p>
+                <p className="relative text-[10px] sm:text-xs text-zinc-500 mt-1 hidden sm:block text-center">Unlock Vault</p>
               </motion.div>
 
               {/* Clipboard */}
               <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => { playSound('click'); setLocation('/clipboard'); }}
-                className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-emerald-500/40 hover:bg-zinc-900 transition-all p-5 text-left cursor-pointer overflow-hidden"
+                className="group relative flex flex-col items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/80 hover:border-emerald-500/30 transition-all p-4 py-6 sm:p-6 sm:py-8 cursor-pointer overflow-hidden h-full aspect-square sm:aspect-auto sm:min-h-[140px]"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-3">
-                  <Clipboard className="w-5 h-5 text-emerald-400" />
+                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all duration-300">
+                  <Clipboard className="w-5 h-5 sm:w-7 sm:h-7 text-emerald-400" />
                 </div>
-                <p className="text-base font-bold text-zinc-100">Clipboard Sync</p>
-                <p className="text-xs text-zinc-500 mt-1">Share text across devices instantly</p>
-                <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-zinc-700 group-hover:text-emerald-400 transition-colors" />
+                <p className="relative text-sm sm:text-base font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">Clipboard</p>
+                <p className="relative text-[10px] sm:text-xs text-zinc-500 mt-1 hidden sm:block text-center">Sync Text</p>
               </motion.div>
             </div>
 
             {/* ── Vault Access Input Panel ── */}
-            <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-left backdrop-blur-sm">
+            <div className="w-full rounded-xl sm:rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-4 text-left backdrop-blur-sm">
               <div className="flex flex-col gap-3">
                 <div className="flex gap-2">
                   <Input
@@ -432,11 +432,11 @@ export default function Home() {
                     }}
                     onKeyDown={(e) => { if (e.key === "Enter") openVault(vaultInput); }}
                     placeholder="Paste vault link or 6-digit code…"
-                    className="flex-1 h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-primary/40"
+                    className="flex-1 h-10 sm:h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-primary/40"
                   />
                   <Button
                     type="button"
-                    className="h-11 rounded-xl bg-primary px-5 font-semibold text-primary-foreground hover:bg-primary/90 flex-shrink-0"
+                    className="h-10 sm:h-11 rounded-xl bg-primary px-4 sm:px-5 font-semibold text-sm text-primary-foreground hover:bg-primary/90 flex-shrink-0"
                     onClick={() => openVault(vaultInput)}
                   >
                     Open
@@ -491,19 +491,21 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap justify-center items-center gap-4 sm:gap-8 text-xs font-medium text-zinc-600">
+            <div className="mt-3 sm:mt-5 flex flex-wrap justify-center items-center gap-3 sm:gap-8 text-[10px] sm:text-xs font-medium text-zinc-600">
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> No login required
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" /> No login
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> End-to-end secure
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" /> E2E encrypted
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" /> Free forever
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" /> Free forever
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" /> Instant sharing
-              </div>
+              {!isMobile && (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary" /> Instant sharing
+                </div>
+              )}
             </div>
           </motion.div>
         </section>
@@ -514,7 +516,7 @@ export default function Home() {
         </section>
 
         {/* SECTION 2 — Product Demo Preview */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 relative max-w-6xl mx-auto">
+        <section className="py-10 sm:py-20 px-3 sm:px-6 lg:px-8 relative max-w-6xl mx-auto">
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -538,8 +540,8 @@ export default function Home() {
             </div>
 
             {/* Demo Sequence Container */}
-            <div className="p-8 md:p-16 flex flex-col items-center justify-center min-h-[400px]">
-              <div className="flex flex-col md:flex-row items-center gap-8 md:gap-4 w-full max-w-4xl justify-between relative">
+            <div className="p-4 sm:p-8 md:p-16 flex flex-col items-center justify-center min-h-[200px] sm:min-h-[400px]">
+              <div className="flex flex-row items-center gap-3 sm:gap-8 md:gap-4 w-full max-w-4xl justify-between relative">
                 {/* Connecting Line */}
                 <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-zinc-800 -z-10 -translate-y-1/2" />
                 <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500 -z-10 -translate-y-1/2 demo-line-anim origin-left" />
@@ -556,12 +558,12 @@ export default function Home() {
                     whileInView={{ opacity: 1, scale: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.3, duration: 0.5 }}
-                    className="flex flex-col items-center gap-4 bg-zinc-950 p-4 rounded-xl z-10"
+                    className="flex flex-col items-center gap-2 sm:gap-4 bg-zinc-950 p-2 sm:p-4 rounded-xl z-10"
                   >
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center border ${step.bg} ${step.border} shadow-lg`}>
-                      <step.icon className={`w-8 h-8 ${step.color}`} />
+                    <div className={`w-10 h-10 sm:w-16 sm:h-16 rounded-full flex items-center justify-center border ${step.bg} ${step.border} shadow-lg`}>
+                      <step.icon className={`w-5 h-5 sm:w-8 sm:h-8 ${step.color}`} />
                     </div>
-                    <span className="font-semibold text-zinc-300">{step.label}</span>
+                    <span className="font-semibold text-zinc-300 text-[10px] sm:text-base">{step.label}</span>
                   </motion.div>
                 ))}
               </div>
@@ -570,17 +572,17 @@ export default function Home() {
         </section>
 
         {/* SECTION 3 — Why VaultBridge (Trust Triggers) */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-white/5 relative">
+        <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-white/5 relative">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
           <motion.div
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={fadeInUp}
-            className="text-center mb-16"
+            className="text-center mb-8 sm:mb-16"
           >
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Privacy by Design</h2>
-            <p className="text-xl text-zinc-400 max-w-2xl mx-auto">Built from the ground up to protect your data. We remove friction so you can focus on sharing securely.</p>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Privacy by Design</h2>
+            <p className="text-sm sm:text-xl text-zinc-400 max-w-2xl mx-auto">Built from the ground up to protect your data. We remove friction so you can focus on sharing securely.</p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {[
               { icon: Eye, title: "Zero Tracking", desc: "No analytics, no cookies, no tracking pixels. What you share is your business." },
               { icon: Globe, title: "No Data Selling", desc: "We don't monetize your data. The product is the encryption, not the user." },
@@ -590,26 +592,26 @@ export default function Home() {
               <motion.div
                 key={feature.title}
                 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                className="p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:border-primary/30 transition-colors"
+                className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:border-primary/30 transition-colors"
               >
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4 text-primary">
-                  <feature.icon className="w-6 h-6" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg sm:rounded-xl flex items-center justify-center mb-3 sm:mb-4 text-primary">
+                  <feature.icon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">{feature.desc}</p>
+                <h3 className="text-sm sm:text-xl font-semibold mb-1 sm:mb-2">{feature.title}</h3>
+                <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
           </div>
         </section>
 
         {/* SECTION 4 — How it Works */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-zinc-900/20 border-y border-white/5">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Radically Simple</h2>
-            <p className="text-xl text-zinc-400">Secure sharing shouldn't require a manual.</p>
+        <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-zinc-900/20 border-y border-white/5">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 sm:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Radically Simple</h2>
+            <p className="text-sm sm:text-xl text-zinc-400">Secure sharing shouldn't require a manual.</p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
             {[
               { num: "01", title: "Upload your file", desc: "Drag and drop any file up to 500MB directly into your browser." },
               { num: "02", title: "We encrypt it", desc: "Files are encrypted locally using AES-256 before upload. We never see the key." },
@@ -618,23 +620,23 @@ export default function Home() {
               <motion.div
                 key={step.num}
                 initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.2 }}
-                className="relative p-8 rounded-3xl bg-zinc-950 border border-zinc-800"
+                className="relative p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-zinc-950 border border-zinc-800"
               >
-                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-zinc-800 to-zinc-950/0 absolute top-4 right-6 pointer-events-none">
+                <div className="text-4xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-zinc-800 to-zinc-950/0 absolute top-3 right-4 sm:top-4 sm:right-6 pointer-events-none">
                   {step.num}
                 </div>
-                <h3 className="text-2xl font-bold mb-4 relative z-10">{step.title}</h3>
-                <p className="text-zinc-400 relative z-10">{step.desc}</p>
+                <h3 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-4 relative z-10">{step.title}</h3>
+                <p className="text-zinc-400 text-sm relative z-10">{step.desc}</p>
               </motion.div>
             ))}
           </div>
         </section>
 
         {/* SECTION 5 — Use Cases */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Built for Everyone</h2>
-            <p className="text-xl text-zinc-400">Versatile privacy tools for every workflow.</p>
+        <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 sm:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Built for Everyone</h2>
+            <p className="text-sm sm:text-xl text-zinc-400">Versatile privacy tools for every workflow.</p>
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -647,13 +649,12 @@ export default function Home() {
             ].map((useCase, i) => (
               <motion.div
                 key={useCase.title}
-                whileHover={{ y: -5 }}
-                className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex items-start gap-4"
+                className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-zinc-900/50 border border-zinc-800 flex items-start gap-3 sm:gap-4"
               >
-                <div className="p-3 rounded-lg bg-zinc-800 text-primary shrink-0"><useCase.icon className="w-5 h-5" /></div>
+                <div className="p-2 sm:p-3 rounded-lg bg-zinc-800 text-primary shrink-0"><useCase.icon className="w-4 h-4 sm:w-5 sm:h-5" /></div>
                 <div>
-                  <h4 className="font-bold text-lg mb-1">{useCase.title}</h4>
-                  <p className="text-sm text-zinc-400">{useCase.desc}</p>
+                  <h4 className="font-bold text-sm sm:text-lg mb-0.5 sm:mb-1">{useCase.title}</h4>
+                  <p className="text-xs sm:text-sm text-zinc-400">{useCase.desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -661,20 +662,20 @@ export default function Home() {
         </section>
 
         {/* SECTION 6 — Privacy by Architecture (Comparison Section) */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Privacy by Architecture</h2>
-            <p className="text-xl text-zinc-400 max-w-3xl mx-auto">VaultBridge is built around privacy. Traditional cloud platforms are built around retention and monetization.</p>
+        <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 sm:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Privacy by Architecture</h2>
+            <p className="text-sm sm:text-xl text-zinc-400 max-w-3xl mx-auto">VaultBridge is built around privacy. Traditional cloud platforms are built around retention and monetization.</p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 lg:gap-12 items-stretch">
             {/* VaultBridge Card */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="relative p-8 sm:p-10 rounded-[2rem] border border-primary/30 bg-zinc-900/60 shadow-[0_0_30px_rgba(16,185,129,0.15)] flex flex-col"
+              className="relative p-5 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] border border-primary/30 bg-zinc-900/60 shadow-[0_0_30px_rgba(16,185,129,0.15)] flex flex-col"
               style={{ scale: 1.02 }}
             >
               <div className="absolute top-0 right-8 -mt-4 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full shadow-lg">
@@ -685,12 +686,12 @@ export default function Home() {
                   <Shield className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-white">VaultBridge</h3>
+                  <h3 className="text-lg sm:text-2xl font-bold text-white">VaultBridge</h3>
                   <p className="text-sm text-primary">Privacy-First by Design</p>
                 </div>
               </div>
 
-              <ul className="space-y-5 mb-10 flex-1">
+              <ul className="space-y-3 sm:space-y-5 mb-6 sm:mb-10 flex-1">
                 {[
                   "No account required",
                   "Zero tracking policy",
@@ -708,7 +709,7 @@ export default function Home() {
                 ))}
               </ul>
 
-              <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 transition-all rounded-xl h-14 text-lg mt-auto" onClick={() => { playSound('click'); setLocation('/upload'); }}>
+              <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 transition-all rounded-xl h-12 sm:h-14 text-sm sm:text-lg mt-auto" onClick={() => { playSound('click'); setLocation('/upload'); }}>
                 Start Secure Sharing
               </Button>
             </motion.div>
@@ -719,14 +720,14 @@ export default function Home() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="p-8 sm:p-10 rounded-[2rem] border border-zinc-800 bg-zinc-950/50 flex flex-col opacity-80"
+              className="p-5 sm:p-8 md:p-10 rounded-2xl sm:rounded-[2rem] border border-zinc-800 bg-zinc-950/50 flex flex-col opacity-80"
             >
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-400">
                   <Building className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-zinc-300">Traditional Cloud</h3>
+                  <h3 className="text-lg sm:text-2xl font-bold text-zinc-300">Traditional Cloud</h3>
                   <p className="text-sm text-zinc-500">Built for Data Ecosystems</p>
                 </div>
               </div>
@@ -793,13 +794,13 @@ export default function Home() {
         </section>
 
         {/* SECTION 8 — Call to Action */}
-        <section className="py-32 px-4 text-center relative overflow-hidden">
+        <section className="py-16 sm:py-32 px-3 sm:px-4 text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-primary/5 blur-[100px] z-0" />
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="relative z-10 max-w-2xl mx-auto flex flex-col items-center">
-            <h2 className="text-4xl md:text-6xl font-bold mb-6">Ready to regain your privacy?</h2>
-            <p className="text-xl text-zinc-400 mb-10">Start sharing files securely right now. No signup. No tracking. Just encryption.</p>
+            <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">Ready to regain your privacy?</h2>
+            <p className="text-sm sm:text-xl text-zinc-400 mb-6 sm:mb-10">Start sharing files securely right now. No signup. No tracking. Just encryption.</p>
             <Link href="/upload">
-              <Button size="lg" className="text-lg h-16 px-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:scale-105 transition-all w-full sm:w-auto">
+              <Button size="lg" className="text-sm sm:text-lg h-12 sm:h-16 px-8 sm:px-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:scale-105 transition-all w-full sm:w-auto">
                 Start Secure Sharing Now
               </Button>
             </Link>
@@ -894,8 +895,8 @@ export default function Home() {
       </main>
 
       {/* SECTION 9 — Footer (SEO Critical) */}
-      <footer className="relative z-10 border-t border-zinc-800 bg-zinc-950 pt-16 pb-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
+      <footer className="relative z-10 border-t border-zinc-800 bg-zinc-950 pt-10 sm:pt-16 pb-6 sm:pb-8 px-3 sm:px-6 lg:px-8 safe-bottom">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-6 sm:gap-12 mb-8 sm:mb-12">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
