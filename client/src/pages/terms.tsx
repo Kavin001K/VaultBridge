@@ -271,7 +271,7 @@ Code is Law. But for the lawyers: These terms are governed by the laws of the St
                 <div className="container px-4 text-center max-w-4xl mx-auto relative z-10">
                     <ShieldAlert className="w-12 h-12 text-zinc-900 mx-auto mb-6" />
                     <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
-                        VaultBridge Legal Protocol • Binding Agreement
+                        VaultBridge Legal Protocol • Binding Agreement • <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-red-400 transition-colors">Sitemap</a>
                     </p>
 
                     <motion.div

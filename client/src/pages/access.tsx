@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,9 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
 import { LiveClipboard } from "@/components/LiveClipboard";
 import { useCodeLookup, useGetChunkDownloadUrl, useTrackDownload, useTrackFileDownload } from "@/hooks/use-vaults";
-import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardText } from "@/lib/crypto";
+import { unwrapFileKey, decryptMetadata, decryptData, decryptClipboardPayload, type ClipboardPayload } from "@/lib/crypto";
 import { initiateStreamDownload } from "@/lib/downloadStream";
 import { useIsMobile } from "@/hooks/use-mobile"; // Installed Mobile SDK
+import { useVaultHistory } from "@/hooks/useVaultHistory";
+import { RecentActivity } from "@/components/RecentActivity";
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
@@ -126,7 +128,7 @@ export default function AccessPage() {
     const [vaultData, setVaultData] = useState<any>(null);
     const [fileKey, setFileKey] = useState<CryptoKey | null>(null);
     const [isBurned, setIsBurned] = useState(false);
-    const [clipboardContent, setClipboardContent] = useState<string | null>(null);
+    const [clipboardPayload, setClipboardPayload] = useState<ClipboardPayload | null>(null);
     const [vaultLinkInput, setVaultLinkInput] = useState("");
     const [vaultLinkError, setVaultLinkError] = useState<string | null>(null);
     const [recentVaultLink, setRecentVaultLink] = useState<string | null>(null);
@@ -136,6 +138,10 @@ export default function AccessPage() {
 
     // Derived lookupId for sync
     const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
+    const hasClipboardData = Boolean(
+        clipboardPayload &&
+        (clipboardPayload.plainText.trim().length > 0 || clipboardPayload.attachments.length > 0)
+    );
 
     const [, setLocation] = useLocation();
     const { toast } = useToast();
@@ -144,6 +150,8 @@ export default function AccessPage() {
     const getChunkUrl = useGetChunkDownloadUrl();
     const trackDownload = useTrackDownload();
     const trackFileDownload = useTrackFileDownload();
+    const { addRecord, updateRecord } = useVaultHistory();
+    const accessHistorySavedRef = useRef(false);
 
     const extractAccessCode = (value: string | null): string | null => {
         if (!value) return null;
@@ -300,6 +308,7 @@ export default function AccessPage() {
 
         setStage("fetching");
         setStatusText("Looking up vault...");
+        setClipboardPayload(null);
 
         try {
             // Split the code into lookupId (first 3) and PIN (last 3)
@@ -340,8 +349,8 @@ export default function AccessPage() {
             if (vault.encryptedClipboardText) {
                 setStatusText("Decrypting clipboard content...");
                 try {
-                    const clipText = await decryptClipboardText(vault.encryptedClipboardText, key);
-                    setClipboardContent(clipText);
+                    const decryptedPayload = await decryptClipboardPayload(vault.encryptedClipboardText, key);
+                    setClipboardPayload(decryptedPayload);
                 } catch (clipErr) {
                     console.error("Failed to decrypt clipboard:", clipErr);
                 }
@@ -361,6 +370,27 @@ export default function AccessPage() {
                         ? "Secure clipboard content available."
                         : "Vault accessed successfully.",
             });
+
+            // Save to vault history (received)
+            if (!accessHistorySavedRef.current) {
+                accessHistorySavedRef.current = true;
+                const clipPreview = clipboardPayload?.plainText?.trim().slice(0, 80) || undefined;
+                addRecord({
+                    type: hasClipboard && !hasFiles ? "clipboard" : "vault",
+                    action: "received",
+                    accessCode: cleanCode,
+                    vaultId: vault.id,
+                    fileNames: metadata.map((f: any) => f.name || "Unknown"),
+                    fileCount: metadata.length,
+                    totalSize: metadata.reduce((acc: number, f: any) => acc + (f.size || 0), 0),
+                    hasClipboard: !!hasClipboard,
+                    clipboardPreview: clipPreview,
+                    createdAt: Date.now(),
+                    expiresAt: new Date(vault.expiresAt).getTime(),
+                    maxDownloads: vault.maxDownloads || 0,
+                    downloadCount: vault.downloadCount || 0,
+                });
+            }
 
         } catch (err) {
             playSound('error');
@@ -960,6 +990,11 @@ export default function AccessPage() {
                                                 </div>
                                             </div>
                                         </motion.div>
+
+                                        {/* Recent Activity */}
+                                        <div className="mt-6 mx-4 sm:mx-0">
+                                            <RecentActivity />
+                                        </div>
                                     </div>
                                 )}
 
@@ -1060,20 +1095,20 @@ export default function AccessPage() {
                                                 <div className="relative bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-5 sm:p-6 md:p-8">
                                                     <div className="flex items-center gap-3 mb-6">
                                                         <span className="flex items-center justify-center w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/30">
-                                                            {fileMetadata.length + (clipboardContent ? 1 : 0)}
+                                                            {fileMetadata.length + (hasClipboardData ? 1 : 0)}
                                                         </span>
                                                         <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">
                                                             {fileMetadata.length > 0 ? "Available Content" : "Secure Clipboard"}
                                                         </h3>
                                                     </div>
 
-                                                    {(clipboardContent !== null || !!vaultData.encryptedClipboardText) && (
+                                                    {(hasClipboardData || !!vaultData.encryptedClipboardText) && (
                                                         <div className="mb-6">
                                                             <LiveClipboard
                                                                 lookupId={lookupId}
                                                                 fileKey={fileKey!}
                                                                 wrappedKey={vaultData.wrappedKey}
-                                                                initialContent={clipboardContent}
+                                                                initialContent={clipboardPayload?.plainText || null}
                                                                 size="large"
                                                             />
                                                         </div>
@@ -1152,7 +1187,7 @@ export default function AccessPage() {
                                                                 )}
                                                             </Button>
                                                             <p className="text-[10px] md:text-xs text-center text-muted-foreground mt-4 opacity-70">
-                                                                By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
+                                                                By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link>, <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link> & <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">Sitemap</a>.
                                                             </p>
                                                         </>
                                                     )}

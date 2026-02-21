@@ -43,17 +43,37 @@ export class DatabaseStorage implements IStorage {
 
         const expiresAt = new Date(Date.now() + data.expiresIn * 60 * 60 * 1000);
 
-        const [vault] = await db.insert(vaults).values({
-            shortCode,
-            lookupId: data.lookupId,
-            wrappedKey: data.wrappedKey,
-            encryptedMetadata: data.encryptedMetadata,
-            encryptedClipboardText: data.encryptedClipboardText,
-            expiresAt,
-            maxDownloads: data.maxDownloads,
-            downloadCount: 0,
-            isDeleted: false
-        }).returning();
+        let vault: Vault;
+        try {
+            [vault] = await db.insert(vaults).values({
+                shortCode,
+                lookupId: data.lookupId,
+                wrappedKey: data.wrappedKey,
+                encryptedMetadata: data.encryptedMetadata,
+                encryptedClipboardText: data.encryptedClipboardText,
+                expiresAt,
+                maxDownloads: data.maxDownloads,
+                downloadCount: 0,
+                isDeleted: false
+            }).returning();
+        } catch (error: any) {
+            const isLookupConflict =
+                error?.code === "23505" &&
+                (String(error?.constraint || "").includes("lookup_id") ||
+                    String(error?.message || "").includes("lookup_id"));
+
+            if (isLookupConflict) {
+                const conflictError = new Error("Lookup ID collision. Retrying with a new access code is required.") as Error & {
+                    status?: number;
+                    code?: string;
+                };
+                conflictError.status = 409;
+                conflictError.code = "LOOKUP_ID_CONFLICT";
+                throw conflictError;
+            }
+
+            throw error;
+        }
 
         for (const f of data.files) {
             const fileMaxDownloads = f.maxDownloads ?? data.maxDownloads;

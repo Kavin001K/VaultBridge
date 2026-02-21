@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Clipboard, RefreshCw, Share2, FileText, FileType, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,13 +33,20 @@ export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent, s
     const { data: syncData, refetch, isRefetching } = useClipboardSync(lookupId, !!lookupId);
     const updateClipboard = useUpdateClipboard();
 
-    // Sync Effect
+    // FIX: Use ref to track current content — prevents this effect from running on every keystroke.
+    // The root bug was: clipboardContent in deps → user types → content changes → effect re-runs →
+    // decrypt runs again unnecessarily (and could overwrite a concurrent edit).
+    const clipboardContentRef = useRef(clipboardContent);
+    clipboardContentRef.current = clipboardContent;
+
+    // Sync Effect — only reruns when server data, key, or editing state changes
     useEffect(() => {
         if (syncData?.encryptedClipboardText && fileKey && !isEditing) {
             const decryptSync = async () => {
                 try {
                     const decrypted = await decryptClipboardText(syncData.encryptedClipboardText!, fileKey);
-                    if (decrypted !== clipboardContent) {
+                    // Compare via ref, not state dependency
+                    if (decrypted !== clipboardContentRef.current) {
                         setClipboardContent(decrypted);
                         if (syncData.updatedAt) {
                             setLastSaved(new Date(syncData.updatedAt));
@@ -51,7 +58,8 @@ export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent, s
             };
             decryptSync();
         }
-    }, [syncData, fileKey, isEditing, clipboardContent]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [syncData, fileKey, isEditing]);
 
     const handleSaveClipboard = async (text: string) => {
         if (!fileKey) return;
