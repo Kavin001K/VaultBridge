@@ -18,6 +18,7 @@ import { registerSeoRoutes } from "./seo-routes";
 const app = express();
 const httpServer = createServer(app);
 const isProduction = process.env.NODE_ENV === "production";
+const apiBodyLimit = process.env.API_BODY_LIMIT || "100mb";
 const cspConnectSrc = [
   "'self'",
   "ws:",
@@ -103,14 +104,14 @@ export const uploadLimiter = rateLimit({
 
 app.use(
   express.json({
-    limit: "25mb",
+    limit: apiBodyLimit,
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
 
-app.use(express.urlencoded({ extended: false, limit: "25mb" }));
+app.use(express.urlencoded({ extended: false, limit: apiBodyLimit }));
 
 // =============================================================================
 // REQUEST LOGGING
@@ -197,6 +198,12 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 
   // Error handling middleware
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === "entity.too.large") {
+      return res.status(413).json({
+        message: "Payload too large. Reduce clipboard attachments and try again.",
+      });
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
@@ -227,8 +234,20 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   const port = parseInt(process.env.PORT || "5000", 10);
   const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
 
+  httpServer.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `[startup] Port ${port} is already in use. Stop the existing server process before running npm run dev.`
+      );
+      process.exit(1);
+    }
+    console.error("[startup] HTTP server failed to start:", error);
+    process.exit(1);
+  });
+
   httpServer.listen(port, host, () => {
     log(`🔐 VaultBridge server running on http://${host}:${port}`);
+    log(`📦 API body limit: ${apiBodyLimit}`);
     log(`🧹 Cleanup worker active (10 min interval)`);
   });
 })();

@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Upload, KeyRound, Shield, Zap, Eye,
-  ArrowRight, Sparkles, Mail, Send, CheckCircle2, AlertCircle,
+  ArrowRight, RefreshCw, Sparkles, Mail, Send, CheckCircle2, AlertCircle,
   Clipboard, AlertTriangle, Check, Github, Volume2, VolumeX,
   ServerOff, Globe, Users, Code, Building, GraduationCap, X
 } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { useSounds } from "@/hooks/useSounds";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { RecentActivity } from "@/components/RecentActivity";
 
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
@@ -344,179 +345,158 @@ export default function Home() {
 
       <main className="flex-1 relative z-10 pt-24">
 
-        {/* SECTION 1 — Hero */}
-        <section className="relative pt-20 pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col items-center text-center">
+        {/* SECTION 1 — Hero (simplified, action-first) */}
+        <section className="relative pt-10 pb-20 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
             className="flex flex-col items-center w-full"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
-              <Sparkles className="w-4 h-4" />
-              <span>Next-Gen Secure File Transfer</span>
-            </div>
-
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6 leading-[1.05] max-w-5xl">
-              Secure File Sharing.<br />
-              Zero Tracking. <br className="sm:hidden" />
-              <span className="text-gradient" style={{ backgroundImage: "linear-gradient(to right, #10b981, #0ea5e9)", WebkitBackgroundClip: "text", color: "transparent" }}>
-                Zero Friction.
+            {/* Compact headline */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-3 leading-tight">
+              Share Securely.{" "}
+              <span style={{ backgroundImage: "linear-gradient(to right, #10b981, #0ea5e9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>
+                No Login.
               </span>
             </h1>
-
-            <p className="text-lg sm:text-xl md:text-2xl text-zinc-400 max-w-3xl mb-10 leading-relaxed">
-              Send files securely without login. Private, encrypted, and instant. Your files are encrypted in your browser before they ever leave your device.
+            <p className="text-base sm:text-lg text-zinc-400 max-w-xl mb-8">
+              Encrypt files in your browser and share with a 6-digit code. Gone after first read.
             </p>
 
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-zinc-200">
-              <Users className="h-4 w-4 text-primary" />
-              Trusted by 1,248+ privacy-conscious users
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+            {/* ── 3 Big Action Cards ── */}
+            <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              {/* Upload */}
               <Link href="/upload">
-                <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all" onClick={() => playSound('click')}>
-                  <Upload className="mr-2 w-5 h-5" />
-                  Upload File Securely
-                </Button>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => playSound('click')}
+                  className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-primary/50 hover:bg-zinc-900 transition-all p-5 text-left cursor-pointer overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center mb-3">
+                    <Upload className="w-5 h-5 text-primary" />
+                  </div>
+                  <p className="text-base font-bold text-zinc-100">Upload File</p>
+                  <p className="text-xs text-zinc-500 mt-1">Encrypt & share with a secure link</p>
+                  <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-zinc-700 group-hover:text-primary transition-colors" />
+                </motion.div>
               </Link>
-              <Link href="/access">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 transition-all backdrop-blur-sm" onClick={() => playSound('click')}>
-                  Access Vault
-                </Button>
-              </Link>
+
+              {/* Access Vault */}
+              <motion.div
+                ref={vaultAccessPanelRef}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => { playSound('click'); focusVaultAccess(); }}
+                className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-cyan-500/40 hover:bg-zinc-900 transition-all p-5 text-left cursor-pointer overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center mb-3">
+                  <KeyRound className="w-5 h-5 text-cyan-400" />
+                </div>
+                <p className="text-base font-bold text-zinc-100">Access Vault</p>
+                <p className="text-xs text-zinc-500 mt-1">Enter code to retrieve files</p>
+                <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-zinc-700 group-hover:text-cyan-400 transition-colors" />
+              </motion.div>
+
+              {/* Clipboard */}
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => { playSound('click'); setLocation('/clipboard'); }}
+                className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-emerald-500/40 hover:bg-zinc-900 transition-all p-5 text-left cursor-pointer overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-3">
+                  <Clipboard className="w-5 h-5 text-emerald-400" />
+                </div>
+                <p className="text-base font-bold text-zinc-100">Clipboard Sync</p>
+                <p className="text-xs text-zinc-500 mt-1">Share text across devices instantly</p>
+                <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-zinc-700 group-hover:text-emerald-400 transition-colors" />
+              </motion.div>
             </div>
 
-            <div
-              ref={vaultAccessPanelRef}
-              className="mt-6 w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-left backdrop-blur-sm sm:p-5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Vault Access</p>
-                  <p className="mt-1 text-sm text-zinc-400">Unified retrieval: clipboard, recent vault, email recovery, and manual paste.</p>
+            {/* ── Vault Access Input Panel ── */}
+            <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-left backdrop-blur-sm">
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <Input
+                    ref={vaultInputRef}
+                    type="text"
+                    value={vaultInput}
+                    onChange={(e) => {
+                      setVaultInput(e.target.value);
+                      if (vaultInputError) setVaultInputError(null);
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter") openVault(vaultInput); }}
+                    placeholder="Paste vault link or 6-digit code…"
+                    className="flex-1 h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-primary/40"
+                  />
+                  <Button
+                    type="button"
+                    className="h-11 rounded-xl bg-primary px-5 font-semibold text-primary-foreground hover:bg-primary/90 flex-shrink-0"
+                    onClick={() => openVault(vaultInput)}
+                  >
+                    Open
+                  </Button>
                 </div>
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
-                  Unified Retrieval
-                </span>
-              </div>
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <Input
-                  ref={vaultInputRef}
-                  type="text"
-                  value={vaultInput}
-                  onChange={(event) => {
-                    setVaultInput(event.target.value);
-                    if (vaultInputError) setVaultInputError(null);
-                  }}
-                  placeholder="Paste vault link or code (example: ABC123)"
-                  className="h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-500 focus-visible:ring-primary/40"
-                />
-                <Button
-                  type="button"
-                  className="h-11 rounded-xl bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90"
-                  onClick={() => openVault(vaultInput)}
-                >
-                  Open Vault
-                </Button>
-              </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePasteFromClipboard}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-zinc-400 bg-zinc-800/60 hover:bg-zinc-700/60 border border-zinc-700/60 transition-colors"
+                  >
+                    <Clipboard className="h-3.5 w-3.5" />
+                    Paste
+                  </button>
+                  {recentVault && (
+                    <button
+                      type="button"
+                      onClick={() => openVault(recentVault)}
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-zinc-400 bg-zinc-800/60 hover:bg-zinc-700/60 border border-zinc-700/60 transition-colors"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Recent Vault
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { playSound('click'); setLocation('/get-it-mailed'); }}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 transition-colors"
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Get It Mailed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRecoveryStatus(null); setShowRecoveryDialog(true); }}
+                    className="h-8 px-3 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    Lost your code?
+                  </button>
+                </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800"
-                  onClick={handlePasteFromClipboard}
-                >
-                  <Clipboard className="mr-2 h-4 w-4" />
-                  Paste from Clipboard
-                </Button>
                 {recentVault && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800"
-                    onClick={() => openVault(recentVault)}
-                  >
-                    Open Recent Vault
-                  </Button>
+                  <p className="truncate text-xs text-zinc-600">Recent: {recentVault}</p>
                 )}
-                <button
-                  type="button"
-                  className="h-9 rounded-lg px-3 text-xs font-semibold text-cyan-300 transition-colors hover:bg-zinc-800/80 hover:text-cyan-200"
-                  onClick={() => {
-                    setRecoveryStatus(null);
-                    setShowRecoveryDialog(true);
-                  }}
-                >
-                  Didn&apos;t save your link? Recover via email
-                </button>
-              </div>
-
-              {recentVault && (
-                <p className="mt-2 truncate text-xs text-zinc-500">Recent: {recentVault}</p>
-              )}
-              {vaultInputError && (
-                <p className="mt-2 text-xs text-rose-400">{vaultInputError}</p>
-              )}
-
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-100">Get It Mailed</p>
-                      <p className="mt-1 text-xs text-zinc-400">Send secure vault access details to your email for recovery and handoff.</p>
-                    </div>
-                    <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-cyan-300">
-                      <Mail className="h-4 w-4" />
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-4 h-9 w-full rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:bg-zinc-800"
-                    onClick={() => setLocation("/get-it-mailed")}
-                  >
-                    Open Get It Mailed
-                  </Button>
-                </div>
-
-                <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-100">Secure Clipboard</p>
-                      <p className="mt-1 text-xs text-zinc-400">Use encrypted clipboard sync for one-tap cross-device vault retrieval.</p>
-                    </div>
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-300">
-                      <Clipboard className="h-4 w-4" />
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-4 h-9 w-full rounded-lg border-zinc-700 bg-zinc-900/70 text-zinc-200 hover:bg-zinc-800"
-                    onClick={() => setLocation("/clipboard")}
-                  >
-                    Open Clipboard
-                  </Button>
-                </div>
+                {vaultInputError && (
+                  <p className="text-xs text-rose-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    {vaultInputError}
+                  </p>
+                )}
               </div>
             </div>
 
-            <Link href="/how-it-works">
-              <span className="mt-4 inline-flex cursor-pointer text-sm text-zinc-400 underline-offset-4 transition-colors hover:text-zinc-200 hover:underline">
-                Learn how VaultBridge works
-              </span>
-            </Link>
-
-            <div className="mt-12 flex flex-wrap justify-center items-center gap-6 sm:gap-12 text-sm font-medium text-zinc-500">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" /> No login required
+            <div className="mt-5 flex flex-wrap justify-center items-center gap-4 sm:gap-8 text-xs font-medium text-zinc-600">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> No login required
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" /> End-to-end secure
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> End-to-end secure
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-primary" /> Free forever
@@ -526,6 +506,11 @@ export default function Home() {
               </div>
             </div>
           </motion.div>
+        </section>
+
+        {/* Recent Vault Activity (stored in browser) */}
+        <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-12">
+          <RecentActivity />
         </section>
 
         {/* SECTION 2 — Product Demo Preview */}
@@ -946,6 +931,7 @@ export default function Home() {
               <li><Link href="/how-it-works"><span className="hover:text-primary cursor-pointer transition-colors">How it Works</span></Link></li>
               <li><Link href="/privacy"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Policy</span></Link></li>
               <li><Link href="/terms"><span className="hover:text-primary cursor-pointer transition-colors">Terms of Service</span></Link></li>
+              <li><a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-primary cursor-pointer transition-colors">Sitemap</a></li>
             </ul>
           </div>
 

@@ -170,11 +170,6 @@ export default function UploadPage() {
             setStatusText("Generating military-grade AES-256 keys...");
             await new Promise(r => setTimeout(r, 300));
             const key = await generateKey();
-
-            // Generate Split-Code
-            const splitCode = generateSplitCode();
-            setStatusText("Deriving PIN-protective wrapper...");
-            const wrappedKey = await wrapFileKey(key, splitCode.pin);
             setProgress(10);
 
             // Step 2: Encrypt Metadata
@@ -202,15 +197,41 @@ export default function UploadPage() {
             setProgress(20);
 
             // Step 3: Register Vault
-            setStatusText("Securing vault location...");
-            const vault = await createVault.mutateAsync({
-                expiresIn: expiresIn[0],
-                maxDownloads: maxDownloads[0],
-                encryptedMetadata,
-                lookupId: splitCode.lookupId,
-                wrappedKey,
-                files: filesPayload
-            });
+            const maxLookupRetries = 5;
+            let splitCode: ReturnType<typeof generateSplitCode> | null = null;
+            let wrappedKey = "";
+            let vault: Awaited<ReturnType<typeof createVault.mutateAsync>> | null = null;
+
+            for (let attempt = 0; attempt <= maxLookupRetries; attempt++) {
+                splitCode = generateSplitCode();
+                setStatusText(`Deriving PIN-protective wrapper (attempt ${attempt + 1})...`);
+                wrappedKey = await wrapFileKey(key, splitCode.pin);
+
+                try {
+                    setStatusText("Securing vault location...");
+                    vault = await createVault.mutateAsync({
+                        expiresIn: expiresIn[0],
+                        maxDownloads: maxDownloads[0],
+                        encryptedMetadata,
+                        lookupId: splitCode.lookupId,
+                        wrappedKey,
+                        files: filesPayload
+                    });
+                    break;
+                } catch (err) {
+                    const typedError = err as Error & { status?: number; code?: string };
+                    const isLookupCollision =
+                        typedError.status === 409 || typedError.code === "LOOKUP_ID_CONFLICT";
+                    if (!isLookupCollision || attempt === maxLookupRetries) {
+                        throw err;
+                    }
+                }
+            }
+
+            if (!vault || !splitCode) {
+                throw new Error("Could not allocate a unique access code. Please retry.");
+            }
+
             setProgress(30);
 
             // Step 4: Encrypt & Upload Each File (No Chunking - Single Blob)
@@ -389,10 +410,10 @@ export default function UploadPage() {
                                     }}
                                     disabled={!isCompleted && !isCurrent}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${isCompleted
-                                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20"
-                                            : isCurrent
-                                                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                                                : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 cursor-not-allowed"
+                                        ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20"
+                                        : isCurrent
+                                            ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                            : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 cursor-not-allowed"
                                         }`}
                                 >
                                     {isCompleted ? <Check className="w-3.5 h-3.5" /> : <StepIcon className="w-3.5 h-3.5" />}
@@ -585,8 +606,8 @@ export default function UploadPage() {
                                                 Download Limit
                                             </label>
                                             <span className={`text-sm font-mono font-bold px-2.5 py-0.5 rounded-lg ${maxDownloads[0] === 1
-                                                    ? "text-red-400 bg-red-500/10"
-                                                    : "text-emerald-400 bg-emerald-500/10"
+                                                ? "text-red-400 bg-red-500/10"
+                                                : "text-emerald-400 bg-emerald-500/10"
                                                 }`}>
                                                 {maxDownloads[0] === 1 ? "BURN" : `${maxDownloads[0]}×`}
                                             </span>
@@ -603,8 +624,8 @@ export default function UploadPage() {
                                         <button
                                             onClick={() => setMaxDownloads(maxDownloads[0] === 1 ? [5] : [1])}
                                             className={`w-full text-xs cursor-pointer select-none transition-all py-2.5 rounded-xl border flex items-center justify-center gap-2 ${maxDownloads[0] === 1
-                                                    ? "bg-red-500/10 border-red-500/25 text-red-400"
-                                                    : "bg-zinc-800/50 border-zinc-700/50 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
+                                                ? "bg-red-500/10 border-red-500/25 text-red-400"
+                                                : "bg-zinc-800/50 border-zinc-700/50 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
                                                 }`}
                                         >
                                             <Flame className={`w-3.5 h-3.5 ${maxDownloads[0] === 1 ? "text-red-400" : ""}`} />
@@ -679,7 +700,7 @@ export default function UploadPage() {
                     className="mt-6 text-center"
                 >
                     <p className="text-[10px] md:text-xs text-center text-muted-foreground opacity-70">
-                        By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link> & <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link>.
+                        By continuing, you agree to our <Link href="/terms" className="underline hover:text-primary transition-colors">Terms of Service</Link>, <Link href="/privacy" className="underline hover:text-primary transition-colors">Privacy Policy</Link> & <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">Sitemap</a>.
                     </p>
                 </motion.div>
             </main>

@@ -97,6 +97,133 @@ export async function decryptMetadata(encryptedMetadataStr: string, key: CryptoK
 // CLIPBOARD TEXT ENCRYPTION (Universal Clipboard Feature)
 // ============================================================================
 
+export interface ClipboardAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  dataBase64: string;
+}
+
+export interface ClipboardPayload {
+  version: 2;
+  plainText: string;
+  attachments: ClipboardAttachment[];
+  timestamp: number;
+}
+
+export function createEmptyClipboardPayload(): ClipboardPayload {
+  return {
+    version: 2,
+    plainText: "",
+    attachments: [],
+    timestamp: Date.now(),
+  };
+}
+
+function normalizeAttachment(raw: any): ClipboardAttachment | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const dataBase64 = typeof raw.dataBase64 === "string" ? raw.dataBase64 : "";
+  if (!dataBase64) return null;
+
+  return {
+    id: typeof raw.id === "string" && raw.id.length > 0 ? raw.id : generateUUID(),
+    name: typeof raw.name === "string" && raw.name.length > 0 ? raw.name : "pasted-file",
+    mimeType: typeof raw.mimeType === "string" && raw.mimeType.length > 0 ? raw.mimeType : "application/octet-stream",
+    size: typeof raw.size === "number" && Number.isFinite(raw.size) ? raw.size : base64ToArrayBuffer(dataBase64).byteLength,
+    dataBase64,
+  };
+}
+
+function normalizeClipboardPayload(raw: any): ClipboardPayload {
+  const fallbackPayload = createEmptyClipboardPayload();
+  const isClipboardAttachment = (item: ClipboardAttachment | null): item is ClipboardAttachment => Boolean(item);
+
+  // Backward compatibility with old schema: { clipboardText, timestamp }
+  if (raw && typeof raw.clipboardText === "string") {
+    const legacyAttachments = Array.isArray(raw.attachments)
+      ? raw.attachments.map(normalizeAttachment).filter(isClipboardAttachment)
+      : [];
+
+    return {
+      version: 2,
+      plainText: raw.clipboardText,
+      attachments: legacyAttachments,
+      timestamp: typeof raw.timestamp === "number" ? raw.timestamp : Date.now(),
+    };
+  }
+
+  if (!raw || typeof raw !== "object") return fallbackPayload;
+
+  return {
+    version: 2,
+    plainText: typeof raw.plainText === "string" ? raw.plainText : "",
+    attachments: Array.isArray(raw.attachments)
+      ? raw.attachments.map(normalizeAttachment).filter(isClipboardAttachment)
+      : [],
+    timestamp: typeof raw.timestamp === "number" ? raw.timestamp : Date.now(),
+  };
+}
+
+export async function encryptClipboardPayload(
+  payload: { plainText: string; attachments?: ClipboardAttachment[]; timestamp?: number },
+  key: CryptoKey
+): Promise<string> {
+  const normalized: ClipboardPayload = {
+    version: 2,
+    plainText: payload.plainText || "",
+    attachments: Array.isArray(payload.attachments)
+      ? payload.attachments.map(normalizeAttachment).filter((item): item is ClipboardAttachment => Boolean(item))
+      : [],
+    timestamp: typeof payload.timestamp === "number" ? payload.timestamp : Date.now(),
+  };
+
+  return encryptMetadata(normalized, key);
+}
+
+export async function decryptClipboardPayload(encrypted: string, key: CryptoKey): Promise<ClipboardPayload> {
+  const raw = await decryptMetadata(encrypted, key);
+  return normalizeClipboardPayload(raw);
+}
+
+export function buildClipboardAttachmentsFingerprint(attachments: ClipboardAttachment[]): string {
+  return attachments
+    .map((attachment) =>
+      `${attachment.id}:${attachment.name}:${attachment.mimeType}:${attachment.size}:${attachment.dataBase64.length}`
+    )
+    .join("|");
+}
+
+export function isClipboardPayloadEmpty(payload: ClipboardPayload | null | undefined): boolean {
+  if (!payload) return true;
+  return payload.plainText.trim().length === 0 && payload.attachments.length === 0;
+}
+
+export function estimateClipboardPayloadBytes(payload: ClipboardPayload): number {
+  // Base64 expands payload by ~4/3; using raw base64 length keeps this estimate cheap and stable.
+  const attachmentsBytes = payload.attachments.reduce((sum, attachment) => sum + attachment.dataBase64.length, 0);
+  const textBytes = new TextEncoder().encode(payload.plainText).byteLength;
+  return attachmentsBytes + textBytes;
+}
+
+export async function fileToClipboardAttachment(file: File): Promise<ClipboardAttachment> {
+  const fileBuffer = await file.arrayBuffer();
+  return {
+    id: generateUUID(),
+    name: file.name || "pasted-file",
+    mimeType: file.type || "application/octet-stream",
+    size: file.size,
+    dataBase64: arrayBufferToBase64(fileBuffer),
+  };
+}
+
+export function clipboardAttachmentToBlob(attachment: ClipboardAttachment): Blob {
+  return new Blob([base64ToArrayBuffer(attachment.dataBase64)], {
+    type: attachment.mimeType || "application/octet-stream",
+  });
+}
+
 /**
  * Encrypt clipboard text using the file key.
  * Uses the same AES-GCM encryption as file metadata.
@@ -106,7 +233,7 @@ export async function decryptMetadata(encryptedMetadataStr: string, key: CryptoK
  * @returns Promise<string> - Encrypted text as base64 JSON string
  */
 export async function encryptClipboardText(text: string, key: CryptoKey): Promise<string> {
-  return encryptMetadata({ clipboardText: text, timestamp: Date.now() }, key);
+  return encryptClipboardPayload({ plainText: text, attachments: [], timestamp: Date.now() }, key);
 }
 
 /**
@@ -117,18 +244,21 @@ export async function encryptClipboardText(text: string, key: CryptoKey): Promis
  * @returns Promise<string> - Decrypted plain text
  */
 export async function decryptClipboardText(encrypted: string, key: CryptoKey): Promise<string> {
-  const result = await decryptMetadata(encrypted, key);
-  return result.clipboardText;
+  const payload = await decryptClipboardPayload(encrypted, key);
+  return payload.plainText;
 }
 
 // Utility: ArrayBuffer to Base64
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = "";
   const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
   }
+
   return window.btoa(binary);
 }
 
