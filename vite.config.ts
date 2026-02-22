@@ -27,6 +27,7 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
     target: "safari14",
+    sourcemap: true,
   },
   server: {
     host: "0.0.0.0",

@@ -30,6 +30,13 @@ Disallow: /live/
 # Crawl delay (be respectful to server)
 Crawl-delay: 1
 
+# Block AI Bots
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
 # Sitemaps
 Sitemap: https://vaultbridge.org/sitemap.xml
 Sitemap: https://vaultbridge.org/sitemap-index.xml

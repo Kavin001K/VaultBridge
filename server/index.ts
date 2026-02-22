@@ -25,6 +25,7 @@ const cspConnectSrc = [
   "wss:",
   "https://api.github.com",
   "https://plausible.io",
+  "https://cloudflareinsights.com",
   process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
   "https://*.r2.cloudflarestorage.com",
   "https://*.cloudflarestorage.com",
@@ -54,7 +55,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io"], // For Vite HMR in dev
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io", "https://static.cloudflareinsights.com"], // For Vite HMR in dev
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],

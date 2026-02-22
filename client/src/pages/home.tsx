@@ -288,6 +288,7 @@ export default function Home() {
                 if (newState) playSound('click');
               }}
               whileTap={{ scale: 0.9 }}
+              aria-label={soundEnabled ? "Mute sounds" : "Enable sounds"}
               className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-primary/50 transition-all text-muted-foreground hover:text-primary tap-sm"
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -596,7 +597,7 @@ export default function Home() {
               >
                 <div className="p-2 sm:p-3 rounded-lg bg-zinc-800 text-primary shrink-0"><useCase.icon className="w-4 h-4 sm:w-5 sm:h-5" /></div>
                 <div>
-                  <h4 className="font-bold text-sm sm:text-lg mb-0.5 sm:mb-1">{useCase.title}</h4>
+                  <h3 className="font-bold text-sm sm:text-lg mb-0.5 sm:mb-1">{useCase.title}</h3>
                   <p className="text-xs sm:text-sm text-zinc-400">{useCase.desc}</p>
                 </div>
               </motion.div>
@@ -810,17 +811,17 @@ export default function Home() {
               </div>
               <span className="font-bold text-xl tracking-tight">VAULTBRIDGE</span>
             </div>
-            <p className="text-zinc-500 max-w-sm mb-6">
+            <p className="text-zinc-400 max-w-sm mb-6">
               The premier platform for Secure File Sharing, Encrypted Transfer, and Private Uploads.
             </p>
             <div className="flex gap-4">
-              <a href="https://github.com/Kavin001K/VaultBridge" className="text-zinc-500 hover:text-white"><Github className="w-5 h-5" /></a>
+              <a href="https://github.com/Kavin001K/VaultBridge" aria-label="VaultBridge GitHub Repository" className="text-zinc-400 hover:text-white"><Github className="w-5 h-5" /></a>
             </div>
           </div>
 
           <div>
-            <h4 className="font-bold text-white mb-4">Product</h4>
-            <ul className="space-y-3 text-sm text-zinc-500">
+            <h3 className="font-bold text-white mb-4">Product</h3>
+            <ul className="space-y-3 text-sm text-zinc-400">
               <li><Link href="/upload"><span className="hover:text-primary cursor-pointer transition-colors">Secure Upload</span></Link></li>
               <li><Link href="/access"><span className="hover:text-primary cursor-pointer transition-colors">Access Vault</span></Link></li>
               <li><Link href="/get-it-mailed"><span className="hover:text-primary cursor-pointer transition-colors">Secure Email Relay</span></Link></li>
@@ -829,8 +830,8 @@ export default function Home() {
           </div>
 
           <div>
-            <h4 className="font-bold text-white mb-4">Resources</h4>
-            <ul className="space-y-3 text-sm text-zinc-500">
+            <h3 className="font-bold text-white mb-4">Resources</h3>
+            <ul className="space-y-3 text-sm text-zinc-400">
               <li><Link href="/blog"><span className="hover:text-primary cursor-pointer transition-colors">Blog Hub</span></Link></li>
               <li><Link href="/security"><span className="hover:text-primary cursor-pointer transition-colors">Security</span></Link></li>
               <li><Link href="/privacy-manifesto"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Manifesto</span></Link></li>
@@ -843,8 +844,8 @@ export default function Home() {
           </div>
 
           <div>
-            <h4 className="font-bold text-white mb-4">Blogs</h4>
-            <ul className="space-y-3 text-sm text-zinc-500">
+            <h3 className="font-bold text-white mb-4">Blogs</h3>
+            <ul className="space-y-3 text-sm text-zinc-400">
               <li><Link href="/blog/secure-file-sharing-best-practices"><span className="hover:text-primary cursor-pointer transition-colors">Secure File Sharing Best Practices</span></Link></li>
               <li><Link href="/blog/encrypted-file-transfer-vs-cloud-storage"><span className="hover:text-primary cursor-pointer transition-colors">Encrypted Transfer vs Cloud Storage</span></Link></li>
               <li><Link href="/blog/anonymous-file-sharing-without-login"><span className="hover:text-primary cursor-pointer transition-colors">Anonymous Sharing Without Login</span></Link></li>
@@ -853,7 +854,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto pt-8 border-t border-zinc-800/50 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-600">
+        <div className="max-w-7xl mx-auto pt-8 border-t border-zinc-800/50 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-400">
           <p>© 2026 VaultBridge by Ace-Groups. All rights reserved.</p>
           <div className="mt-4 md:mt-0 flex gap-4">
             <span>Anonymous File Sharing</span>
