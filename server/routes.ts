@@ -9,6 +9,7 @@ import { supabaseStorage } from "./services/supabase_storage";
 import { localStorage } from "./services/local_storage";
 import { logStorageStatus } from "./services/storage_router";
 import multer from "multer";
+import fs from "fs";
 
 const MAX_ENCRYPTED_CLIPBOARD_CHARS = 80 * 1024 * 1024; // Keep below API body limit headroom.
 
@@ -16,9 +17,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Configure Multer for transient "hot potato" memory storage
+  // Configure Multer for transient "hot potato" storage using /tmp (Cloud Run memory-backed temp space)
   const upload = multer({
-    storage: multer.memoryStorage(),
+    storage: multer.diskStorage({ destination: '/tmp' }),
     limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per-file limit
   });
 
@@ -455,7 +456,7 @@ export async function registerRoutes(
       // Prepare file attachments once
       const attachments = files.map(f => ({
         filename: f.originalname,
-        content: f.buffer
+        content: fs.readFileSync(f.path)
       }));
 
       // Send to all recipients in parallel
@@ -470,6 +471,13 @@ export async function registerRoutes(
           return { recipientEmail, result };
         })
       );
+
+      // Clean up local /tmp files after reading them into memory for sending
+      files.forEach(f => {
+        fs.unlink(f.path, (err) => {
+          if (err) console.error(`[Cleanup] Failed to unlink tmp file ${f.path}:`, err);
+        });
+      });
 
       const successful = results.filter(
         (entry): entry is PromiseFulfilledResult<{ recipientEmail: string; result: Awaited<ReturnType<typeof sendDirectAttachment>> }> =>
