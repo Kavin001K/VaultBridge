@@ -401,16 +401,18 @@ export async function registerRoutes(
       next();
     });
   }, async (req, res) => {
+
+    // Create a safe reference to files for cleanup
+    const files = (req.files as Express.Multer.File[]) || [];
+
     try {
-      if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
+      if (files.length === 0) {
         return res.status(400).json({ message: "No files uploaded." });
       }
 
-      const files = req.files as Express.Multer.File[];
       const { to } = req.body;
       let { subject, body } = req.body;
 
-      // Require at least the recipient email
       if (!to) {
         return res.status(400).json({ message: "Missing required field: to (recipient email)." });
       }
@@ -472,13 +474,6 @@ export async function registerRoutes(
         })
       );
 
-      // Clean up local /tmp files after reading them into memory for sending
-      files.forEach(f => {
-        fs.unlink(f.path, (err) => {
-          if (err) console.error(`[Cleanup] Failed to unlink tmp file ${f.path}:`, err);
-        });
-      });
-
       const successful = results.filter(
         (entry): entry is PromiseFulfilledResult<{ recipientEmail: string; result: Awaited<ReturnType<typeof sendDirectAttachment>> }> =>
           entry.status === "fulfilled" && entry.value.result.success
@@ -490,14 +485,12 @@ export async function registerRoutes(
             const reason = entry.reason instanceof Error ? entry.reason.message : "Unexpected send failure";
             return { recipient: "unknown", reason };
           }
-
           if (!entry.value.result.success) {
             return {
               recipient: entry.value.recipientEmail,
               reason: entry.value.result.error || "Delivery failed",
             };
           }
-
           return null;
         })
         .filter((entry): entry is { recipient: string; reason: string } => Boolean(entry));
@@ -523,14 +516,25 @@ export async function registerRoutes(
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: `Successfully sent to ${successCount} recipient(s).`,
         delivered: successCount
       });
+
     } catch (err) {
       console.error("Direct email error:", err);
-      res.status(500).json({ message: "Internal server error." });
+      return res.status(500).json({ message: "Internal server error." });
+
+    } finally {
+      // GUARANTEED CLEANUP: This runs no matter what happened above
+      files.forEach(f => {
+        if (f.path && fs.existsSync(f.path)) {
+          fs.unlink(f.path, (err) => {
+            if (err) console.error(`[Cleanup] Failed to unlink tmp file ${f.path}:`, err);
+          });
+        }
+      });
     }
   });
 
