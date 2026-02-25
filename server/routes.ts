@@ -9,6 +9,7 @@ import { supabaseStorage } from "./services/supabase_storage";
 import { localStorage } from "./services/local_storage";
 import { logStorageStatus } from "./services/storage_router";
 import multer from "multer";
+import fs from "fs";
 
 const MAX_ENCRYPTED_CLIPBOARD_CHARS = 80 * 1024 * 1024; // Keep below API body limit headroom.
 
@@ -16,9 +17,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Configure Multer for transient "hot potato" memory storage
+  // Configure Multer for transient "hot potato" storage using /tmp (Cloud Run memory-backed temp space)
   const upload = multer({
-    storage: multer.memoryStorage(),
+    storage: multer.diskStorage({ destination: '/tmp' }),
     limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per-file limit
   });
 
@@ -400,16 +401,18 @@ export async function registerRoutes(
       next();
     });
   }, async (req, res) => {
+
+    // Create a safe reference to files for cleanup
+    const files = (req.files as Express.Multer.File[]) || [];
+
     try {
-      if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
+      if (files.length === 0) {
         return res.status(400).json({ message: "No files uploaded." });
       }
 
-      const files = req.files as Express.Multer.File[];
       const { to } = req.body;
       let { subject, body } = req.body;
 
-      // Require at least the recipient email
       if (!to) {
         return res.status(400).json({ message: "Missing required field: to (recipient email)." });
       }
@@ -455,7 +458,7 @@ export async function registerRoutes(
       // Prepare file attachments once
       const attachments = files.map(f => ({
         filename: f.originalname,
-        content: f.buffer
+        content: fs.readFileSync(f.path)
       }));
 
       // Send to all recipients in parallel
@@ -482,14 +485,12 @@ export async function registerRoutes(
             const reason = entry.reason instanceof Error ? entry.reason.message : "Unexpected send failure";
             return { recipient: "unknown", reason };
           }
-
           if (!entry.value.result.success) {
             return {
               recipient: entry.value.recipientEmail,
               reason: entry.value.result.error || "Delivery failed",
             };
           }
-
           return null;
         })
         .filter((entry): entry is { recipient: string; reason: string } => Boolean(entry));
@@ -515,14 +516,25 @@ export async function registerRoutes(
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: `Successfully sent to ${successCount} recipient(s).`,
         delivered: successCount
       });
+
     } catch (err) {
       console.error("Direct email error:", err);
-      res.status(500).json({ message: "Internal server error." });
+      return res.status(500).json({ message: "Internal server error." });
+
+    } finally {
+      // GUARANTEED CLEANUP: This runs no matter what happened above
+      files.forEach(f => {
+        if (f.path && fs.existsSync(f.path)) {
+          fs.unlink(f.path, (err) => {
+            if (err) console.error(`[Cleanup] Failed to unlink tmp file ${f.path}:`, err);
+          });
+        }
+      });
     }
   });
 

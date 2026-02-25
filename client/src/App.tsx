@@ -168,7 +168,7 @@ function App() {
 
   // Enforce minimum splash screen time
   useEffect(() => {
-    const timer = setTimeout(() => setMinTimeElapsed(true), 2500);
+    const timer = setTimeout(() => setMinTimeElapsed(true), 500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -185,19 +185,21 @@ function App() {
       // Use requestIdleCallback so prefetching absolutely doesn't interfere with main thread interactivity
       const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000));
       idleCallback(() => {
-        const prefetch = async () => {
-          try {
-            await Promise.all([
-              import("@/pages/upload"),
-              import("@/pages/access"),
-              import("@/pages/clipboard")
-            ]);
-            console.log("VaultBridge: Heavy routes pre-fetched in background.");
-          } catch (e) {
-            // Ignore prefetch failures
-          }
-        };
-        prefetch();
+        setTimeout(() => {
+          const prefetch = async () => {
+            try {
+              await Promise.all([
+                import("@/pages/upload"),
+                import("@/pages/access"),
+                import("@/pages/clipboard")
+              ]);
+              console.log("VaultBridge: Heavy routes pre-fetched in background.");
+            } catch (e) {
+              // Ignore prefetch failures
+            }
+          };
+          prefetch();
+        }, 5000);
       });
     }
   }, [showSplash]);
