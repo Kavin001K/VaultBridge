@@ -1,8 +1,3 @@
-// IMPORTANT: Force IPv4 first to avoid EHOSTUNREACH on some networks
-// This MUST be at the very top, before any imports that might create connections
-import dns from 'node:dns';
-dns.setDefaultResultOrder('ipv4first');
-
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
@@ -25,6 +20,7 @@ const cspConnectSrc = [
   "wss:",
   "https://api.github.com",
   "https://plausible.io",
+  "https://cloudflareinsights.com",
   process.env.SUPABASE_URL || "https://kigljmhbgzbbhrtgtxmk.supabase.co",
   "https://*.r2.cloudflarestorage.com",
   "https://*.cloudflarestorage.com",
@@ -45,6 +41,27 @@ declare module "http" {
 }
 
 // =============================================================================
+// IMMEDIATE BOT REJECTION (HIGHEST PRIORITY)
+// =============================================================================
+// Drop known bot requests before handling CORS, Security Headers, or Rate Limits
+app.use((req, res, next) => {
+  const botPaths = [
+    '.php',
+    '/wp-',
+    'wp-cron.php',
+    '/ads.txt',
+    '/.well-known/sg-hosted',
+    '/xmlrpc.php'
+  ];
+
+  if (botPaths.some(path => req.path.includes(path) || req.url.includes(path))) {
+    // 444 is a non-standard code used to tell the server to drop the connection
+    return res.status(444).end();
+  }
+  next();
+});
+
+// =============================================================================
 // SECURITY MIDDLEWARE (Phase 2.4)
 // =============================================================================
 
@@ -54,7 +71,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io"], // For Vite HMR in dev
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io", "https://static.cloudflareinsights.com"], // For Vite HMR in dev
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
@@ -69,16 +86,18 @@ app.use(
   })
 );
 
-// Global rate limiter: 100 requests per minute
+
+
+// Global rate limiter: 50 requests per minute to protect all routes from bots
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 100,
+  max: 50,
   message: { message: "Too many requests. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-app.use("/api", globalLimiter);
+app.use(globalLimiter);  // Applied globally instead of just /api
 
 // Stricter rate limit for code resolution (anti-brute-force)
 export const codeLimiter = rateLimit({
@@ -105,9 +124,6 @@ export const uploadLimiter = rateLimit({
 app.use(
   express.json({
     limit: apiBodyLimit,
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
   })
 );
 
@@ -197,7 +213,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   startCleanupWorker();
 
   // Error handling middleware
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     if (err?.type === "entity.too.large") {
       return res.status(413).json({
         message: "Payload too large. Reduce clipboard attachments and try again.",
@@ -207,7 +223,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error("Internal Server Error:", err);
+    console.error(`[Internal Error] Path: ${req.path} | Error:`, err.stack || err);
 
     if (res.headersSent) {
       return next(err);

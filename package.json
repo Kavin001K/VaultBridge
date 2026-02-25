@@ -11,7 +11,7 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "test": "npx tsx tests/encryption.test.ts",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.992.0",
