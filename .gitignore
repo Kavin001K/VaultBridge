@@ -1,1 +1,11 @@
 node_modules
+
+# Storage data - should not be committed
+storage_data/
+*.enc
+
+# AWS installer
+AWSCLIV2.pkg
+
+# OS files
+.DS_Store
