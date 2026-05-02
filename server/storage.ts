@@ -168,12 +168,18 @@ export class DatabaseStorage implements IStorage {
             .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<number> {
+    async incrementDownloadCount(vaultId: string): Promise<{ success: boolean; newCount: number }> {
         const [updated] = await db.update(vaults)
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
-            .where(eq(vaults.id, vaultId))
+            .where(sql`${vaults.id} = ${vaultId} AND ${vaults.downloadCount} < ${vaults.maxDownloads}`)
             .returning();
-        return updated?.downloadCount || 0;
+        if (updated) {
+            return { success: true, newCount: updated.downloadCount };
+        } else {
+            // Check if vault exists and get current count
+            const [vault] = await db.select().from(vaults).where(eq(vaults.id, vaultId));
+            return { success: false, newCount: vault?.downloadCount || 0 };
+        }
     }
 
     async incrementFileDownloadCount(fileIds: string[]): Promise<{

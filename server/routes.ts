@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./services/email";
-import { codeLimiter, uploadLimiter } from "./index";
+import { codeLimiter, uploadLimiter, vaultCreateLimiter, chunkUploadLimiter, generalLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";
@@ -64,7 +64,7 @@ export async function registerRoutes(
   // =============================================================================
 
   // Create a new vault
-  app.post(api.vaults.create.path, async (req, res) => {
+  app.post(api.vaults.create.path, vaultCreateLimiter, async (req, res) => {
     try {
       const input = api.vaults.create.input.parse(req.body);
       const vault = await storage.createVault(input);
@@ -165,11 +165,13 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Vault not found" });
     }
 
-    if (vault.downloadCount >= vault.maxDownloads) {
+    const result = await storage.incrementDownloadCount(vault.id);
+
+    if (!result.success) {
       return res.status(403).json({ message: "Download limit exceeded" });
     }
 
-    const newCount = await storage.incrementDownloadCount(vault.id);
+    const newCount = result.newCount;
 
     // BURNING LOGIC: If limit reached, delete immediately
     if (newCount >= vault.maxDownloads) {
@@ -614,7 +616,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.chunks.getUploadUrl.path, uploadLimiter, async (req, res) => {
+  app.post(api.chunks.getUploadUrl.path, chunkUploadLimiter, async (req, res) => {
     const id = req.params.id as string;
     const fileId = req.params.fileId as string;
     const chunkIndex = req.params.chunkIndex as string;

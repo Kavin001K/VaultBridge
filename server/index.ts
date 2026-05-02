@@ -89,30 +89,39 @@ app.use(
 
 
 // Global rate limiter: 50 requests per minute to protect all routes from bots
-const globalLimiter = rateLimit({
+// const globalLimiter = rateLimit({
+//   windowMs: 60 * 1000, // 1 minute
+//   max: 50,
+//   message: { message: "Too many requests. Please try again later." },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+
+// app.use(globalLimiter);  // Applied globally instead of just /api
+
+// Stricter rate limit for vault creation (anti-abuse)
+export const vaultCreateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 50,
+  max: 10, // 10 vault creations per minute
+  message: { message: "Too many vault creations. Please wait before creating another vault." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Relaxed rate limit for chunk uploads (to support large files)
+export const chunkUploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 500, // 500 chunk upload requests per minute
+  message: { message: "Chunk upload rate limit exceeded." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// General API rate limiter (for other routes)
+export const generalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute for general API calls
   message: { message: "Too many requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use(globalLimiter);  // Applied globally instead of just /api
-
-// Stricter rate limit for code resolution (anti-brute-force)
-export const codeLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // Only 5 attempts per minute
-  message: { message: "Too many code attempts. Please wait before trying again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Upload rate limiter
-export const uploadLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20, // 20 uploads per minute
-  message: { message: "Upload rate limit exceeded." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -128,6 +137,9 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: apiBodyLimit }));
+
+// Apply general rate limiter to all /api routes
+app.use('/api', generalLimiter);
 
 // =============================================================================
 // REQUEST LOGGING

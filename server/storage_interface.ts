@@ -16,7 +16,7 @@ export interface IStorage {
     createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord>;
     getChunk(fileId: string, chunkIndex: number): Promise<ChunkRecord | undefined>;
     updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string): Promise<void>;
-    incrementDownloadCount(vaultId: string): Promise<number>;
+    incrementDownloadCount(vaultId: string): Promise<{ success: boolean; newCount: number }>;
     incrementFileDownloadCount(fileIds: string[]): Promise<{
         fileId: string;
         downloadCount: number;

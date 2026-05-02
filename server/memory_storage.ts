@@ -185,14 +185,14 @@ export class MemoryStorage implements IStorage {
         }
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<number> {
+    async incrementDownloadCount(vaultId: string): Promise<{ success: boolean; newCount: number }> {
         const v = this.vaults.get(vaultId);
-        if (v) {
+        if (v && v.downloadCount < v.maxDownloads) {
             v.downloadCount += 1;
             this.vaults.set(vaultId, v);
-            return v.downloadCount;
+            return { success: true, newCount: v.downloadCount };
         }
-        return 0;
+        return { success: false, newCount: v?.downloadCount || 0 };
     }
 
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
