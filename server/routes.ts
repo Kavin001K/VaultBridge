@@ -422,7 +422,7 @@ export async function registerRoutes(
     upload.array("files", 10)(req, res, (err) => { // Allow up to 10 files
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
-          return res.status(413).json({ message: "File too large. Max limit is 25MB per file." });
+          return res.status(413).json({ message: "File too large. Max limit is 500MB per file." });
         }
         return res.status(400).json({ message: err.message });
       } else if (err) {

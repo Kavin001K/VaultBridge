@@ -159,26 +159,34 @@ export default function Success() {
     }
   };
 
-  const vaultId = params?.id || "";
+  // Clean vaultId from potential trailing hashes if the router includes them
+  const rawId = params?.id || "";
+  const vaultId = rawId.split('#')[0];
   const { data: vault } = useGetVault(vaultId);
 
   useEffect(() => {
     const hash = window.location.hash;
-    const codeMatch = hash.match(/code=([A-Za-z0-9]+)/);
+    // Extract code using multiple patterns for maximum resilience
+    const codeMatch = hash.match(/[#&]code=([A-Za-z0-9]+)/) || hash.match(/#([A-Za-z0-9]{6,7})/);
+    
     if (codeMatch) {
       setSplitCode(codeMatch[1]);
     }
 
-    // Parse Stats
-    const params = new URLSearchParams(hash.replace("#", "?")); // Hacky but works for hash params styled as queries
-    const time = params.get("time");
-    const speed = params.get("speed");
+    // Parse Stats using URLSearchParams (more robust)
+    try {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const time = hashParams.get("time");
+      const speed = hashParams.get("speed");
 
-    if (time && speed) {
-      setUploadStats({
-        time: parseInt(time),
-        speed: parseInt(speed)
-      });
+      if (time && speed) {
+        setUploadStats({
+          time: parseInt(time),
+          speed: parseInt(speed)
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to parse upload stats from hash", e);
     }
   }, []);
 

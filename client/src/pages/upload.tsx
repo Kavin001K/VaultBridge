@@ -363,7 +363,8 @@ export default function UploadPage() {
             const speed = totalSize / (duration / 1000); // Bytes/sec
 
             setTimeout(() => {
-                setLocation(`/success/${vault.id}#code=${splitCode.fullCode}&time=${duration}&speed=${Math.floor(speed)}`);
+                const targetUrl = `/success/${vault.id}#code=${splitCode.fullCode}&time=${duration}&speed=${Math.floor(speed)}`;
+                window.location.assign(targetUrl);
             }, 800);
 
         } catch (err) {
