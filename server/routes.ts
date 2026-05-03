@@ -2,12 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./services/email";
-<<<<<<< Updated upstream
-import { codeLimiter, uploadLimiter } from "./index";
-=======
-import { codeLimiter, vaultCreateLimiter, chunkUploadLimiter } from "./index";
+import { codeLimiter, vaultCreateLimiter, chunkUploadLimiter, uploadLimiter } from "./index";
 import { enqueueJob } from "./jobQueue";
->>>>>>> Stashed changes
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";

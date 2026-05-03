@@ -95,12 +95,9 @@ app.use(
 
 
 
-// Global rate limiter: 50 requests per minute to protect all routes from bots
-const globalLimiter = rateLimit({
+// Vault creation rate limiter: 10 per minute
+export const vaultCreateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-<<<<<<< Updated upstream
-  max: 50,
-=======
   max: 10, // 10 vault creations per minute
   message: { message: "Too many vault creations. Please wait before creating another vault." },
   standardHeaders: true,
@@ -128,7 +125,6 @@ export const chunkUploadLimiter = rateLimit({
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 100, // 100 requests per minute for general API calls
->>>>>>> Stashed changes
   message: { message: "Too many requests. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -139,10 +135,10 @@ export const generalLimiter = rateLimit({
   },
 });
 
-app.use(globalLimiter);  // Applied globally instead of just /api
+app.use(vaultCreateLimiter);  // Applied globally instead of just /api
 
 // Stricter rate limit for code resolution (anti-brute-force)
-export const codeLimiter = rateLimit({
+export const codeLimiterStrict = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5, // Only 5 attempts per minute
   message: { message: "Too many code attempts. Please wait before trying again." },
