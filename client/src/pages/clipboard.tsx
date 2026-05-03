@@ -229,11 +229,11 @@ export default function UniversalClipboard() {
                         <button className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
                             <ArrowLeft className="w-4 h-4 flex-shrink-0" />
                             <div className="hidden sm:flex items-center gap-1.5">
-                                <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                                <div className="w-6 h-6 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                                    <Terminal className="w-3.5 h-3.5 text-primary" />
                                 </div>
-                                <span className="text-sm font-bold tracking-tight font-mono">
-                                    VAULT<span className="text-emerald-400">BRIDGE</span>
+                                <span className="text-sm font-bold tracking-tight font-display uppercase">
+                                    VAULT<span className="text-primary">BRIDGE</span>
                                 </span>
                             </div>
                             <span className="sm:hidden text-sm font-semibold">Back</span>
@@ -330,10 +330,10 @@ export default function UniversalClipboard() {
                             className="flex items-center justify-between"
                         >
                             <div>
-                                <h1 className="text-xl font-bold text-zinc-100 tracking-tight">Encrypted Clipboard</h1>
-                                <p className="text-xs text-zinc-500 mt-0.5">Paste text → share PIN → syncs everywhere</p>
+                                <h1 className="text-xl font-bold text-zinc-100 tracking-tight font-display uppercase">Encrypted Clipboard</h1>
+                                <p className="text-xs text-zinc-500 mt-0.5 font-sans">Paste text → share PIN → syncs everywhere</p>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-600">
+                            <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-600 uppercase">
                                 <Lock className="w-3 h-3" /> AES-256
                             </div>
                         </motion.div>
@@ -455,7 +455,7 @@ export default function UniversalClipboard() {
                             <Button
                                 onClick={handleGoLive}
                                 disabled={!content.trim() || isCreating}
-                                className="w-full text-base font-bold rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/20"
+                                className="w-full text-base font-bold rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
                                 style={{ height: "52px" }}
                             >
                                 {isCreating ? (

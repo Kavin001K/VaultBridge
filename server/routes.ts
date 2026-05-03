@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./services/email";
-import { codeLimiter, vaultCreateLimiter, chunkUploadLimiter, uploadLimiter } from "./index";
+import { codeLimiter, vaultCreateLimiter, chunkUploadLimiter, uploadLimiter, generalLimiter } from "./index";
 import { enqueueJob } from "./jobQueue";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
@@ -65,8 +65,8 @@ export async function registerRoutes(
   // VAULT OPERATIONS
   // =============================================================================
 
-  // Create a new vault
-  app.post(api.vaults.create.path, async (req, res) => {
+  // Create a new vault (strict limit)
+  app.post(api.vaults.create.path, vaultCreateLimiter, async (req, res) => {
     try {
       const input = api.vaults.create.input.parse(req.body);
       const vault = await storage.createVault(input);
@@ -104,8 +104,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get vault info
-  app.get(api.vaults.get.path, async (req, res) => {
+  // Get vault info (general limit)
+  app.get(api.vaults.get.path, generalLimiter, async (req, res) => {
     // Security headers for download routes
     res.set({
       "Cache-Control": "no-store, no-cache, must-revalidate",
@@ -183,8 +183,8 @@ export async function registerRoutes(
     }
   });
 
-  // Per-file download tracking
-  app.post(api.vaults.downloadFile.path, async (req, res) => {
+  // Per-file download tracking (general limit)
+  app.post(api.vaults.downloadFile.path, generalLimiter, async (req, res) => {
     try {
       const vaultId = req.params.id as string;
       const singleFileId = req.params.fileId as string;
