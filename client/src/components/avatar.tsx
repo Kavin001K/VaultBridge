@@ -31,7 +31,7 @@ export function VaultAvatar({ shortCode, className, size = 'md' }: VaultAvatarPr
   return (
     <div
       className={cn(
-        'flex items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-lg',
+        'flex items-center justify-center rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl transition-all duration-500 group-hover:scale-110 group-hover:border-primary/50',
         sizeClasses[size],
         className
       )}
