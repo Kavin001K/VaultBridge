@@ -313,8 +313,8 @@ export default function Success() {
             <Shield className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold font-mono tracking-tight text-lg leading-none">SECURE<span className="text-primary">VAULT</span></h1>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Encrypted Transfer</p>
+            <h1 className="font-bold font-display tracking-tight text-lg leading-none uppercase">VAULT<span className="text-primary">BRIDGE</span></h1>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Encrypted Transfer</p>
           </div>
         </div>
         <Button
@@ -354,7 +354,7 @@ export default function Success() {
                 <div className="p-2 bg-primary/10 rounded-full">
                   <Key className="w-4 h-4 text-primary" />
                 </div>
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">Access PIN</span>
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-[0.3em] font-mono">Access Code</span>
               </div>
 
               <div className="flex items-center gap-4 mb-4 scale-110">
@@ -575,8 +575,8 @@ export default function Success() {
                       className="flex-1 flex flex-col justify-center space-y-8"
                     >
                       <div className="text-center space-y-2">
-                        <h3 className="text-2xl font-bold tracking-tight">Ready to Share</h3>
-                        <p className="text-zinc-400">Copy the secure link below or use the share sheet.</p>
+                        <h3 className="text-2xl font-bold tracking-tight font-display">Ready to Share</h3>
+                        <p className="text-zinc-400 font-sans">Copy the secure link below or use the share sheet.</p>
                       </div>
 
                       <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 flex items-center gap-4 group hover:border-primary/30 transition-colors">
@@ -609,8 +609,8 @@ export default function Success() {
                       className="flex-1 flex flex-col justify-center space-y-8"
                     >
                       <div className="text-center space-y-2">
-                        <h3 className="text-2xl font-bold tracking-tight">Secure Dispatch</h3>
-                        <p className="text-zinc-400">Send an automated email notification with access details.</p>
+                        <h3 className="text-2xl font-bold tracking-tight font-display">Secure Dispatch</h3>
+                        <p className="text-zinc-400 font-sans">Send an automated email notification with access details.</p>
                       </div>
 
                       <div className="space-y-6">
@@ -649,8 +649,8 @@ export default function Success() {
                         <Trash2 className="w-10 h-10 text-rose-500" />
                       </div>
                       <div className="space-y-4">
-                        <h3 className="text-2xl font-bold text-rose-500">Initiate Self-Destruct</h3>
-                        <p className="text-zinc-400 max-w-md mx-auto">
+                        <h3 className="text-2xl font-bold text-rose-500 font-display">Initiate Self-Destruct</h3>
+                        <p className="text-zinc-400 max-w-md mx-auto font-sans">
                           This will immediately purge all encryption keys, metadata, and file chunks from the server.
                         </p>
                       </div>

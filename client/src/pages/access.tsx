@@ -40,7 +40,7 @@ interface FileDownloadState {
 
 const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
 const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
-const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{4}$/;
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
 
 const normalizeVaultPath = (pathname: string) =>
     pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -137,7 +137,7 @@ export default function AccessPage() {
     const [fileDownloadStates, setFileDownloadStates] = useState<Map<string, FileDownloadState>>(new Map());
 
     // Derived lookupId for sync
-    const lookupId = stage === "ready" && accessCode.length === 7 ? accessCode.slice(0, 3) : "";
+    const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
     const hasClipboardData = Boolean(
         clipboardPayload &&
         (clipboardPayload.plainText.trim().length > 0 || clipboardPayload.attachments.length > 0)
@@ -156,7 +156,7 @@ export default function AccessPage() {
     const extractAccessCode = (value: string | null): string | null => {
         if (!value) return null;
         const direct = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        if (direct.length === 7) return direct;
+        if (direct.length === 6) return direct;
 
         try {
             const parsed = value.startsWith("http")
@@ -165,14 +165,14 @@ export default function AccessPage() {
             const queryCode = parsed.searchParams.get("code");
             if (queryCode) {
                 const cleaned = queryCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                if (cleaned.length === 7) return cleaned;
+                if (cleaned.length === 6) return cleaned;
             }
 
             const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
             const hashCode = new URLSearchParams(hash).get("code");
             if (hashCode) {
                 const cleaned = hashCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                if (cleaned.length === 7) return cleaned;
+                if (cleaned.length === 6) return cleaned;
             }
         } catch {
             return null;
@@ -718,14 +718,14 @@ export default function AccessPage() {
                                         whileHover={!isMobile ? { scale: 1.02 } : {}}
                                         whileTap={{ scale: 0.98 }}
                                     >
-                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
-                                            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:border-primary/50 transition-colors">
+                                            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                                         </div>
                                         <div>
-                                            <h1 className="font-bold text-base sm:text-lg tracking-tight">
-                                                VAULT<span className="text-cyan-400">BRIDGE</span>
+                                            <h1 className="font-bold text-base sm:text-lg tracking-tight font-display uppercase">
+                                                VAULT<span className="text-primary">BRIDGE</span>
                                             </h1>
-                                            {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">ACCESS VAULT</p>}
+                                            {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em] uppercase">Secure Access</p>}
                                         </div>
                                     </motion.div>
                                 </Link>
@@ -771,14 +771,14 @@ export default function AccessPage() {
                                                 <Sparkles className="w-3 h-3" />
                                                 <span>ZERO-KNOWLEDGE DECRYPTION</span>
                                             </div>
-                                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3 sm:mb-4">
+                                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3 sm:mb-4 font-display uppercase">
                                                 Access Secure{" "}
-                                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">
+                                                <span className="text-primary">
                                                     Vault
                                                 </span>
                                             </h1>
-                                            <p className="text-sm sm:text-base text-zinc-400 px-4">
-                                                Enter your 7-character access code to unlock the vault
+                                            <p className="text-sm sm:text-base text-zinc-400 px-4 font-sans">
+                                                Enter your 6-character access code to unlock the vault
                                             </p>
                                         </div>
 

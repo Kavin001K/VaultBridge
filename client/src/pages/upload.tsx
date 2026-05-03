@@ -405,11 +405,11 @@ export default function UploadPage() {
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-2 cursor-pointer group shrink-0"
                         >
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:border-amber-500/50 transition-colors">
-                                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 group-hover:border-primary/50 transition-colors">
+                                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                             </div>
-                            <h1 className="text-lg sm:text-xl font-bold font-mono tracking-tight group-hover:text-amber-500 transition-colors">
-                                VAULT<span className="text-amber-500">BRIDGE</span>
+                            <h1 className="text-lg sm:text-xl font-bold font-display tracking-tight group-hover:text-primary transition-colors uppercase">
+                                VAULT<span className="text-primary">BRIDGE</span>
                             </h1>
                         </motion.div>
                     </Link>
@@ -432,14 +432,14 @@ export default function UploadPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-6 sm:mb-8"
                 >
-                    <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-amber-500/8 border border-amber-500/15 text-amber-400 text-[10px] sm:text-xs font-mono tracking-widest uppercase mb-3 sm:mb-4">
+                    <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-primary/5 border border-primary/10 text-primary text-[10px] sm:text-xs font-mono tracking-widest uppercase mb-3 sm:mb-4">
                         <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         End-to-End Encrypted Vault
                     </div>
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 bg-clip-text text-transparent">
+                    <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-3 font-display tracking-tight text-white">
                         Secure Upload
                     </h2>
-                    <p className="text-zinc-400 text-xs sm:text-sm max-w-md mx-auto px-2">
+                    <p className="text-zinc-400 text-xs sm:text-sm max-w-md mx-auto px-2 font-sans">
                         Select files, configure vault settings, then encrypt & upload — all client-side, zero-knowledge.
                     </p>
                 </motion.div>
@@ -464,10 +464,10 @@ export default function UploadPage() {
                                     }}
                                     disabled={!isCompleted && !isCurrent}
                                     className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${isCompleted
-                                        ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20"
+                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/20"
                                         : isCurrent
-                                            ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                                            : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 cursor-not-allowed"
+                                            ? "bg-primary/10 text-primary border border-primary/20"
+                                            : "bg-zinc-900/50 text-zinc-500 border border-zinc-800/50 cursor-not-allowed"
                                         }`}
                                 >
                                     {isCompleted ? <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <StepIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
@@ -486,7 +486,7 @@ export default function UploadPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.15 }}
-                    className={`bg-zinc-900/50 border border-white/10 rounded-3xl relative overflow-hidden backdrop-blur-xl ${isDragActive ? 'ring-2 ring-amber-500 bg-amber-500/5' : ''}`}
+                    className={`bg-zinc-900/40 border border-white/5 rounded-3xl relative overflow-hidden backdrop-blur-2xl ${isDragActive ? 'ring-2 ring-primary bg-primary/5' : ''}`}
                 >
                     {/* Progress Overlay */}
                     <AnimatePresence>
@@ -562,13 +562,13 @@ export default function UploadPage() {
                                             <span className="text-zinc-400">
                                                 {files.length} file{files.length > 1 ? 's' : ''} selected
                                             </span>
-                                            <span className="font-mono text-amber-400">{formatSize(totalSize)} / 500 MB</span>
+                                            <span className="font-mono text-primary">{formatSize(totalSize)} / 500 MB</span>
                                         </div>
                                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                                             <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${sizePercentage}%` }}
-                                                className={`h-full rounded-full transition-colors ${sizePercentage > 90 ? 'bg-red-500' : sizePercentage > 70 ? 'bg-amber-500' : 'bg-amber-500/70'}`}
+                                                className={`h-full rounded-full transition-colors ${sizePercentage > 90 ? 'bg-red-500' : sizePercentage > 70 ? 'bg-amber-500' : 'bg-primary'}`}
                                             />
                                         </div>
                                     </motion.div>
@@ -606,8 +606,8 @@ export default function UploadPage() {
                                 <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-4 sm:p-5 space-y-2 sm:space-y-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <Paperclip className="w-4 h-4 text-amber-400" />
-                                            <span className="text-sm font-semibold text-zinc-200">Attachments</span>
+                                            <Paperclip className="w-4 h-4 text-primary" />
+                                            <span className="text-sm font-bold text-zinc-200">Attachments</span>
                                         </div>
                                         <span className="text-xs font-mono text-zinc-500">{formatSize(totalSize)}</span>
                                     </div>
@@ -637,7 +637,7 @@ export default function UploadPage() {
                                                 <Clock className="w-4 h-4 text-amber-400" />
                                                 Auto-Destruct
                                             </label>
-                                            <span className="text-sm font-mono text-amber-400 font-bold bg-amber-500/10 px-2.5 py-0.5 rounded-lg">
+                                            <span className="text-sm font-mono text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-lg">
                                                 {formatExpiry(expiresIn[0])}
                                             </span>
                                         </div>
@@ -691,12 +691,12 @@ export default function UploadPage() {
                                 </div>
 
                                 {/* Zero-Knowledge Note */}
-                                <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-3 sm:p-4 flex items-start gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-                                        <Shield className="w-4.5 h-4.5 text-amber-400" />
+                                <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-4 flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                        <Shield className="w-4.5 h-4.5 text-primary" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-amber-300">Zero-Knowledge Encryption</p>
+                                        <p className="text-sm font-bold text-zinc-200">Zero-Knowledge Encryption</p>
                                         <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
                                             Encryption happens entirely in your browser. We never see your files, keys, or data.
                                         </p>
@@ -767,7 +767,7 @@ export default function UploadPage() {
                         <Button
                             onClick={() => setStep(2)}
                             disabled={!canProceed}
-                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
                         >
                             Continue
                             <ArrowRight className="w-4 h-4 ml-2" />
@@ -778,7 +778,7 @@ export default function UploadPage() {
                         <Button
                             onClick={() => setShowConfirmDialog(true)}
                             disabled={files.length === 0 || stage !== "idle" || !!uploadError}
-                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
                         >
                             <Lock className="w-4 h-4 mr-2" />
                             Encrypt & Upload

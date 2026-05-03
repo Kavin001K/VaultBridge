@@ -1,137 +1,52 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
-interface VaultDialProps {
-  className?: string;
-  size?: number;
-}
-
-export function VaultDial({ className = '', size = 200 }: VaultDialProps) {
+export const VaultDial: React.FC = () => {
+  const hexValues = ['00', '1F', '3E', '5D', '7C', '9B', 'BA', 'D9', 'F8', '17', '36', '55'];
+  
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 200 200"
-      className={`vault-dial ${className}`}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* Outer ring */}
-      <circle
-        cx="100"
-        cy="100"
-        r="90"
-        fill="none"
-        stroke="url(#dialGradient)"
-        strokeWidth="4"
-        className="animate-spin"
-        style={{ animationDuration: '20s' }}
+    <div className="relative w-[400px] h-[400px] flex items-center justify-center opacity-40">
+      {/* Outer Ring */}
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
+        className="absolute inset-0 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-3xl shadow-[0_0_50px_rgba(16,185,129,0.1)]"
       />
-
-      {/* Inner dial face */}
-      <circle
-        cx="100"
-        cy="100"
-        r="70"
-        fill="url(#faceGradient)"
-        stroke="#1f2937"
-        strokeWidth="2"
-      />
-
-      {/* Vault handle */}
-      <g className="animate-pulse">
-        <rect
-          x="95"
-          y="30"
-          width="10"
-          height="40"
-          rx="5"
-          fill="url(#handleGradient)"
-          className="origin-bottom animate-bounce"
-          style={{ animationDuration: '3s' }}
-        />
-        <circle
-          cx="100"
-          cy="25"
-          r="8"
-          fill="#fbbf24"
-          className="animate-ping"
-          style={{ animationDuration: '2s' }}
-        />
-      </g>
-
-      {/* Dial markings */}
-      {Array.from({ length: 12 }, (_, i) => {
-        const angle = (i * 30) - 90;
-        const rad = angle * (Math.PI / 180);
-        const x1 = 100 + 50 * Math.cos(rad);
-        const y1 = 100 + 50 * Math.sin(rad);
-        const x2 = 100 + 60 * Math.cos(rad);
-        const y2 = 100 + 60 * Math.sin(rad);
-
-        return (
-          <line
+      
+      {/* Middle Ring with Hex Values */}
+      <motion.div
+        animate={{ rotate: -360 }}
+        transition={{ duration: 180, repeat: Infinity, ease: "linear" }}
+        className="absolute w-[85%] h-[85%] rounded-full border border-white/10"
+      >
+        {hexValues.map((hex, i) => (
+          <div
             key={i}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
-            stroke="#374151"
-            strokeWidth="2"
-            className={i % 3 === 0 ? 'stroke-primary' : ''}
-          />
-        );
-      })}
-
-      {/* Center lock */}
-      <g className="animate-pulse">
-        <rect
-          x="85"
-          y="85"
-          width="30"
-          height="20"
-          rx="15"
-          fill="url(#lockGradient)"
-        />
-        <rect
-          x="92"
-          y="92"
-          width="16"
-          height="10"
-          rx="8"
-          fill="#1f2937"
-        />
-        <circle
-          cx="100"
-          cy="97"
-          r="3"
-          fill="#fbbf24"
-        />
-      </g>
-
-      {/* Gradients */}
-      <defs>
-        <radialGradient id="dialGradient" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#10b981" />
-          <stop offset="50%" stopColor="#0ea5e9" />
-          <stop offset="100%" stopColor="#1f2937" />
-        </radialGradient>
-
-        <radialGradient id="faceGradient" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#111827" />
-          <stop offset="100%" stopColor="#374151" />
-        </radialGradient>
-
-        <linearGradient id="handleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fbbf24" />
-          <stop offset="50%" stopColor="#f59e0b" />
-          <stop offset="100%" stopColor="#d97706" />
-        </linearGradient>
-
-        <linearGradient id="lockGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#6b7280" />
-          <stop offset="50%" stopColor="#4b5563" />
-          <stop offset="100%" stopColor="#374151" />
-        </linearGradient>
-      </defs>
-    </svg>
+            className="absolute top-0 left-1/2 -translate-x-1/2 h-full py-4 flex flex-col items-center justify-start"
+            style={{ transform: `rotate(${i * (360 / hexValues.length)}deg)` }}
+          >
+            <span className="text-[10px] font-mono text-primary/40 font-bold">{hex}</span>
+            <div className="w-[1px] h-2 bg-primary/20 mt-1" />
+          </div>
+        ))}
+      </motion.div>
+      
+      {/* Inner Dial */}
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+        className="absolute w-[60%] h-[60%] rounded-full border-2 border-primary/30 flex items-center justify-center bg-zinc-900/50"
+      >
+        <div className="w-1 h-1/2 bg-gradient-to-b from-primary to-transparent absolute top-0 rounded-full" />
+        
+        {/* The "Knob" */}
+        <div className="w-16 h-16 rounded-full bg-zinc-800 border border-white/10 shadow-inner flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 animate-pulse" />
+        </div>
+      </motion.div>
+      
+      {/* Decorative Ticks on the Outer Edge */}
+      <div className="absolute inset-[-20px] rounded-full border border-white/5" />
+    </div>
   );
-}
+};
