@@ -13,7 +13,11 @@ const sdk = new NodeSDK({
 });
 
 export async function initializeTracing(): Promise<void> {
-  if (process.env.NODE_ENV === "test") return;
+  // Only enable tracing in production to avoid local ECONNREFUSED errors
+  if (process.env.NODE_ENV !== "production") {
+    console.log("🔍 Tracing disabled in development mode.");
+    return;
+  }
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR);
   await sdk.start();
 }

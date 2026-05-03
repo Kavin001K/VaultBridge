@@ -60,6 +60,12 @@ app.use((req, res, next) => {
     // 444 is a non-standard code used to tell the server to drop the connection
     return res.status(444).end();
   }
+
+  // Bypass for .well-known paths to avoid Vite/SPA interference
+  if (req.path.startsWith('/.well-known/')) {
+    return res.status(404).end();
+  }
+
   next();
 });
 
@@ -83,6 +89,7 @@ app.use(
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
         connectSrc: cspConnectSrc, // API + storage + local dev tooling
+        scriptSrcAttr: isProduction ? ["'none'"] : ["'unsafe-inline'"], // Allow Vite inline handlers in dev
       },
     },
     crossOriginEmbedderPolicy: false, // Required for some features
@@ -115,7 +122,7 @@ export const codeLimiter = rateLimit({
 // Relaxed rate limit for chunk uploads (to support large files)
 export const chunkUploadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 1200, // 1200 chunk upload requests per minute
+  max: 2000, // Increased for stability
   message: { message: "Chunk upload rate limit exceeded." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -135,7 +142,7 @@ export const generalLimiter = rateLimit({
   },
 });
 
-app.use(vaultCreateLimiter);  // Applied globally instead of just /api
+// Applied to /api routes below to avoid blocking static assets/Vite in dev
 
 // Stricter rate limit for code resolution (anti-brute-force)
 export const codeLimiterStrict = rateLimit({
@@ -146,10 +153,10 @@ export const codeLimiterStrict = rateLimit({
   legacyHeaders: false,
 });
 
-// Upload rate limiter
+// Upload rate limiter (increased for multi-file stability)
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20, // 20 uploads per minute
+  max: 100, // Increased to 100 uploads per minute
   message: { message: "Upload rate limit exceeded." },
   standardHeaders: true,
   legacyHeaders: false,
