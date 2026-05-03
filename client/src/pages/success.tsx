@@ -85,6 +85,26 @@ function CountdownTimer({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+function ConfettiBurst() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden z-10">
+      {Array.from({ length: 18 }).map((_, i) => (
+        <div
+          key={i}
+          className="confetti-piece"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 20}%`,
+            backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#fde68a'][i % 4],
+            animationDelay: `${Math.random() * 0.6}s`,
+            animationDuration: `${1.4 + Math.random() * 0.8}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function Success() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/success/:id");
@@ -316,6 +336,7 @@ export default function Success() {
           opacity: isBurned ? 0 : 1
         }}
       >
+        {splitCode && <ConfettiBurst />}
 
         {/* Hero Section: PIN & Insights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
@@ -337,8 +358,23 @@ export default function Success() {
               </div>
 
               <div className="flex items-center gap-4 mb-4 scale-110">
-                <div className="font-mono text-5xl md:text-6xl font-black tracking-widest text-white drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] select-all">
-                  {splitCode.slice(0, 3)}-{splitCode.slice(3, 6)}
+                <div className="flex flex-wrap justify-center gap-2 font-mono text-5xl md:text-6xl font-black tracking-widest text-white drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] select-all">
+                  {splitCode
+                    .slice(0, 3)
+                    .split("")
+                    .concat(["-"])
+                    .concat(splitCode.slice(3).split(""))
+                    .map((char, index) => (
+                      <motion.span
+                        key={index}
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: index * 0.04, duration: 0.2 }}
+                        className="inline-block w-10 text-center"
+                      >
+                        {char}
+                      </motion.span>
+                    ))}
                 </div>
               </div>
 

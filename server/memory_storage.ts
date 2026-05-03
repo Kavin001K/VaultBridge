@@ -8,6 +8,7 @@ import {
     parseStoragePath,
     trackDeletion,
 } from "./services/storage_router";
+import { logger } from "./logger";
 
 /**
  * In-Memory Storage — fallback when PostgreSQL is unavailable.
@@ -202,30 +203,29 @@ export class MemoryStorage implements IStorage {
         remainingDownloads: number;
         isExhausted: boolean;
     }[]> {
-        const results = [];
+        const toUpdate: FileRecord[] = [];
 
         for (const fileId of fileIds) {
-            let file: FileRecord | undefined;
-            for (const f of Array.from(this.files.values())) {
-                if (f.fileId === fileId) {
-                    file = f;
-                    break;
-                }
+            const file = Array.from(this.files.values()).find((f) => f.fileId === fileId);
+            if (!file || file.downloadCount >= file.maxDownloads) {
+                throw new Error("FILE_DOWNLOAD_LIMIT_EXCEEDED");
             }
+            toUpdate.push(file);
+        }
 
-            if (file) {
-                file.downloadCount += 1;
-                this.files.set(file.id, file);
+        const results = [];
+        for (const file of toUpdate) {
+            file.downloadCount += 1;
+            this.files.set(file.id, file);
 
-                const remaining = Math.max(0, file.maxDownloads - file.downloadCount);
-                results.push({
-                    fileId: file.fileId,
-                    downloadCount: file.downloadCount,
-                    maxDownloads: file.maxDownloads,
-                    remainingDownloads: remaining,
-                    isExhausted: remaining <= 0
-                });
-            }
+            const remaining = Math.max(0, file.maxDownloads - file.downloadCount);
+            results.push({
+                fileId: file.fileId,
+                downloadCount: file.downloadCount,
+                maxDownloads: file.maxDownloads,
+                remainingDownloads: remaining,
+                isExhausted: remaining <= 0,
+            });
         }
 
         return results;
@@ -285,12 +285,12 @@ export class MemoryStorage implements IStorage {
                 if (bytesPerProvider.r2 > 0) trackDeletion("r2", bytesPerProvider.r2);
                 if (bytesPerProvider.supabase > 0) trackDeletion("supabase", bytesPerProvider.supabase);
             } catch (err) {
-                console.error(`[MemoryStorage] Failed to delete physical files:`, err);
+                logger.error({ err, vaultId: id }, "[MemoryStorage] Failed to delete physical files");
             }
         }
 
         this.vaults.delete(id);
-        console.log(`[MemoryStorage] Deleted vault ${id} and resources.`);
+        logger.info({ vaultId: id }, "[MemoryStorage] Deleted vault and resources.");
     }
 
     async cleanupExpiredVaults(): Promise<void> {
@@ -301,7 +301,7 @@ export class MemoryStorage implements IStorage {
         }
 
         if (expiredIds.length > 0) {
-            console.log(`[Cleanup] Found ${expiredIds.length} expired vaults. Purging from memory...`);
+            logger.info({ count: expiredIds.length }, "[Cleanup] Found expired vaults. Purging from memory...");
             for (const id of expiredIds) {
                 await this.deleteVault(id);
             }

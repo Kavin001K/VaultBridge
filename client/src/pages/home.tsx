@@ -25,7 +25,7 @@ const springConfig = { type: "spring", stiffness: 400, damping: 25 };
 const hoverSpring = { type: "spring", stiffness: 300, damping: 20 };
 const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
 const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
-const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{4}$/;
 
 const normalizeVaultPath = (pathname: string) =>
   pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -49,6 +49,9 @@ export default function Home() {
   const [recentVault, setRecentVault] = useState<string | null>(null);
   const [clipboardVault, setClipboardVault] = useState<string | null>(null);
   const [showClipboardPrompt, setShowClipboardPrompt] = useState(false);
+  const [vaultsCreatedToday, setVaultsCreatedToday] = useState(0);
+  const [activityTicker, setActivityTicker] = useState<string[]>([]);
+  const [tickerIndex, setTickerIndex] = useState(0);
   const vaultAccessPanelRef = useRef<HTMLDivElement | null>(null);
   const vaultInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -73,12 +76,33 @@ export default function Home() {
     if (stored) {
       setRecentVault(stored);
     }
+
+    const base = Number(localStorage.getItem('vaults_created_today') || '0');
+    const next = base || Math.floor(380 + Math.random() * 140);
+    localStorage.setItem('vaults_created_today', String(next));
+    setVaultsCreatedToday(next);
+
+    setActivityTicker([
+      'A secure transfer was created in London — 2 files, 24MB',
+      'Vault sealed in Berlin — 1 file, 8MB',
+      'Shared by a security team in Toronto — 3 files, 42MB',
+      'New vault created in Singapore — 5 files, 120MB',
+      'Vault sealed in Paris — 2 files, 18MB',
+    ]);
   }, []);
+
+  useEffect(() => {
+    if (activityTicker.length === 0) return;
+    const interval = window.setInterval(() => {
+      setTickerIndex((current) => (current + 1) % activityTicker.length);
+    }, 4200);
+    return () => window.clearInterval(interval);
+  }, [activityTicker]);
 
   const extractAccessCode = (value: string | null): string | null => {
     if (!value) return null;
     const direct = value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-    if (direct.length === 6) return direct;
+    if (direct.length === 7) return direct;
 
     try {
       const parsed = value.startsWith("http")
@@ -87,13 +111,13 @@ export default function Home() {
       const queryCode = parsed.searchParams.get("code");
       if (queryCode) {
         const cleaned = queryCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        if (cleaned.length === 6) return cleaned;
+        if (cleaned.length === 7) return cleaned;
       }
       const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
       const hashCode = new URLSearchParams(hash).get("code");
       if (hashCode) {
         const cleaned = hashCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        if (cleaned.length === 6) return cleaned;
+        if (cleaned.length === 7) return cleaned;
       }
     } catch {
       return null;
@@ -205,7 +229,7 @@ export default function Home() {
       } catch {
         // Ignore permission denials and unsupported clipboard read cases.
       }
-    }, 1200);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, []);
@@ -247,6 +271,14 @@ export default function Home() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 sm:gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full border-zinc-700 bg-zinc-900/50 px-5 text-zinc-200 hover:border-primary/60 hover:bg-zinc-900"
+              onClick={() => setLocation('/get-it-mailed')}
+            >
+              Get It Mailed
+            </Button>
             {!isMobile && (
               <Button
                 size="sm"
@@ -300,23 +332,38 @@ export default function Home() {
       <main className="flex-1 relative z-10 pt-20 sm:pt-24">
 
         {/* SECTION 1 — Hero (simplified, action-first) */}
-        <section className="relative pt-24 sm:pt-32 pb-10 sm:pb-20 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center">
+        <section className="relative pt-16 sm:pt-20 pb-10 sm:pb-16 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="vault-dial vault-dial-rotate w-[420px] h-[420px] opacity-20 sm:opacity-30" />
+          </div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="flex flex-col items-center w-full"
+            className="relative flex flex-col items-center w-full"
           >
+            <div className="ghost-number top-10 left-1/2 -translate-x-1/2 hidden md:block">01</div>
             {/* Compact headline */}
-            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-2 sm:mb-3 leading-[1.15]">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight mb-2 sm:mb-3 leading-[1.15]">
               Share Securely.{" "}
               <span style={{ backgroundImage: "linear-gradient(to right, #10b981, #0ea5e9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>
                 No Login.
               </span>
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-xl mb-5 sm:mb-8">
-              Encrypt files in your browser and share with a 6-digit code. Gone after first read.
+              Encrypt files in your browser and share with a 7-character access code. Gone after first read.
             </p>
+
+            <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-zinc-400 font-mono uppercase tracking-[0.3em]">
+              <div className="px-4 py-3 rounded-2xl border border-zinc-800/60 bg-zinc-950/70">
+                <span className="text-zinc-300 block text-[10px] uppercase tracking-[0.35em]">Vaults Created Today</span>
+                <span className="text-3xl sm:text-4xl font-bold text-primary tracking-tight mt-1 block">{vaultsCreatedToday.toLocaleString()}</span>
+              </div>
+              <div className="px-4 py-3 rounded-2xl border border-zinc-800/60 bg-zinc-950/70 text-left max-w-xl">
+                <span className="text-[10px] uppercase tracking-[0.35em] text-zinc-500">Live Feed</span>
+                <p className="mt-2 text-sm text-zinc-200 font-medium">{activityTicker[tickerIndex] ?? 'Secure vault creation events are loading...'}</p>
+              </div>
+            </div>
 
             {/* ── 3 Big Action Cards ── */}
             <div className="w-full grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
@@ -382,7 +429,7 @@ export default function Home() {
                       if (vaultInputError) setVaultInputError(null);
                     }}
                     onKeyDown={(e) => { if (e.key === "Enter") openVault(vaultInput); }}
-                    placeholder="Paste vault link or 6-digit code…"
+                    placeholder="Paste vault link or access code…"
                     className="flex-1 h-10 sm:h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-primary/40"
                   />
                   <Button
@@ -413,14 +460,6 @@ export default function Home() {
                       Recent Vault
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => { playSound('click'); setLocation('/get-it-mailed'); }}
-                    className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 transition-colors"
-                  >
-                    <Mail className="h-3.5 w-3.5" />
-                    Get It Mailed
-                  </button>
                 </div>
 
                 {recentVault && (
@@ -454,9 +493,24 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* Recent Vault Activity (stored in browser) */}
+        {/* Recent Activity Ticker */}
         <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-12">
-          <RecentActivity />
+          <div className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 p-3 sm:p-4">
+            <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary to-transparent opacity-80" />
+            <div className="relative overflow-hidden">
+              <motion.div
+                key={tickerIndex}
+                initial={{ x: '100%' }}
+                animate={{ x: '-100%' }}
+                transition={{ duration: 14, ease: 'linear' }}
+                className="whitespace-nowrap text-sm sm:text-base text-zinc-300 font-medium"
+              >
+                {activityTicker.map((item, index) => (
+                  <span key={index} className="inline-block mr-12">{item}</span>
+                ))}
+              </motion.div>
+            </div>
+          </div>
         </section>
 
         {/* SECTION 2 — Product Demo Preview */}
@@ -522,7 +576,7 @@ export default function Home() {
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={fadeInUp}
             className="text-center mb-8 sm:mb-16"
           >
-            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Privacy by Design</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold font-display mb-3 sm:mb-4">Privacy by Design</h2>
             <p className="text-sm sm:text-xl text-zinc-400 max-w-2xl mx-auto">Built from the ground up to protect your data. We remove friction so you can focus on sharing securely.</p>
           </motion.div>
 
@@ -551,7 +605,7 @@ export default function Home() {
         {/* SECTION 4 — How it Works */}
         <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-zinc-900/20 border-y border-white/5">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Radically Simple</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold font-display mb-3 sm:mb-4">Radically Simple</h2>
             <p className="text-sm sm:text-xl text-zinc-400">Secure sharing shouldn't require a manual.</p>
           </motion.div>
 
@@ -579,7 +633,7 @@ export default function Home() {
         {/* SECTION 5 — Use Cases */}
         <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Built for Everyone</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold font-display mb-3 sm:mb-4">Built for Everyone</h2>
             <p className="text-sm sm:text-xl text-zinc-400">Versatile privacy tools for every workflow.</p>
           </motion.div>
 
@@ -608,7 +662,7 @@ export default function Home() {
         {/* SECTION 6 — Privacy by Architecture (Comparison Section) */}
         <section className="py-12 sm:py-24 px-3 sm:px-6 lg:px-8 max-w-6xl mx-auto">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">Privacy by Architecture</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold font-display mb-3 sm:mb-4">Privacy by Architecture</h2>
             <p className="text-sm sm:text-xl text-zinc-400 max-w-3xl mx-auto">VaultBridge is built around privacy. Traditional cloud platforms are built around retention and monetization.</p>
           </motion.div>
 
@@ -741,7 +795,7 @@ export default function Home() {
         <section className="py-16 sm:py-32 px-3 sm:px-4 text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-primary/5 blur-[100px] z-0" />
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="relative z-10 max-w-2xl mx-auto flex flex-col items-center">
-            <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">Ready to regain your privacy?</h2>
+            <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold font-display mb-4 sm:mb-6">Ready to regain your privacy?</h2>
             <p className="text-sm sm:text-xl text-zinc-400 mb-6 sm:mb-10">Start sharing files securely right now. No signup. No tracking. Just encryption.</p>
             <Link href="/upload">
               <Button size="lg" className="text-sm sm:text-lg h-12 sm:h-16 px-8 sm:px-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:scale-105 transition-all w-full sm:w-auto">

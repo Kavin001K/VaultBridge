@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { VaultAvatar } from "./avatar";
 
 interface VaultCardProps {
   vaultId: string;
@@ -175,17 +175,10 @@ export function VaultCard({
         {!minimal && (
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 md:mb-10">
             <div className="flex items-center gap-4">
-              <div className="relative shrink-0">
-                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl flex items-center justify-center border border-zinc-700 shadow-inner">
-                  <HardDrive className={`w-7 h-7 md:w-8 md:h-8 ${isExpired ? 'text-rose-500' : 'text-primary'}`} />
-                </div>
-                <div className="absolute -bottom-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800">
-                  {isExpired ? <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 text-rose-500" /> : <ShieldCheck className="w-3 h-3 md:w-4 md:h-4 text-primary" />}
-                </div>
-              </div>
+              <VaultAvatar shortCode={shortCode} size="lg" />
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-xl md:text-2xl font-bold font-mono tracking-tight text-foreground">SECURE VAULT</h2>
+                  <h2 className="text-xl md:text-2xl font-bold font-display tracking-tight text-foreground">SECURE VAULT</h2>
                   <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${isExpired
                     ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
                     : 'bg-primary/10 border-primary/20 text-primary'

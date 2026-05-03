@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { logger } from "../logger";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Cloudflare R2 Storage Service — S3-Compatible Object Storage
@@ -45,7 +46,7 @@ function getS3Client(): S3Client {
             // Optimize for R2
             forcePathStyle: true,
         });
-        console.log("[R2 Storage] ✅ Client initialized successfully.");
+        logger.info("[R2 Storage] Client initialized successfully.");
     }
     return _s3Client;
 }
@@ -69,7 +70,7 @@ async function withRetry<T>(operation: () => Promise<T>, label: string): Promise
 
             if (isTransient && attempt <= MAX_RETRIES) {
                 const delay = RETRY_DELAY_MS * attempt;
-                console.warn(`[R2 Storage] ${label} — transient error (attempt ${attempt}/${MAX_RETRIES + 1}), retrying in ${delay}ms...`);
+                logger.warn({ attempt, maxRetries: MAX_RETRIES + 1, delay }, `[R2 Storage] ${label} — transient error, retrying...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
@@ -139,9 +140,9 @@ export class CloudflareR2StorageService {
                     await getS3Client().send(command);
                 }, `deleteFiles(batch ${batchNum})`);
 
-                console.log(`[R2 Storage] 🗑️  Deleted ${batch.length} files (batch ${batchNum}).`);
+                logger.info({ batchNum, count: batch.length }, "[R2 Storage] Deleted files batch.");
             } catch (error) {
-                console.error(`[R2 Storage] ❌ Delete error (batch ${batchNum}):`, error);
+                logger.error({ batchNum, err: error }, "[R2 Storage] Delete error");
                 // Don't throw — allow DB cleanup to continue even if physical delete fails
             }
         }

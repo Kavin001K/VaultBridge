@@ -24,12 +24,23 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             let compressedSize = undefined;
 
             if (type === 'compress_and_encrypt') {
-                dataToEncrypt = await new Promise<Uint8Array>((resolve, reject) => {
-                    gzip(new Uint8Array(data as ArrayBuffer), { level: 6 }, (err, result) => {
-                        if (err) reject(err);
-                        else resolve(result);
+                try {
+                    if (typeof CompressionStream !== 'undefined') {
+                        const compressedStream = new Response(dataToEncrypt).body!.pipeThrough(new CompressionStream('br'));
+                        const compressedBuffer = await new Response(compressedStream).arrayBuffer();
+                        dataToEncrypt = new Uint8Array(compressedBuffer);
+                    } else {
+                        throw new Error('CompressionStream not supported');
+                    }
+                } catch (err) {
+                    dataToEncrypt = await new Promise<Uint8Array>((resolve, reject) => {
+                        gzip(new Uint8Array(data as ArrayBuffer), { level: 6 }, (gzipErr, result) => {
+                            if (gzipErr) reject(gzipErr);
+                            else resolve(result);
+                        });
                     });
-                });
+                }
+
                 compressedSize = dataToEncrypt.byteLength;
             }
 

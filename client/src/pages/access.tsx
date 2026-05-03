@@ -40,7 +40,7 @@ interface FileDownloadState {
 
 const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
 const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
-const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{4}$/;
 
 const normalizeVaultPath = (pathname: string) =>
     pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -137,7 +137,7 @@ export default function AccessPage() {
     const [fileDownloadStates, setFileDownloadStates] = useState<Map<string, FileDownloadState>>(new Map());
 
     // Derived lookupId for sync
-    const lookupId = stage === "ready" && accessCode.length === 6 ? accessCode.slice(0, 3) : "";
+    const lookupId = stage === "ready" && accessCode.length === 7 ? accessCode.slice(0, 3) : "";
     const hasClipboardData = Boolean(
         clipboardPayload &&
         (clipboardPayload.plainText.trim().length > 0 || clipboardPayload.attachments.length > 0)
@@ -156,7 +156,7 @@ export default function AccessPage() {
     const extractAccessCode = (value: string | null): string | null => {
         if (!value) return null;
         const direct = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        if (direct.length === 6) return direct;
+        if (direct.length === 7) return direct;
 
         try {
             const parsed = value.startsWith("http")
@@ -165,14 +165,14 @@ export default function AccessPage() {
             const queryCode = parsed.searchParams.get("code");
             if (queryCode) {
                 const cleaned = queryCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                if (cleaned.length === 6) return cleaned;
+                if (cleaned.length === 7) return cleaned;
             }
 
             const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
             const hashCode = new URLSearchParams(hash).get("code");
             if (hashCode) {
                 const cleaned = hashCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                if (cleaned.length === 6) return cleaned;
+                if (cleaned.length === 7) return cleaned;
             }
         } catch {
             return null;
@@ -778,7 +778,7 @@ export default function AccessPage() {
                                                 </span>
                                             </h1>
                                             <p className="text-sm sm:text-base text-zinc-400 px-4">
-                                                Enter your 6-digit access code to unlock the vault
+                                                Enter your 7-character access code to unlock the vault
                                             </p>
                                         </div>
 
@@ -838,26 +838,26 @@ export default function AccessPage() {
                                                 <div className="space-y-6">
                                                     <div className="space-y-4">
                                                         <label className="text-xs text-center block text-zinc-400 uppercase tracking-widest font-mono">
-                                                            Enter 6-Digit Code
+                                                            Enter 3-Digit ID + 4-Character PIN
                                                         </label>
 
                                                         <div className="flex justify-center gap-2 relative">
                                                             {/* Invisible input for handling focus/typing */}
                                                             <Input
                                                                 type="search"
-                                                                inputMode="numeric"
-                                                                pattern="[0-9]*"
+                                                                inputMode="text"
+                                                                pattern="[A-Za-z0-9]*"
                                                                 value={accessCode}
                                                                 onChange={(e) => {
-                                                                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+                                                                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 7).toUpperCase();
                                                                     setAccessCode(val);
-                                                                    // Auto-submit when user types 6th digit
-                                                                    if (val.length === 6 && stage === "input") {
+                                                                    // Auto-submit when user types the full code
+                                                                    if (val.length === 7 && stage === "input") {
                                                                         setTimeout(() => submitCode(val), 50);
                                                                     }
                                                                 }}
                                                                 onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter' && accessCode.length === 6) {
+                                                                    if (e.key === 'Enter' && accessCode.length === 7) {
                                                                         submitCode();
                                                                     }
                                                                 }}
@@ -912,7 +912,7 @@ export default function AccessPage() {
                                                                 </div>
 
                                                                 <div className="flex gap-1 sm:gap-2">
-                                                                    {Array.from({ length: 3 }).map((_, i) => {
+                                                                    {Array.from({ length: 4 }).map((_, i) => {
                                                                         const index = i + 3;
                                                                         const num = accessCode[index] || "";
                                                                         const isFocused = accessCode.length === index;
@@ -950,19 +950,19 @@ export default function AccessPage() {
                                                         </div>
 
                                                         <p className="text-[10px] sm:text-xs text-zinc-500 text-center">
-                                                            First 3 digits = Vault ID • Last 3 digits = PIN
+                                                            First 3 digits = Vault ID • Last 4 chars = PIN
                                                         </p>
                                                     </div>
 
                                                     <Button
                                                         onClick={() => submitCode()}
-                                                        disabled={accessCode.length !== 6}
-                                                        className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 6
-                                                            ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40" // Removed hover scale on mobile
+                                                        disabled={accessCode.length !== 7}
+                                                        className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 7
+                                                            ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40"
                                                             : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}`}
                                                     >
-                                                        <KeyRound className={`w-4 h-4 sm:w-5 sm:h-5 mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
-                                                        {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
+                                                        <KeyRound className={`w-4 h-4 sm:w-5 sm:h-5 mr-3 ${accessCode.length === 7 ? "opacity-100" : "opacity-50"}`} />
+                                                        {accessCode.length === 7 ? "Unlock Vault" : "Enter Code"}
                                                     </Button>
 
                                                     {/* Trust Indicators - Simplified on Mobile */}

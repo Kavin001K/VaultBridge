@@ -2,12 +2,18 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./services/email";
+<<<<<<< Updated upstream
 import { codeLimiter, uploadLimiter } from "./index";
+=======
+import { codeLimiter, vaultCreateLimiter, chunkUploadLimiter } from "./index";
+import { enqueueJob } from "./jobQueue";
+>>>>>>> Stashed changes
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";
 import { localStorage } from "./services/local_storage";
 import { logStorageStatus } from "./services/storage_router";
+import { logger } from "./logger";
 import multer from "multer";
 import fs from "fs";
 
@@ -20,7 +26,7 @@ export async function registerRoutes(
   // Configure Multer for transient "hot potato" storage using /tmp (Cloud Run memory-backed temp space)
   const upload = multer({
     storage: multer.diskStorage({ destination: '/tmp' }),
-    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per-file limit
+    limits: { fileSize: 500 * 1024 * 1024 }, // 500MB per-file limit
   });
 
   // =============================================================================
@@ -37,7 +43,7 @@ export async function registerRoutes(
         await localStorage.uploadFile(storagePath, req);
         res.json({ success: true });
       } catch (e) {
-        console.error("Local upload failed", e);
+        logger.error({ err: e, storagePath }, "Local upload failed");
         res.status(500).send("Upload failed");
       }
     };
@@ -94,7 +100,7 @@ export async function registerRoutes(
       }
 
       // Log the actual error for debugging
-      console.error("[Vault Create Error]", err);
+      logger.error({ err }, "[Vault Create Error]");
       return res.status(500).json({
         message: "Failed to create vault",
         error: err instanceof Error ? err.message : "Unknown error"
@@ -173,8 +179,8 @@ export async function registerRoutes(
 
     // BURNING LOGIC: If limit reached, delete immediately
     if (newCount >= vault.maxDownloads) {
-      console.log(`[Vault ${vault.id}] Burn-on-read triggered. Deleting...`);
-      await storage.deleteVault(vault.id);
+      logger.info({ vaultId: vault.id }, "Burn-on-read triggered. Scheduling vault deletion.");
+      enqueueJob({ type: "deleteVault", vaultId: vault.id });
       res.json({ success: true, remainingDownloads: 0 });
     } else {
       res.json({ success: true, remainingDownloads: vault.maxDownloads - newCount });
@@ -220,25 +226,53 @@ export async function registerRoutes(
       }
 
       // Increment download counts for all requested files
-      const results = await storage.incrementFileDownloadCount(fileIds);
+      let results;
+      try {
+        results = await storage.incrementFileDownloadCount(fileIds);
+      } catch (err: any) {
+        if (err?.message === "FILE_DOWNLOAD_LIMIT_EXCEEDED") {
+          const currentFiles = await storage.getFiles(vault.id);
+          const exhaustedFiles = currentFiles
+            .filter((f) => fileIds.includes(f.fileId) && f.downloadCount >= f.maxDownloads)
+            .map((f) => f.fileId);
+
+          return res.status(403).json({
+            message: "Download limit exceeded for one or more files",
+            exhaustedFiles,
+          });
+        }
+        throw err;
+      }
+
+      if (results.length !== fileIds.length) {
+        const currentFiles = await storage.getFiles(vault.id);
+        const exhaustedFiles = currentFiles
+          .filter((f) => fileIds.includes(f.fileId) && f.downloadCount >= f.maxDownloads)
+          .map((f) => f.fileId);
+
+        return res.status(403).json({
+          message: "Download limit exceeded for one or more files",
+          exhaustedFiles,
+        });
+      }
 
       // Check if ALL files in the vault are now exhausted
       const allVaultFilesExhausted = await storage.areAllFilesExhausted(vault.id);
 
-      // BURNING LOGIC: If all files exhausted, delete the vault
+      // BURNING LOGIC: If all files exhausted, schedule deletion asynchronously
       if (allVaultFilesExhausted) {
-        console.log(`[Vault ${vault.id}] All files exhausted. Initiating burn...`);
-        await storage.deleteVault(vault.id);
+        logger.info({ vaultId: vault.id }, "All files exhausted. Scheduling vault deletion.");
+        enqueueJob({ type: "deleteVault", vaultId: vault.id });
       }
 
       res.json({
         success: true,
         files: results,
-        vaultExhausted: allVaultFilesExhausted
+        vaultExhausted: allVaultFilesExhausted,
       });
 
     } catch (err) {
-      console.error("[File Download Track Error]", err);
+      logger.error({ err }, "[File Download Track Error]");
       return res.status(500).json({
         message: "Failed to track download",
         error: err instanceof Error ? err.message : "Unknown error"
@@ -257,10 +291,11 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Vault not found" });
       }
 
-      await storage.deleteVault(id);
-      res.json({ success: true, message: "Vault burned successfully" });
+      logger.info({ vaultId: id }, "Scheduling vault deletion via API.");
+      enqueueJob({ type: "deleteVault", vaultId: id });
+      res.status(202).json({ success: true, message: "Vault burn scheduled" });
     } catch (err) {
-      console.error("Delete failed:", err);
+      logger.error({ err }, "Delete failed");
       res.status(500).json({ message: "Failed to delete vault" });
     }
   });
@@ -355,7 +390,7 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input" });
       }
-      console.error("Clipboard update failed:", err);
+      logger.error({ err }, "Clipboard update failed");
       res.status(500).json({ message: "Failed to update clipboard" });
     }
   });
@@ -378,7 +413,7 @@ export async function registerRoutes(
         updatedAt: new Date().toISOString()
       });
     } catch (err) {
-      console.error("Clipboard poll failed:", err);
+      logger.error({ err }, "Clipboard poll failed");
       res.status(500).json({ message: "Failed to get clipboard" });
     }
   });
@@ -523,7 +558,7 @@ export async function registerRoutes(
       });
 
     } catch (err) {
-      console.error("Direct email error:", err);
+      logger.error({ err }, "Direct email error");
       return res.status(500).json({ message: "Internal server error." });
 
     } finally {
@@ -531,7 +566,7 @@ export async function registerRoutes(
       files.forEach(f => {
         if (f.path && fs.existsSync(f.path)) {
           fs.unlink(f.path, (err) => {
-            if (err) console.error(`[Cleanup] Failed to unlink tmp file ${f.path}:`, err);
+            if (err) logger.error({ err, path: f.path }, "[Cleanup] Failed to unlink tmp file");
           });
         }
       });
@@ -571,29 +606,30 @@ export async function registerRoutes(
       // Ensure the client-provided code matches the vault's stored lookup ID.
       // This prevents sending a random/incorrect code that won't unlock the files.
       if (fullCode && vault.lookupId && !fullCode.startsWith(vault.lookupId)) {
-        console.error(`[Email Verification Failed] Vault ${id}: fullCode '${fullCode}' does not match lookupId '${vault.lookupId}'`);
+        logger.error({ vaultId: id, fullCode, lookupId: vault.lookupId }, "[Email Verification Failed]");
         return res.status(400).json({ message: "Invalid access code provided. Verification failed." });
       }
 
-      const result = await sendVaultEmail({
-        to,
-        vaultId: vault.id,
-        shortCode: vault.shortCode || "UNKNOWN",
-        fullCode, // Pass the full code if provided by client
-        expiresAt: vault.expiresAt,
-        senderName,
+      // Enqueue send email job asynchronously so the request is not blocked by external provider latency.
+      enqueueJob({
+        type: "sendVaultEmail",
+        payload: {
+          to,
+          vaultId: vault.id,
+          shortCode: vault.shortCode || "UNKNOWN",
+          fullCode,
+          expiresAt: vault.expiresAt,
+          senderName,
+        },
       });
 
-      if (!result.success) {
-        return res.status(400).json({ message: result.error });
-      }
-
-      res.json({
+      res.status(202).json({
         success: true,
+        pending: true,
         remainingEmails: remaining - 1,
-        previewUrl: result.previewUrl, // Only in dev mode
       });
     } catch (err) {
+      logger.error({ err }, "Failed to enqueue vault email");
       res.status(500).json({ message: "Failed to send email" });
     }
   });
@@ -625,6 +661,10 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Vault not found" });
     }
 
+    if (new Date() > vault.expiresAt || vault.isDeleted) {
+      return res.status(410).json({ message: "Vault expired" });
+    }
+
     // Ensure the chunk record exists (idempotent)
     await storage.createChunk(fileId, parseInt(chunkIndex), size);
 
@@ -638,15 +678,15 @@ export async function registerRoutes(
       });
     } catch (err: any) {
       if (err.message?.includes('STORAGE_FULL')) {
-        console.error("[Upload] Storage capacity reached:", err.message);
+        logger.warn({ err }, "[Upload] Storage capacity reached");
         return res.status(507).json({ message: "Storage capacity reached. Please try again later as expired vaults are cleaned up." });
       }
-      console.error("Upload URL Gen Failed:", err);
+      logger.error({ err }, "Upload URL generation failed");
       res.status(500).json({ message: "Failed to generate upload URL" });
     }
   });
 
-  app.put(api.chunks.markUploaded.path, async (req, res) => {
+  app.put(api.chunks.markUploaded.path, chunkUploadLimiter, async (req, res) => {
     const id = req.params.id as string;
     const fileId = req.params.fileId as string;
     const chunkIndex = req.params.chunkIndex as string;
@@ -667,6 +707,15 @@ export async function registerRoutes(
     const fileId = req.params.fileId as string;
     const chunkIndex = req.params.chunkIndex as string;
 
+    const vault = await storage.getVault(id);
+    if (!vault) {
+      return res.status(404).json({ message: "Vault not found" });
+    }
+
+    if (new Date() > vault.expiresAt || vault.isDeleted) {
+      return res.status(410).json({ message: "Vault expired" });
+    }
+
     try {
       const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
 
@@ -682,7 +731,7 @@ export async function registerRoutes(
       const downloadUrl = await storage.getDownloadUrl(chunk.storagePath);
       res.json({ downloadUrl });
     } catch (err) {
-      console.error(`[Download] URL generation failed: Vault=${id}, File=${fileId}, Chunk=${chunkIndex}`, err);
+      logger.error({ err, vaultId: id, fileId, chunkIndex }, "[Download] URL generation failed");
       res.status(500).json({ message: "Failed to generate download URL" });
     }
   });

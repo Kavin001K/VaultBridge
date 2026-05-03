@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { emailUsage } from "../../shared/schema";
 import { eq, sql } from "drizzle-orm";
-import { log } from "../index";
+import { logger } from "../logger";
 import fs from "fs";
 import path from "path";
 
@@ -153,6 +153,6 @@ async function incrementFileUsage(today: string, provider: "RESEND" | "BREVO" | 
 
         fs.writeFileSync(FALLBACK_FILE_PATH, JSON.stringify(current, null, 2));
     } catch (e) {
-        console.error("[EmailQuota] Fallback file write error:", e);
+        logger.error({ err: e }, "[EmailQuota] Fallback file write error");
     }
 }

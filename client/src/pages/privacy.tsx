@@ -57,7 +57,7 @@ When utilizing the Universal Live Clipboard feature:
             content: `
 ### What We Collect (The Minimum Viable)
 * **Encrypted Blobs**: The AES-256 encrypted binary data.
-* **Routing IDs (Partial Keys)**: We see the first 3 digits of your Access Code to route traffic. We DO NOT see the full 6-digit PIN used for decryption.
+* **Routing IDs (Partial Keys)**: We see the first 3 digits of your Access Code to route traffic. We DO NOT see the full PIN used for decryption.
 * **Ephemeral Metadata**: File size, upload timestamp, and expiration timer (TTL).
 * **Access Logs**: IP addresses are logged for 24 hours strictly for DDoS mitigation and abuse prevention, then sanitized.
 
@@ -66,9 +66,9 @@ When utilizing the Universal Live Clipboard feature:
 * **Memory-Only Mode**: During database outages, the system fails over to volatile RAM. Metadata stored in this state is lost instantly upon server restart.
 
 ### What We DO NOT Collect
-* **Your Decryption Keys**: The full 6-digit PIN never leaves your device. Even when sharing via QR Codes or direct links, the PIN is passed exclusively via URL hash fragments (#code), ensuring it is completely invisible to our servers and network logs.
+* **Your Decryption Keys**: The full PIN never leaves your device. Even when sharing via QR Codes or direct links, the PIN is passed exclusively via URL hash fragments (#code), ensuring it is completely invisible to our servers and network logs.
 * **Your Content**: Streaming decryption ensures even large files are never realized on our server's disk in plaintext.
-* **Lost Codes / PINs**: We offer **absolutely no code recovery options**. If you lose your 6-digit access PIN, your encrypted data is permanently inaccessible. We cannot recover it for you because we never had it to begin with.
+* **Lost Codes / PINs**: We offer **absolutely no code recovery options**. If you lose your access PIN, your encrypted data is permanently inaccessible. We cannot recover it for you because we never had it to begin with.
 * **Your Identity**: No accounts. No emails.
 * **Analytics**: No Google Analytics. No Facebook Pixels. No tracking cookies.
             `
