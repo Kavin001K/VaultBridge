@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { logger } from "../logger";
 
 // Supabase Configuration
 // Prioritize Service Role Key for backend operations to bypass RLS
@@ -28,7 +27,7 @@ export class SupabaseStorageService {
             .createSignedUploadUrl(storagePath);
 
         if (error) {
-            logger.error({ err: error }, "Supabase Storage Error");
+            console.error("Supabase Storage Error:", error);
             throw new Error(`Failed to generate upload URL: ${error.message}`);
         }
 
@@ -48,7 +47,7 @@ export class SupabaseStorageService {
             .createSignedUrl(storagePath, 3600);
 
         if (error) {
-            logger.error({ err: error }, "Supabase Download Error");
+            console.error("Supabase Download Error:", error);
             throw new Error(`Failed to generate download URL: ${error.message}`);
         }
 
@@ -75,10 +74,10 @@ export class SupabaseStorageService {
             .remove(paths);
 
         if (error) {
-            logger.error({ err: error }, "Supabase Delete Error");
+            console.error("Supabase Delete Error:", error);
             // We don't throw here to avoid blocking the DB cleanup if storage fails (orphan risk > blocking flow)
         } else {
-            logger.info({ count: paths.length }, "[Storage] Successfully deleted chunks from bucket.");
+            console.log(`[Storage] Successfully deleted ${paths.length} chunks from bucket.`);
         }
     }
 }

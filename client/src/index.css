@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Inconsolata:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -105,40 +105,9 @@
 
 
 /* =============================================================================
-   UTILITIES & ANIMATIONS
-   ============================================================================= */
-
-.grid-bg {
-  background-image: 
-    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.glow-text-primary {
-  text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
-}
-
-.glass-panel {
-  @apply bg-white/[0.02] border border-white/5 backdrop-blur-2xl shadow-2xl;
-}
-
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
-}
-
-.animate-scanline {
-  animation: scanline 8s linear infinite;
-}
-
-.font-display {
-  font-family: var(--font-display);
-}
-
-.ghost-number {
-  @apply absolute text-[12rem] font-display font-black text-white/[0.02] select-none pointer-events-none;
-}
+   DESIGN SYSTEM: "Zinc Dark" with Emerald Accents
+   Premium Cyber-Security Product Aesthetic
+============================================================================= */
 
 :root {
   /* Zinc Dark Theme */
@@ -158,13 +127,6 @@
   --primary: 142 71% 45%;
   /* emerald-500 */
   --primary-foreground: 144 100% 5%;
-
-  /* Vault Gold */
-  --gold: 42 95% 55%;
-  --gold-foreground: 15 15% 10%;
-
-  --cipher: 156 100% 42%;
-  --cipher-foreground: 145 100% 5%;
 
   /* Rose Destructive (Expiry/Warning) */
   --destructive: 346 77% 50%;
@@ -187,9 +149,7 @@
   --radius: 0.75rem;
 
   /* Typography */
-  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-display: 'Clash Display', system-ui, sans-serif;
-  --font-serif: 'Bebas Neue', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
@@ -256,69 +216,6 @@
     content: "";
     @apply absolute -inset-[1px] rounded-2xl opacity-0 transition-opacity duration-500;
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, transparent 50%, hsl(var(--primary)) 100%);
-  }
-
-  .vault-dial {
-    @apply rounded-full border border-white/10 bg-white/5 backdrop-blur-xl;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset, 0 30px 80px -40px rgba(0,0,0,0.8);
-  }
-
-  .vault-dial::before {
-    content: "";
-    @apply absolute inset-0 rounded-full opacity-30;
-    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.12), transparent 45%);
-  }
-
-  .vault-dial-rotate {
-    animation: vault-dial-spin 120s linear infinite;
-  }
-
-  @keyframes vault-dial-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  .ghost-number {
-    @apply absolute text-[7rem] leading-none uppercase font-serif text-white/5 tracking-[0.3em] select-none pointer-events-none;
-  }
-
-  .confetti-piece {
-    @apply w-2 h-2 rounded-full absolute opacity-0;
-    animation: confetti-fall 1.8s ease-out forwards;
-  }
-
-  @keyframes confetti-fall {
-    0% { opacity: 1; transform: translateY(0) rotate(0deg); }
-    100% { opacity: 0; transform: translateY(180px) rotate(720deg); }
-  }
-
-  .waveform {
-    @apply w-full h-14 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800;
-    position: relative;
-  }
-
-  .waveform::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(16,185,129,0.16), transparent 24%),
-                radial-gradient(circle at 50% 50%, rgba(15, 155, 255, 0.1), transparent 18%),
-                radial-gradient(circle at 80% 50%, rgba(16, 185, 129, 0.08), transparent 22%);
-    opacity: 0.75;
-  }
-
-  .waveform span {
-    position: absolute;
-    display: block;
-    background: linear-gradient(90deg, rgba(16,185,129,0.95), rgba(14,165,233,0.85));
-    height: 100%;
-    will-change: transform;
-    animation: waveform-move 1.6s linear infinite;
-  }
-
-  @keyframes waveform-move {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
   }
 
   .glow-border:hover::before {

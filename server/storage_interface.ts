@@ -16,7 +16,7 @@ export interface IStorage {
     createChunk(fileId: string, chunkIndex: number, size: number): Promise<ChunkRecord>;
     getChunk(fileId: string, chunkIndex: number): Promise<ChunkRecord | undefined>;
     updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string): Promise<void>;
-    incrementDownloadCount(vaultId: string): Promise<{ success: boolean; count: number }>;
+    incrementDownloadCount(vaultId: string): Promise<number>;
     incrementFileDownloadCount(fileIds: string[]): Promise<{
         fileId: string;
         downloadCount: number;
@@ -28,5 +28,4 @@ export interface IStorage {
     updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date>;
     deleteVault(id: string): Promise<void>;
     cleanupExpiredVaults(): Promise<void>;
-    getActiveVaultsCount(): Promise<number>;
 }

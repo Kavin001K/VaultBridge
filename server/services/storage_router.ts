@@ -22,7 +22,6 @@
 import { cloudflareStorage } from "./cloudflare_storage";
 import { supabaseStorage } from "./supabase_storage";
 import { localStorage } from "./local_storage";
-import { logger } from "../logger";
 
 // === PROVIDER IDENTIFIERS ===
 export type StorageProvider = "r2" | "supabase" | "local";
@@ -93,7 +92,7 @@ export function resolveUploadProvider(chunkSizeBytes: number): StorageProvider |
 
     // Validate input
     if (chunkSizeBytes <= 0 || !Number.isFinite(chunkSizeBytes)) {
-        logger.warn({ chunkSizeBytes }, "[Storage Router] Invalid chunk size, defaulting to Supabase");
+        console.warn(`[Storage Router] Invalid chunk size: ${chunkSizeBytes}, defaulting to Supabase`);
         return "supabase";
     }
 
@@ -117,7 +116,7 @@ export function resolveUploadProvider(chunkSizeBytes: number): StorageProvider |
  */
 export function parseStoragePath(prefixedPath: string): { provider: StorageProvider; rawPath: string } {
     if (!prefixedPath || typeof prefixedPath !== 'string') {
-        logger.warn({ prefixedPath }, "[Storage Router] Invalid storage path, assuming Supabase");
+        console.warn(`[Storage Router] Invalid storage path: ${prefixedPath}, assuming Supabase`);
         return { provider: "supabase", rawPath: prefixedPath || "" };
     }
 
@@ -198,9 +197,9 @@ export async function deleteFiles(prefixedPaths: string[]): Promise<void> {
     if (r2Paths.length > 0) {
         promises.push(
             cloudflareStorage.deleteFiles(r2Paths).then(() => {
-                logger.info({ count: r2Paths.length }, "[Storage Router] Freed files from R2.");
+                console.log(`[Storage Router] 🗑️  Freed ${r2Paths.length} files from R2.`);
             }).catch(err => {
-                logger.error({ count: r2Paths.length, err }, "[Storage Router] R2 delete error");
+                console.error(`[Storage Router] R2 delete error (${r2Paths.length} files):`, err);
             })
         );
     }
@@ -208,9 +207,9 @@ export async function deleteFiles(prefixedPaths: string[]): Promise<void> {
     if (supabasePaths.length > 0) {
         promises.push(
             supabaseStorage.deleteFiles(supabasePaths).then(() => {
-                logger.info({ count: supabasePaths.length }, "[Storage Router] Freed files from Supabase.");
+                console.log(`[Storage Router] 🗑️  Freed ${supabasePaths.length} files from Supabase.`);
             }).catch(err => {
-                logger.error({ count: supabasePaths.length, err }, "[Storage Router] Supabase delete error");
+                console.error(`[Storage Router] Supabase delete error (${supabasePaths.length} files):`, err);
             })
         );
     }
@@ -221,7 +220,7 @@ export async function deleteFiles(prefixedPaths: string[]): Promise<void> {
             const filename = path.basename(p);
             promises.push(
                 localStorage.deleteFile(filename).catch(err => {
-                    logger.error({ filename, err }, "[Storage Router] Local delete error");
+                    console.error(`[Storage Router] Local delete error (${filename}):`, err);
                 })
             );
         }
@@ -277,14 +276,9 @@ export function reconcileUsage(r2Bytes: number, supabaseBytes: number): void {
     supabaseUsedBytes = safeSb;
 
     if (oldR2 !== safeR2 || oldSb !== safeSb) {
-        logger.info({
-            r2Before: formatBytes(oldR2),
-            r2After: formatBytes(safeR2),
-            r2Max: formatBytes(R2_MAX_BYTES),
-            supabaseBefore: formatBytes(oldSb),
-            supabaseAfter: formatBytes(safeSb),
-            supabaseMax: formatBytes(SUPABASE_MAX_BYTES)
-        }, "[Storage Router] Usage reconciled");
+        console.log(`[Storage Router] Usage reconciled:`);
+        console.log(`  R2:       ${formatBytes(oldR2)} → ${formatBytes(safeR2)} / ${formatBytes(R2_MAX_BYTES)}`);
+        console.log(`  Supabase: ${formatBytes(oldSb)} → ${formatBytes(safeSb)} / ${formatBytes(SUPABASE_MAX_BYTES)}`);
     }
 }
 
@@ -304,5 +298,17 @@ function formatBytes(bytes: number): string {
  */
 export function logStorageStatus(): void {
     const status = getStorageStatus();
-    logger.info(status, "STORAGE STATUS");
+    console.log("═══════════════════════════════════════════════════════");
+    console.log("📦 STORAGE STATUS");
+    console.log("═══════════════════════════════════════════════════════");
+
+    if (status.isLocal) {
+        console.log("  Mode: LOCAL DISK (development)");
+    } else {
+        console.log(`  ☁️  Cloudflare R2:  ${formatBytes(status.r2.usedBytes)} / ${formatBytes(status.r2.limitBytes)} (${status.r2.usedPercent}%) ${status.r2.available ? "✅" : "❌ Not configured"}`);
+        console.log(`  🗄️  Supabase:      ${formatBytes(status.supabase.usedBytes)} / ${formatBytes(status.supabase.limitBytes)} (${status.supabase.usedPercent}%)`);
+        console.log(`  📊 Total:         ${formatBytes(status.totalUsedBytes)} / ${formatBytes(status.totalLimitBytes)}`);
+    }
+
+    console.log("═══════════════════════════════════════════════════════");
 }

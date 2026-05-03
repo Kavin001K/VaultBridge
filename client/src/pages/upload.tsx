@@ -21,18 +21,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useSounds } from "@/hooks/useSounds";
 import { useCreateVault, useGetChunkUploadUrl, useMarkChunkUploaded } from "@/hooks/use-vaults";
-import { generateKey, encryptMetadata, generateUUID, generateSplitCode, wrapFileKey } from "@/lib/crypto";
+import { generateKey, exportKey, encryptMetadata, generateUUID, generateSplitCode, wrapFileKey, encryptData } from "@/lib/crypto";
 import { getUploadConfig, formatBytes, MAX_FILE_SIZE } from "@/lib/uploadConfig";
 import { clearStoredFiles, saveUploadSettings, loadUploadSettings } from "@/lib/fileStorage";
-import {
-  estimateNetworkParameters,
-  sampleFileEntropy,
-  shouldCompressFile,
-  createConcurrencyLimiter,
-  EncryptionWorkerPool,
-  uploadChunkBinary,
-  combineIvAndEncrypted,
-} from "@/lib/uploadPipeline";
 
 type UploadStage = "idle" | "encrypting" | "uploading" | "success";
 type ProgressStep = "keys" | "metadata" | "transfer" | "done";
@@ -89,10 +80,6 @@ export default function UploadPage() {
     const [currentStep, setCurrentStep] = useState<ProgressStep>("keys");
     const [progress, setProgress] = useState(0);
     const [statusText, setStatusText] = useState("");
-    const [bytesProcessed, setBytesProcessed] = useState(0);
-    const [totalBytes, setTotalBytes] = useState(0);
-    const [fileProgress, setFileProgress] = useState<Record<string, number>>({});
-    const [previewCode, setPreviewCode] = useState<string>("-------");
     const [isDragActive, setIsDragActive] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -171,16 +158,9 @@ export default function UploadPage() {
             return;
         }
 
-        const totalSize = files.reduce((acc, f) => acc + f.size, 0);
-        setTotalBytes(totalSize);
-        setBytesProcessed(0);
-        setFileProgress(files.reduce((acc, file) => ({ ...acc, [file.name]: 0 }), {}));
-        setPreviewCode("-------");
-
         setStage("encrypting");
         setProgress(0);
         abortControllerRef.current = new AbortController();
-        let workerPool: EncryptionWorkerPool | null = null;
 
         try {
             const startTime = Date.now();
@@ -206,32 +186,14 @@ export default function UploadPage() {
 
             const encryptedMetadata = await encryptMetadata(fileMetadata, key);
 
-            const networkSettings = estimateNetworkParameters();
-            setStatusText(`Calibrating transfer at ${formatBytes(networkSettings.chunkSize)} chunks with ${networkSettings.parallelUploads} streams...`);
-            const uploadLimiter = createConcurrencyLimiter(networkSettings.parallelUploads);
-            const encryptLimiter = createConcurrencyLimiter(networkSettings.workerCount);
-            workerPool = new EncryptionWorkerPool(networkSettings.workerCount);
-
-            const fileUploads = await Promise.all(files.map(async (file, index) => {
-                const entropy = await sampleFileEntropy(file);
-                const compressed = shouldCompressFile(entropy, networkSettings.bandwidthBps, file.size);
-                const chunkCount = Math.max(1, Math.ceil(file.size / networkSettings.chunkSize));
-                return {
-                    file,
-                    compressed,
-                    chunkCount,
-                    fileId: fileMetadata[index].fileId,
-                };
+            // Prepare files payload - 1 chunk per file (no chunking)
+            const filesPayload = fileMetadata.map(fm => ({
+                fileId: fm.fileId,
+                chunks: 1,
+                size: fm.size,
+                isCompressed: false,
+                originalSize: fm.size
             }));
-
-            const updatedPayload = fileUploads.map((fileUpload) => ({
-                fileId: fileUpload.fileId,
-                chunks: fileUpload.chunkCount,
-                size: fileUpload.file.size,
-                isCompressed: fileUpload.compressed,
-                originalSize: fileUpload.file.size
-            }));
-
             setProgress(20);
 
             // Step 3: Register Vault
@@ -253,7 +215,7 @@ export default function UploadPage() {
                         encryptedMetadata,
                         lookupId: splitCode.lookupId,
                         wrappedKey,
-                        files: updatedPayload
+                        files: filesPayload
                     });
                     break;
                 } catch (err) {
@@ -271,86 +233,72 @@ export default function UploadPage() {
             }
 
             setProgress(30);
+
+            // Step 4: Encrypt & Upload Each File (No Chunking - Single Blob)
             setStage("uploading");
             setCurrentStep("transfer");
 
-            const fullCode = splitCode.fullCode;
-            setPreviewCode(fullCode.replace(/./g, '•'));
-            const totalFiles = fileUploads.length;
-            let completedFiles = 0;
+            const totalFiles = files.length;
 
-            for (const fileUpload of fileUploads) {
+            for (let i = 0; i < files.length; i++) {
+                // Check abort
                 if (abortControllerRef.current.signal.aborted) {
                     throw new Error("Upload cancelled");
                 }
 
-                const { file, compressed, fileId, chunkCount } = fileUpload;
+                const file = files[i];
+                const fileId = filesPayload[i].fileId;
                 const displayName = truncateName(file.name);
-                setStatusText(`Preparing ${displayName}...`);
-                setFileProgress((current) => ({ ...current, [file.name]: 5 }));
 
-                const chunkPromises = [] as Promise<void>[];
-                let uploadedBytes = 0;
+                // Read entire file
+                setStatusText(`Reading ${displayName}...`);
+                const fileBuffer = await file.arrayBuffer();
 
-                for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-                    const start = chunkIndex * networkSettings.chunkSize;
-                    const end = Math.min(start + networkSettings.chunkSize, file.size);
-                    const sliceSize = end - start;
+                // Encrypt entire file
+                setStatusText(`Encrypting ${displayName}...`);
+                const { iv, encryptedData } = await encryptData(fileBuffer, key);
 
-                    const chunkTask = encryptLimiter(async () => {
-                        if (abortControllerRef.current.signal.aborted) {
-                            throw new Error("Upload cancelled");
-                        }
+                // Combine IV + encrypted data
+                const combined = new Uint8Array(iv.byteLength + encryptedData.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encryptedData), iv.byteLength);
 
-                        const chunkBlob = file.slice(start, end);
-                        const chunkBuffer = await chunkBlob.arrayBuffer();
+                // Get upload URL
+                setStatusText(`Uploading ${displayName}...`);
+                const { uploadUrl, storagePath } = await getChunkUrl.mutateAsync({
+                    vaultId: vault.id,
+                    fileId,
+                    chunkIndex: 0,
+                    size: combined.byteLength
+                });
 
-                        const encrypted = await workerPool.encrypt(chunkBuffer, key, compressed);
-                        const combined = combineIvAndEncrypted(encrypted);
+                // Upload to Supabase
+                const response = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    body: combined,
+                    signal: abortControllerRef.current.signal
+                });
 
-                        const { uploadUrl, storagePath } = await getChunkUrl.mutateAsync({
-                            vaultId: vault.id,
-                            fileId,
-                            chunkIndex,
-                            size: combined.byteLength,
-                        });
-
-                        await uploadLimiter(async () => {
-                            await uploadChunkBinary(uploadUrl, combined, abortControllerRef.current.signal);
-                        });
-
-                        await markUploaded.mutateAsync({
-                            vaultId: vault.id,
-                            fileId,
-                            chunkIndex,
-                            storagePath
-                        });
-
-                        uploadedBytes += sliceSize;
-                        setBytesProcessed((current) => current + sliceSize);
-                        setFileProgress((current) => ({
-                            ...current,
-                            [file.name]: Math.min(100, Math.round((uploadedBytes / file.size) * 100))
-                        }));
-                    });
-
-                    chunkPromises.push(chunkTask);
+                if (!response.ok) {
+                    throw new Error(`Upload failed for ${file.name}: ${response.statusText}`);
                 }
 
-                await Promise.all(chunkPromises);
-                completedFiles += 1;
+                // Mark as uploaded
+                await markUploaded.mutateAsync({
+                    vaultId: vault.id,
+                    fileId,
+                    chunkIndex: 0,
+                    storagePath
+                });
 
-                const revealCount = Math.min(fullCode.length, Math.ceil((completedFiles / totalFiles) * fullCode.length));
-                setPreviewCode(fullCode.slice(0, revealCount).padEnd(fullCode.length, '•'));
-                const perc = 30 + (completedFiles / totalFiles) * 65;
+                // Update progress
+                const perc = 30 + ((i + 1) / totalFiles) * 65;
                 setProgress(perc);
             }
 
-            workerPool.terminate();
             setCurrentStep("done");
             setProgress(100);
             setStatusText("Finalizing secure vault...");
-            setPreviewCode(fullCode);
             setStage("success");
             playSound('success');
 
@@ -363,8 +311,7 @@ export default function UploadPage() {
             const speed = totalSize / (duration / 1000); // Bytes/sec
 
             setTimeout(() => {
-                const targetUrl = `/success/${vault.id}#code=${splitCode.fullCode}&time=${duration}&speed=${Math.floor(speed)}`;
-                window.location.assign(targetUrl);
+                setLocation(`/success/${vault.id}#code=${splitCode.fullCode}&time=${duration}&speed=${Math.floor(speed)}`);
             }, 800);
 
         } catch (err) {
@@ -380,8 +327,6 @@ export default function UploadPage() {
                     description: err instanceof Error ? err.message : "An error occurred",
                 });
             }
-        } finally {
-            workerPool?.terminate();
         }
     };
 
@@ -406,11 +351,11 @@ export default function UploadPage() {
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-2 cursor-pointer group shrink-0"
                         >
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 group-hover:border-primary/50 transition-colors">
-                                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/20 group-hover:border-amber-500/50 transition-colors">
+                                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
                             </div>
-                            <h1 className="text-lg sm:text-xl font-bold font-display tracking-tight group-hover:text-primary transition-colors uppercase">
-                                VAULT<span className="text-primary">BRIDGE</span>
+                            <h1 className="text-lg sm:text-xl font-bold font-mono tracking-tight group-hover:text-amber-500 transition-colors">
+                                VAULT<span className="text-amber-500">BRIDGE</span>
                             </h1>
                         </motion.div>
                     </Link>
@@ -433,14 +378,14 @@ export default function UploadPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-6 sm:mb-8"
                 >
-                    <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-primary/5 border border-primary/10 text-primary text-[10px] sm:text-xs font-mono tracking-widest uppercase mb-3 sm:mb-4">
+                    <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-amber-500/8 border border-amber-500/15 text-amber-400 text-[10px] sm:text-xs font-mono tracking-widest uppercase mb-3 sm:mb-4">
                         <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         End-to-End Encrypted Vault
                     </div>
-                    <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-3 font-display tracking-tight text-white">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 bg-clip-text text-transparent">
                         Secure Upload
                     </h2>
-                    <p className="text-zinc-400 text-xs sm:text-sm max-w-md mx-auto px-2 font-sans">
+                    <p className="text-zinc-400 text-xs sm:text-sm max-w-md mx-auto px-2">
                         Select files, configure vault settings, then encrypt & upload — all client-side, zero-knowledge.
                     </p>
                 </motion.div>
@@ -465,10 +410,10 @@ export default function UploadPage() {
                                     }}
                                     disabled={!isCompleted && !isCurrent}
                                     className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${isCompleted
-                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/20"
+                                        ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20"
                                         : isCurrent
-                                            ? "bg-primary/10 text-primary border border-primary/20"
-                                            : "bg-zinc-900/50 text-zinc-500 border border-zinc-800/50 cursor-not-allowed"
+                                            ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                            : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 cursor-not-allowed"
                                         }`}
                                 >
                                     {isCompleted ? <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <StepIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
@@ -487,7 +432,7 @@ export default function UploadPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.15 }}
-                    className={`bg-zinc-900/40 border border-white/5 rounded-3xl relative overflow-hidden backdrop-blur-2xl ${isDragActive ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                    className={`bg-zinc-900/50 border border-white/10 rounded-3xl relative overflow-hidden backdrop-blur-xl ${isDragActive ? 'ring-2 ring-amber-500 bg-amber-500/5' : ''}`}
                 >
                     {/* Progress Overlay */}
                     <AnimatePresence>
@@ -503,8 +448,6 @@ export default function UploadPage() {
                                     step={currentStep}
                                     progress={progress}
                                     statusText={statusText}
-                                    bytesProcessed={bytesProcessed}
-                                    bytesTotal={totalBytes}
                                 />
                                 {stage === 'uploading' && (
                                     <Button
@@ -563,13 +506,13 @@ export default function UploadPage() {
                                             <span className="text-zinc-400">
                                                 {files.length} file{files.length > 1 ? 's' : ''} selected
                                             </span>
-                                            <span className="font-mono text-primary">{formatSize(totalSize)} / 500 MB</span>
+                                            <span className="font-mono text-amber-400">{formatSize(totalSize)} / 500 MB</span>
                                         </div>
                                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                                             <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${sizePercentage}%` }}
-                                                className={`h-full rounded-full transition-colors ${sizePercentage > 90 ? 'bg-red-500' : sizePercentage > 70 ? 'bg-amber-500' : 'bg-primary'}`}
+                                                className={`h-full rounded-full transition-colors ${sizePercentage > 90 ? 'bg-red-500' : sizePercentage > 70 ? 'bg-amber-500' : 'bg-amber-500/70'}`}
                                             />
                                         </div>
                                     </motion.div>
@@ -607,8 +550,8 @@ export default function UploadPage() {
                                 <div className="bg-zinc-800/30 border border-zinc-700/30 rounded-2xl p-4 sm:p-5 space-y-2 sm:space-y-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <Paperclip className="w-4 h-4 text-primary" />
-                                            <span className="text-sm font-bold text-zinc-200">Attachments</span>
+                                            <Paperclip className="w-4 h-4 text-amber-400" />
+                                            <span className="text-sm font-semibold text-zinc-200">Attachments</span>
                                         </div>
                                         <span className="text-xs font-mono text-zinc-500">{formatSize(totalSize)}</span>
                                     </div>
@@ -638,7 +581,7 @@ export default function UploadPage() {
                                                 <Clock className="w-4 h-4 text-amber-400" />
                                                 Auto-Destruct
                                             </label>
-                                            <span className="text-sm font-mono text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-lg">
+                                            <span className="text-sm font-mono text-amber-400 font-bold bg-amber-500/10 px-2.5 py-0.5 rounded-lg">
                                                 {formatExpiry(expiresIn[0])}
                                             </span>
                                         </div>
@@ -692,55 +635,17 @@ export default function UploadPage() {
                                 </div>
 
                                 {/* Zero-Knowledge Note */}
-                                <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-4 flex items-start gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                                        <Shield className="w-4.5 h-4.5 text-primary" />
+                                <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-3 sm:p-4 flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                        <Shield className="w-4.5 h-4.5 text-amber-400" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-zinc-200">Zero-Knowledge Encryption</p>
+                                        <p className="text-sm font-medium text-amber-300">Zero-Knowledge Encryption</p>
                                         <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
                                             Encryption happens entirely in your browser. We never see your files, keys, or data.
                                         </p>
                                     </div>
                                 </div>
-
-                                {files.length > 0 && (
-                                    <div className="grid gap-4">
-                                        <div className="bg-zinc-900/60 border border-zinc-700/40 rounded-2xl p-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className="text-[10px] uppercase tracking-[0.35em] text-zinc-500 font-mono">Vault Code Preview</span>
-                                                <span className="text-[10px] uppercase tracking-[0.35em] text-emerald-400 font-mono">{stage === 'uploading' ? 'Live' : 'Ready'}</span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2 justify-center text-2xl sm:text-[2.2rem] font-black font-mono tracking-[0.35em] text-white">
-                                                {previewCode.split("").map((char, index) => (
-                                                    <span key={index} className="w-9 h-12 flex items-center justify-center rounded-2xl bg-zinc-950/80 border border-zinc-800">{char}</span>
-                                                ))}
-                                            </div>
-                                            <p className="text-xs text-zinc-500 mt-3">Code reveals as files finish encrypting and uploading.</p>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            {files.map((file) => (
-                                                <div key={file.name} className="bg-zinc-900/60 border border-zinc-700/40 rounded-2xl p-3">
-                                                    <div className="flex items-center justify-between gap-4 mb-2">
-                                                        <div>
-                                                            <p className="text-sm font-medium text-zinc-100 truncate">{file.name}</p>
-                                                            <p className="text-[11px] text-zinc-500 font-mono">{formatSize(file.size)}</p>
-                                                        </div>
-                                                        <span className="text-[10px] font-mono uppercase tracking-[0.35em] text-zinc-400">
-                                                            {Math.round(fileProgress[file.name] || 0)}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-emerald-400 to-primary"
-                                                            style={{ width: `${Math.min(100, Math.max(0, fileProgress[file.name] || 0))}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -768,7 +673,7 @@ export default function UploadPage() {
                         <Button
                             onClick={() => setStep(2)}
                             disabled={!canProceed}
-                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
                         >
                             Continue
                             <ArrowRight className="w-4 h-4 ml-2" />
@@ -779,7 +684,7 @@ export default function UploadPage() {
                         <Button
                             onClick={() => setShowConfirmDialog(true)}
                             disabled={files.length === 0 || stage !== "idle" || !!uploadError}
-                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
+                            className="flex-1 h-12 sm:h-14 text-sm sm:text-base font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 w-full"
                         >
                             <Lock className="w-4 h-4 mr-2" />
                             Encrypt & Upload

@@ -718,14 +718,14 @@ export default function AccessPage() {
                                         whileHover={!isMobile ? { scale: 1.02 } : {}}
                                         whileTap={{ scale: 0.98 }}
                                     >
-                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:border-primary/50 transition-colors">
-                                            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-400/50 transition-colors">
+                                            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
                                         </div>
                                         <div>
-                                            <h1 className="font-bold text-base sm:text-lg tracking-tight font-display uppercase">
-                                                VAULT<span className="text-primary">BRIDGE</span>
+                                            <h1 className="font-bold text-base sm:text-lg tracking-tight">
+                                                VAULT<span className="text-cyan-400">BRIDGE</span>
                                             </h1>
-                                            {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em] uppercase">Secure Access</p>}
+                                            {!isMobile && <p className="text-[10px] text-zinc-500 font-mono tracking-[0.2em]">ACCESS VAULT</p>}
                                         </div>
                                     </motion.div>
                                 </Link>
@@ -771,14 +771,14 @@ export default function AccessPage() {
                                                 <Sparkles className="w-3 h-3" />
                                                 <span>ZERO-KNOWLEDGE DECRYPTION</span>
                                             </div>
-                                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3 sm:mb-4 font-display uppercase">
+                                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mb-3 sm:mb-4">
                                                 Access Secure{" "}
-                                                <span className="text-primary">
+                                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">
                                                     Vault
                                                 </span>
                                             </h1>
-                                            <p className="text-sm sm:text-base text-zinc-400 px-4 font-sans">
-                                                Enter your 6-character access code to unlock the vault
+                                            <p className="text-sm sm:text-base text-zinc-400 px-4">
+                                                Enter your 6-digit access code to unlock the vault
                                             </p>
                                         </div>
 
@@ -838,26 +838,26 @@ export default function AccessPage() {
                                                 <div className="space-y-6">
                                                     <div className="space-y-4">
                                                         <label className="text-xs text-center block text-zinc-400 uppercase tracking-widest font-mono">
-                                                            Enter 3-Digit ID + 4-Character PIN
+                                                            Enter 6-Digit Code
                                                         </label>
 
                                                         <div className="flex justify-center gap-2 relative">
                                                             {/* Invisible input for handling focus/typing */}
                                                             <Input
                                                                 type="search"
-                                                                inputMode="text"
-                                                                pattern="[A-Za-z0-9]*"
+                                                                inputMode="numeric"
+                                                                pattern="[0-9]*"
                                                                 value={accessCode}
                                                                 onChange={(e) => {
-                                                                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 7).toUpperCase();
+                                                                    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
                                                                     setAccessCode(val);
-                                                                    // Auto-submit when user types the full code
-                                                                    if (val.length === 7 && stage === "input") {
+                                                                    // Auto-submit when user types 6th digit
+                                                                    if (val.length === 6 && stage === "input") {
                                                                         setTimeout(() => submitCode(val), 50);
                                                                     }
                                                                 }}
                                                                 onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter' && accessCode.length === 7) {
+                                                                    if (e.key === 'Enter' && accessCode.length === 6) {
                                                                         submitCode();
                                                                     }
                                                                 }}
@@ -912,7 +912,7 @@ export default function AccessPage() {
                                                                 </div>
 
                                                                 <div className="flex gap-1 sm:gap-2">
-                                                                    {Array.from({ length: 4 }).map((_, i) => {
+                                                                    {Array.from({ length: 3 }).map((_, i) => {
                                                                         const index = i + 3;
                                                                         const num = accessCode[index] || "";
                                                                         const isFocused = accessCode.length === index;
@@ -950,19 +950,19 @@ export default function AccessPage() {
                                                         </div>
 
                                                         <p className="text-[10px] sm:text-xs text-zinc-500 text-center">
-                                                            First 3 digits = Vault ID • Last 4 chars = PIN
+                                                            First 3 digits = Vault ID • Last 3 digits = PIN
                                                         </p>
                                                     </div>
 
                                                     <Button
                                                         onClick={() => submitCode()}
-                                                        disabled={accessCode.length !== 7}
-                                                        className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 7
-                                                            ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40"
+                                                        disabled={accessCode.length !== 6}
+                                                        className={`w-full h-12 sm:h-14 font-bold uppercase tracking-wider text-sm sm:text-base rounded-xl transition-all duration-300 ${accessCode.length === 6
+                                                            ? "bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-lg shadow-cyan-900/30 hover:shadow-cyan-800/40" // Removed hover scale on mobile
                                                             : "bg-zinc-800 text-zinc-500 cursor-not-allowed"}`}
                                                     >
-                                                        <KeyRound className={`w-4 h-4 sm:w-5 sm:h-5 mr-3 ${accessCode.length === 7 ? "opacity-100" : "opacity-50"}`} />
-                                                        {accessCode.length === 7 ? "Unlock Vault" : "Enter Code"}
+                                                        <KeyRound className={`w-4 h-4 sm:w-5 sm:h-5 mr-3 ${accessCode.length === 6 ? "opacity-100" : "opacity-50"}`} />
+                                                        {accessCode.length === 6 ? "Unlock Vault" : "Enter Code"}
                                                     </Button>
 
                                                     {/* Trust Indicators - Simplified on Mobile */}

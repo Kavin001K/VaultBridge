@@ -256,11 +256,7 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
   for (let i = 0; i < bytes.length; i += chunkSize) {
     const chunk = bytes.subarray(i, i + chunkSize);
-    let chunkStr = "";
-    for (let j = 0; j < chunk.length; j++) {
-      chunkStr += String.fromCharCode(chunk[j]);
-    }
-    binary += chunkStr;
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
   }
 
   return window.btoa(binary);
@@ -288,65 +284,60 @@ export function generateUUID() {
 
 // Constants for PBKDF2 key derivation
 const PBKDF2_ITERATIONS = 100000;
-const PIN_SALT_SIZE = 16;
-const PIN_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const SALT_PREFIX = "VaultBridge-PIN-v1"; // Fixed salt prefix for reproducibility
 
 /**
- * Generate a 7-character split code composed of:
- * - lookupId (first 3 digits): numeric ID used to find the vault on the server
- * - pin (last 4 chars): alphanumeric PIN used to unwrap the file key locally
+ * Generate a 6-digit numeric code split into:
+ * - lookupId (first 3 digits): Used to find the vault on the server
+ * - pin (last 3 digits): Used to unwrap the file key locally
  */
 export function generateSplitCode(): { fullCode: string; lookupId: string; pin: string } {
-  const generateRandomChar = () => {
-    const values = new Uint8Array(1);
-    window.crypto.getRandomValues(values);
-    return PIN_CHARSET[values[0] % PIN_CHARSET.length];
-  };
-
-  const lookupId = Array.from({ length: 3 }, () => Math.floor(Math.random() * 10).toString()).join("");
-  const pin = Array.from({ length: 4 }, generateRandomChar).join("");
-  const fullCode = `${lookupId}${pin}`;
+  const fullCode = Array.from({ length: 6 }, () =>
+    Math.floor(Math.random() * 10).toString()
+  ).join('');
 
   return {
     fullCode,
-    lookupId,
-    pin,
+    lookupId: fullCode.slice(0, 3),
+    pin: fullCode.slice(3, 6),
   };
 }
 
 /**
- * Derive a wrapper key from an alphanumeric PIN using PBKDF2.
- * Returns the derived AES-KW key and the random salt used.
+ * Derive a wrapper key from a 3-digit PIN using PBKDF2.
+ * This turns the PIN into a robust AES-KW key for wrapping/unwrapping.
  */
-export async function deriveWrapperKey(
-  pin: string,
-  salt?: Uint8Array
-): Promise<{ key: CryptoKey; salt: Uint8Array }> {
+export async function deriveWrapperKey(pin: string): Promise<CryptoKey> {
+  // Encode the PIN as UTF-8 bytes for the key material
   const encoder = new TextEncoder();
-  const finalSalt = salt || window.crypto.getRandomValues(new Uint8Array(PIN_SALT_SIZE));
+  const pinBytes = encoder.encode(pin);
 
+  // Import PIN as a CryptoKey for PBKDF2
   const pinKey = await window.crypto.subtle.importKey(
     "raw",
-    encoder.encode(pin),
+    pinBytes,
     "PBKDF2",
     false,
     ["deriveKey"]
   );
 
-  const derivedKey = await window.crypto.subtle.deriveKey(
+  // Use a fixed salt derived from lookup ID prefix for reproducibility
+  // The receiver will use the same PIN to derive the same key
+  const salt = encoder.encode(`${SALT_PREFIX}-${pin}`);
+
+  // Derive an AES-KW key using PBKDF2
+  return window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: finalSalt,
+      salt,
       iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256",
     },
     pinKey,
     { name: "AES-KW", length: 256 },
-    false,
+    false, // Not extractable
     ["wrapKey", "unwrapKey"]
   );
-
-  return { key: derivedKey, salt: finalSalt };
 }
 
 /**
@@ -354,7 +345,7 @@ export async function deriveWrapperKey(
  * Returns the wrapped key as a Base64 string for storage.
  */
 export async function wrapFileKey(fileKey: CryptoKey, pin: string): Promise<string> {
-  const { key: wrapperKey, salt } = await deriveWrapperKey(pin);
+  const wrapperKey = await deriveWrapperKey(pin);
 
   const wrappedKeyBuffer = await window.crypto.subtle.wrapKey(
     "raw",
@@ -363,11 +354,7 @@ export async function wrapFileKey(fileKey: CryptoKey, pin: string): Promise<stri
     "AES-KW"
   );
 
-  const combined = new Uint8Array(salt.length + wrappedKeyBuffer.byteLength);
-  combined.set(salt, 0);
-  combined.set(new Uint8Array(wrappedKeyBuffer), salt.length);
-
-  return arrayBufferToBase64(combined.buffer);
+  return arrayBufferToBase64(wrappedKeyBuffer);
 }
 
 /**
@@ -375,17 +362,12 @@ export async function wrapFileKey(fileKey: CryptoKey, pin: string): Promise<stri
  * Returns the original CryptoKey that can be used for file decryption.
  */
 export async function unwrapFileKey(wrappedKeyBase64: string, pin: string): Promise<CryptoKey> {
-  const combined = base64ToArrayBuffer(wrappedKeyBase64);
-  const combinedBytes = new Uint8Array(combined);
-
-  const salt = combinedBytes.slice(0, PIN_SALT_SIZE);
-  const wrappedKey = combinedBytes.slice(PIN_SALT_SIZE);
-
-  const { key: wrapperKey } = await deriveWrapperKey(pin, salt);
+  const wrapperKey = await deriveWrapperKey(pin);
+  const wrappedKeyBuffer = base64ToArrayBuffer(wrappedKeyBase64);
 
   return window.crypto.subtle.unwrapKey(
     "raw",
-    wrappedKey.buffer,
+    wrappedKeyBuffer,
     wrapperKey,
     "AES-KW",
     { name: "AES-GCM", length: 256 },

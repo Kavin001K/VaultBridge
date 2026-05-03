@@ -39,6 +39,8 @@ export interface UploadState {
     uploadedChunks: number[];
     /** Chunk size used for this upload */
     chunkSize: number;
+    /** Exported encryption key (base64) for resuming */
+    cryptoKeyExported: string;
     /** Whether compression was applied */
     isCompressed: boolean;
     /** Vault configuration */
@@ -142,6 +144,7 @@ export async function createUploadSession(params: {
     fileType: string;
     totalChunks: number;
     chunkSize: number;
+    cryptoKeyExported: string;
     isCompressed: boolean;
     vaultConfig: UploadState['vaultConfig'];
 }): Promise<string> {

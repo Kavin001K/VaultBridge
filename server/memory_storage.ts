@@ -8,7 +8,6 @@ import {
     parseStoragePath,
     trackDeletion,
 } from "./services/storage_router";
-import { logger } from "./logger";
 
 /**
  * In-Memory Storage — fallback when PostgreSQL is unavailable.
@@ -186,14 +185,14 @@ export class MemoryStorage implements IStorage {
         }
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<{ success: boolean; count: number }> {
+    async incrementDownloadCount(vaultId: string): Promise<number> {
         const v = this.vaults.get(vaultId);
-        if (v && v.downloadCount < v.maxDownloads) {
+        if (v) {
             v.downloadCount += 1;
             this.vaults.set(vaultId, v);
-            return { success: true, count: v.downloadCount };
+            return v.downloadCount;
         }
-        return { success: false, count: v?.downloadCount ?? -1 };
+        return 0;
     }
 
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
@@ -203,29 +202,30 @@ export class MemoryStorage implements IStorage {
         remainingDownloads: number;
         isExhausted: boolean;
     }[]> {
-        const toUpdate: FileRecord[] = [];
+        const results = [];
 
         for (const fileId of fileIds) {
-            const file = Array.from(this.files.values()).find((f) => f.fileId === fileId);
-            if (!file || file.downloadCount >= file.maxDownloads) {
-                throw new Error("FILE_DOWNLOAD_LIMIT_EXCEEDED");
+            let file: FileRecord | undefined;
+            for (const f of Array.from(this.files.values())) {
+                if (f.fileId === fileId) {
+                    file = f;
+                    break;
+                }
             }
-            toUpdate.push(file);
-        }
 
-        const results = [];
-        for (const file of toUpdate) {
-            file.downloadCount += 1;
-            this.files.set(file.id, file);
+            if (file) {
+                file.downloadCount += 1;
+                this.files.set(file.id, file);
 
-            const remaining = Math.max(0, file.maxDownloads - file.downloadCount);
-            results.push({
-                fileId: file.fileId,
-                downloadCount: file.downloadCount,
-                maxDownloads: file.maxDownloads,
-                remainingDownloads: remaining,
-                isExhausted: remaining <= 0,
-            });
+                const remaining = Math.max(0, file.maxDownloads - file.downloadCount);
+                results.push({
+                    fileId: file.fileId,
+                    downloadCount: file.downloadCount,
+                    maxDownloads: file.maxDownloads,
+                    remainingDownloads: remaining,
+                    isExhausted: remaining <= 0
+                });
+            }
         }
 
         return results;
@@ -285,12 +285,12 @@ export class MemoryStorage implements IStorage {
                 if (bytesPerProvider.r2 > 0) trackDeletion("r2", bytesPerProvider.r2);
                 if (bytesPerProvider.supabase > 0) trackDeletion("supabase", bytesPerProvider.supabase);
             } catch (err) {
-                logger.error({ err, vaultId: id }, "[MemoryStorage] Failed to delete physical files");
+                console.error(`[MemoryStorage] Failed to delete physical files:`, err);
             }
         }
 
         this.vaults.delete(id);
-        logger.info({ vaultId: id }, "[MemoryStorage] Deleted vault and resources.");
+        console.log(`[MemoryStorage] Deleted vault ${id} and resources.`);
     }
 
     async cleanupExpiredVaults(): Promise<void> {
@@ -301,14 +301,10 @@ export class MemoryStorage implements IStorage {
         }
 
         if (expiredIds.length > 0) {
-            logger.info({ count: expiredIds.length }, "[Cleanup] Found expired vaults. Purging from memory...");
+            console.log(`[Cleanup] Found ${expiredIds.length} expired vaults. Purging from memory...`);
             for (const id of expiredIds) {
                 await this.deleteVault(id);
             }
         }
-    }
-
-    async getActiveVaultsCount(): Promise<number> {
-        return Array.from(this.vaults.values()).filter(v => !v.isDeleted).length;
     }
 }

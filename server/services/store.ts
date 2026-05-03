@@ -6,7 +6,6 @@
  */
 
 import { randomUUID } from "crypto";
-import { logger } from "../logger";
 
 export interface VaultMetadata {
     id: string;
@@ -211,7 +210,7 @@ class EphemeralStore {
             this.lookupIdIndex.delete(vault.lookupId);
         }
 
-        logger.info({ vaultId: id, chunksCount: storagePaths.length }, "[store] Vault deleted. Chunks marked for cleanup.");
+        console.log(`[store] Vault ${id} deleted. ${storagePaths.length} chunks marked for cleanup.`);
         return storagePaths;
     }
 
@@ -241,7 +240,7 @@ class EphemeralStore {
             await this.deleteVault(vault.id);
         }
         if (expired.length > 0) {
-            logger.info({ count: expired.length }, "[store] Auto-cleaned expired vaults.");
+            console.log(`[store] Auto-cleaned ${expired.length} expired vaults.`);
         }
     }
 

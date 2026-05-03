@@ -9,8 +9,6 @@ interface EncryptionProgressProps {
     step: ProgressStep;
     progress: number;
     statusText: string;
-    bytesProcessed?: number;
-    bytesTotal?: number;
 }
 
 const steps = [
@@ -87,18 +85,6 @@ export function EncryptionProgress({ stage, step, progress, statusText }: Encryp
             >
                 {statusText}
             </motion.h3>
-
-            {typeof bytesProcessed === 'number' && typeof bytesTotal === 'number' && (
-                <div className="mb-4 text-xs text-zinc-500 font-mono uppercase tracking-[0.25em] flex items-center justify-center gap-2">
-                    <span>{(bytesProcessed / 1024 / 1024).toFixed(1)} / {(bytesTotal / 1024 / 1024).toFixed(1)} MB</span>
-                    <span className="text-primary">•</span>
-                    <span>{Math.round((bytesProcessed / Math.max(bytesTotal, 1)) * 100)}%</span>
-                </div>
-            )}
-
-            <div className="waveform mb-6">
-                <span style={{ width: `${Math.max(20, Math.min(100, progress))}%` }} />
-            </div>
 
             {/* Progress Bar */}
             <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mb-6">

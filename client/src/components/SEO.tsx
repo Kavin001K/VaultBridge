@@ -36,7 +36,7 @@ const staticPageSEO: Record<string, SEOProps> = {
     },
     '/access': {
         title: 'Access Secure Vault | Decrypt & Download Files | VaultBridge',
-        description: 'Enter your 7-character access code to unlock and download encrypted files. Zero-knowledge decryption happens entirely in your browser. No data is ever exposed to the server.',
+        description: 'Enter your 6-digit access code to unlock and download encrypted files. Zero-knowledge decryption happens entirely in your browser. No data is ever exposed to the server.',
         keywords: 'access encrypted vault, download encrypted files, secure access code, vault unlock, zero knowledge download, decrypt files, secure file retrieval',
     },
     '/download': {

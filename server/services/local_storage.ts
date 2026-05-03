@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
 import { createReadStream, createWriteStream } from 'fs';
-import { logger } from "../logger";
 
 // This folder will be mapped to your physical hard drive via Docker
 const UPLOAD_DIR = path.resolve(process.cwd(), 'storage_data');
@@ -44,6 +43,6 @@ export const localStorage = {
 
     // Basic cleanup for old files
     async cleanupOldFiles() {
-        logger.info("[Local Storage] Cleanup logic placeholder");
+        console.log("[Local Storage] Cleanup logic placeholder");
     }
 };

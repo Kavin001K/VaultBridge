@@ -7,7 +7,7 @@
  */
 
 import { storage } from "../storage";
-import { logger } from "../logger";
+import { log } from "../index";
 
 // Track known storage paths for orphan detection
 let lastCleanupRun = new Date();
@@ -17,18 +17,18 @@ let lastCleanupRun = new Date();
  */
 export async function runCleanup(): Promise<void> {
     const startTime = Date.now();
-    logger.info("Starting cleanup job...");
+    log("Starting cleanup job...", "cleanup");
 
     try {
         // Delegate cleanup to storage service (which now handles DB + Object Storage)
         await storage.cleanupExpiredVaults();
 
         const duration = Date.now() - startTime;
-        logger.info({ duration }, "Cleanup complete");
+        log(`Cleanup complete in ${duration}ms.`, "cleanup");
 
         lastCleanupRun = new Date();
     } catch (error) {
-        logger.error({ err: error }, "Cleanup job failed");
+        log(`Cleanup job failed: ${error}`, "cleanup");
     }
 }
 
@@ -39,7 +39,7 @@ export async function runCleanup(): Promise<void> {
 export function startCleanupWorker(): void {
     const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
-    logger.info("Cleanup worker started. Interval: 10 minutes.");
+    log("Cleanup worker started. Interval: 10 minutes.", "cleanup");
 
     // Run immediately on startup
     runCleanup();

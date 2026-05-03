@@ -5,7 +5,6 @@ import viteConfig from "../vite.config";
 import fs from "fs";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-import { logger } from "./logger";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,7 +23,7 @@ export async function setupVite(server: Server, app: Express) {
       error: (msg, options) => {
         viteLogger.error(msg, options);
         // Don't exit on error, just log it
-        logger.error({ msg }, "[vite error]");
+        console.error("[vite error]", msg);
       },
     },
     server: {

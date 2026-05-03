@@ -85,26 +85,6 @@ function CountdownTimer({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-function ConfettiBurst() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden z-10">
-      {Array.from({ length: 18 }).map((_, i) => (
-        <div
-          key={i}
-          className="confetti-piece"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 20}%`,
-            backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#fde68a'][i % 4],
-            animationDelay: `${Math.random() * 0.6}s`,
-            animationDuration: `${1.4 + Math.random() * 0.8}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function Success() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/success/:id");
@@ -159,34 +139,26 @@ export default function Success() {
     }
   };
 
-  // Clean vaultId from potential trailing hashes if the router includes them
-  const rawId = params?.id || "";
-  const vaultId = rawId.split('#')[0];
+  const vaultId = params?.id || "";
   const { data: vault } = useGetVault(vaultId);
 
   useEffect(() => {
     const hash = window.location.hash;
-    // Extract code using multiple patterns for maximum resilience
-    const codeMatch = hash.match(/[#&]code=([A-Za-z0-9]+)/) || hash.match(/#([A-Za-z0-9]{6,7})/);
-    
+    const codeMatch = hash.match(/#code=(\d{6})/);
     if (codeMatch) {
       setSplitCode(codeMatch[1]);
     }
 
-    // Parse Stats using URLSearchParams (more robust)
-    try {
-      const hashParams = new URLSearchParams(hash.substring(1));
-      const time = hashParams.get("time");
-      const speed = hashParams.get("speed");
+    // Parse Stats
+    const params = new URLSearchParams(hash.replace("#", "?")); // Hacky but works for hash params styled as queries
+    const time = params.get("time");
+    const speed = params.get("speed");
 
-      if (time && speed) {
-        setUploadStats({
-          time: parseInt(time),
-          speed: parseInt(speed)
-        });
-      }
-    } catch (e) {
-      console.warn("Failed to parse upload stats from hash", e);
+    if (time && speed) {
+      setUploadStats({
+        time: parseInt(time),
+        speed: parseInt(speed)
+      });
     }
   }, []);
 
@@ -321,8 +293,8 @@ export default function Success() {
             <Shield className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold font-display tracking-tight text-lg leading-none uppercase">VAULT<span className="text-primary">BRIDGE</span></h1>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Encrypted Transfer</p>
+            <h1 className="font-bold font-mono tracking-tight text-lg leading-none">SECURE<span className="text-primary">VAULT</span></h1>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Encrypted Transfer</p>
           </div>
         </div>
         <Button
@@ -344,7 +316,6 @@ export default function Success() {
           opacity: isBurned ? 0 : 1
         }}
       >
-        {splitCode && <ConfettiBurst />}
 
         {/* Hero Section: PIN & Insights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
@@ -362,27 +333,12 @@ export default function Success() {
                 <div className="p-2 bg-primary/10 rounded-full">
                   <Key className="w-4 h-4 text-primary" />
                 </div>
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-[0.3em] font-mono">Access Code</span>
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">Access PIN</span>
               </div>
 
               <div className="flex items-center gap-4 mb-4 scale-110">
-                <div className="flex flex-wrap justify-center gap-2 font-mono text-5xl md:text-6xl font-black tracking-widest text-white drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] select-all">
-                  {splitCode
-                    .slice(0, 3)
-                    .split("")
-                    .concat(["-"])
-                    .concat(splitCode.slice(3).split(""))
-                    .map((char, index) => (
-                      <motion.span
-                        key={index}
-                        initial={{ y: 10, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: index * 0.04, duration: 0.2 }}
-                        className="inline-block w-10 text-center"
-                      >
-                        {char}
-                      </motion.span>
-                    ))}
+                <div className="font-mono text-5xl md:text-6xl font-black tracking-widest text-white drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] select-all">
+                  {splitCode.slice(0, 3)}-{splitCode.slice(3, 6)}
                 </div>
               </div>
 
@@ -583,8 +539,8 @@ export default function Success() {
                       className="flex-1 flex flex-col justify-center space-y-8"
                     >
                       <div className="text-center space-y-2">
-                        <h3 className="text-2xl font-bold tracking-tight font-display">Ready to Share</h3>
-                        <p className="text-zinc-400 font-sans">Copy the secure link below or use the share sheet.</p>
+                        <h3 className="text-2xl font-bold tracking-tight">Ready to Share</h3>
+                        <p className="text-zinc-400">Copy the secure link below or use the share sheet.</p>
                       </div>
 
                       <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 flex items-center gap-4 group hover:border-primary/30 transition-colors">
@@ -617,8 +573,8 @@ export default function Success() {
                       className="flex-1 flex flex-col justify-center space-y-8"
                     >
                       <div className="text-center space-y-2">
-                        <h3 className="text-2xl font-bold tracking-tight font-display">Secure Dispatch</h3>
-                        <p className="text-zinc-400 font-sans">Send an automated email notification with access details.</p>
+                        <h3 className="text-2xl font-bold tracking-tight">Secure Dispatch</h3>
+                        <p className="text-zinc-400">Send an automated email notification with access details.</p>
                       </div>
 
                       <div className="space-y-6">
@@ -657,8 +613,8 @@ export default function Success() {
                         <Trash2 className="w-10 h-10 text-rose-500" />
                       </div>
                       <div className="space-y-4">
-                        <h3 className="text-2xl font-bold text-rose-500 font-display">Initiate Self-Destruct</h3>
-                        <p className="text-zinc-400 max-w-md mx-auto font-sans">
+                        <h3 className="text-2xl font-bold text-rose-500">Initiate Self-Destruct</h3>
+                        <p className="text-zinc-400 max-w-md mx-auto">
                           This will immediately purge all encryption keys, metadata, and file chunks from the server.
                         </p>
                       </div>

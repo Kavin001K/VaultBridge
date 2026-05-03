@@ -5,7 +5,6 @@
 
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
-import { logger } from "./logger";
 
 interface SignalingMessage {
     type: "join" | "offer" | "answer" | "ice-candidate" | "error" | "joined" | "ready" | "leave";
@@ -27,7 +26,7 @@ export function setupWebsocketSignaling(server: Server) {
 
     // Prevent unhandled WebSocket server errors from crashing the whole app.
     wss.on("error", (error: Error) => {
-        logger.error({ err: error }, "[WS-Signal] Server error");
+        console.error("[WS-Signal] Server error:", error.message);
     });
 
     // Map: roomId -> Set<WebSocket>
@@ -44,7 +43,7 @@ export function setupWebsocketSignaling(server: Server) {
     const interval = setInterval(function ping() {
         wss.clients.forEach(function each(ws: any) {
             if (ws.isAlive === false) {
-                logger.info("[WS-Signal] Terminating dead connection");
+                console.log('[WS-Signal] Terminating dead connection');
                 return ws.terminate();
             }
 
@@ -58,7 +57,7 @@ export function setupWebsocketSignaling(server: Server) {
         clientIds.set(ws, clientId);
         ws.isAlive = true;
 
-        logger.info({ clientId, remoteAddress: req.socket.remoteAddress }, "[WS-Signal] Client connected");
+        console.log(`[WS-Signal] Client connected: ${clientId} from ${req.socket.remoteAddress}`);
 
         ws.on("pong", () => {
             ws.isAlive = true;
@@ -85,21 +84,21 @@ export function setupWebsocketSignaling(server: Server) {
                         break;
 
                     default:
-                        logger.warn({ messageType: message.type }, "[WS-Signal] Unknown message type");
+                        console.warn(`[WS-Signal] Unknown message type: ${message.type}`);
                 }
             } catch (e) {
-                logger.error({ err: e }, "[WS-Signal] Parse error");
+                console.error("[WS-Signal] Parse error:", e);
                 safeSend(ws, { type: "error", payload: "Invalid message format" });
             }
         });
 
         ws.on("close", (code: number, reason: Buffer) => {
-            logger.info({ clientId: clientIds.get(ws), code }, "[WS-Signal] Client disconnected");
+            console.log(`[WS-Signal] Client ${clientIds.get(ws)} disconnected: ${code}`);
             handleLeave(ws);
         });
 
         ws.on("error", (error: Error) => {
-            logger.error({ clientId: clientIds.get(ws), err: error }, "[WS-Signal] Client error");
+            console.error(`[WS-Signal] Client ${clientIds.get(ws)} error:`, error.message);
         });
     });
 
@@ -120,7 +119,7 @@ export function setupWebsocketSignaling(server: Server) {
 
         // Allow max 2 peers per room for 1:1 transfer
         if (room.size >= 2) {
-            logger.info({ roomId }, "[WS-Signal] Room is full");
+            console.log(`[WS-Signal] Room ${roomId} is full`);
             safeSend(ws, { type: "error", payload: "Room is full (max 2 peers)" });
             return;
         }
@@ -128,7 +127,7 @@ export function setupWebsocketSignaling(server: Server) {
         room.add(ws);
         clientRooms.set(ws, roomId);
 
-        logger.info({ clientId, roomId, peerCount: room.size }, "[WS-Signal] Client joined room");
+        console.log(`[WS-Signal] Client ${clientId} joined room ${roomId} (${room.size} peers)`);
 
         // Notify caller they joined successfully
         safeSend(ws, {
@@ -140,7 +139,7 @@ export function setupWebsocketSignaling(server: Server) {
 
         // If room has 2 people, notify both to start P2P handshake
         if (room.size === 2) {
-            logger.info({ roomId }, "[WS-Signal] Room ready - notifying peers");
+            console.log(`[WS-Signal] Room ${roomId} ready - notifying peers`);
             room.forEach(client => {
                 safeSend(client, { type: "ready", roomId });
             });
@@ -154,16 +153,16 @@ export function setupWebsocketSignaling(server: Server) {
         const room = rooms.get(roomId)!;
         room.delete(ws);
 
-        logger.info({ roomId, remainingPeers: room.size }, "[WS-Signal] Client left room");
+        console.log(`[WS-Signal] Client left room ${roomId} (${room.size} peers remaining)`);
 
         if (room.size === 0) {
             rooms.delete(roomId);
-            logger.info({ roomId }, "[WS-Signal] Room deleted (empty)");
+            console.log(`[WS-Signal] Room ${roomId} deleted (empty)`);
         } else {
             // Notify remaining peer that other left
             room.forEach(client => {
                 safeSend(client, {
-                    type: "peer-left",
+                    type: "error",
                     payload: "Peer disconnected"
                 });
             });
@@ -173,7 +172,7 @@ export function setupWebsocketSignaling(server: Server) {
     const broadcastToRoom = (sender: WebSocket, message: SignalingMessage, senderId: string) => {
         const roomId = clientRooms.get(sender);
         if (!roomId || !rooms.has(roomId)) {
-            logger.warn({ senderId }, "[WS-Signal] Broadcast failed - client not in a room");
+            console.warn(`[WS-Signal] Broadcast failed - client not in a room`);
             return;
         }
 
@@ -195,14 +194,14 @@ export function setupWebsocketSignaling(server: Server) {
             try {
                 ws.send(JSON.stringify(data));
             } catch (e) {
-                logger.error({ err: e }, "[WS-Signal] Send error");
+                console.error("[WS-Signal] Send error:", e);
             }
         }
     };
 
     // Cleanup on server close
     wss.on("close", () => {
-        logger.info("[WS-Signal] WebSocket server closing");
+        console.log("[WS-Signal] WebSocket server closing");
         clearInterval(interval);
     });
 
@@ -211,9 +210,9 @@ export function setupWebsocketSignaling(server: Server) {
         const totalClients = wss.clients.size;
         const totalRooms = rooms.size;
         if (totalClients > 0 || totalRooms > 0) {
-            logger.info({ totalClients, totalRooms }, "[WS-Signal] Stats");
+            console.log(`[WS-Signal] Stats: ${totalClients} clients, ${totalRooms} rooms`);
         }
     }, 60000);
 
-    logger.info("[WS-Signal] Signaling server initialized on path /ws-signal");
+    console.log("[WS-Signal] Signaling server initialized on path /ws-signal");
 }

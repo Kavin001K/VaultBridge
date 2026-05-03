@@ -9,8 +9,6 @@ import { startCleanupWorker } from "./cron/cleanup";
 import { storage } from "./storage";
 import { logStorageStatus } from "./services/storage_router";
 import { registerSeoRoutes } from "./seo-routes";
-import { logger, httpLogger } from "./logger";
-import { initializeTracing, shutdownTracing } from "./tracing";
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,12 +58,6 @@ app.use((req, res, next) => {
     // 444 is a non-standard code used to tell the server to drop the connection
     return res.status(444).end();
   }
-
-  // Bypass for .well-known paths to avoid Vite/SPA interference
-  if (req.path.startsWith('/.well-known/')) {
-    return res.status(404).end();
-  }
-
   next();
 });
 
@@ -79,17 +71,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://plausible.io",
-          "https://static.cloudflareinsights.com",
-        ],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io", "https://static.cloudflareinsights.com"], // For Vite HMR in dev
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
         connectSrc: cspConnectSrc, // API + storage + local dev tooling
-        scriptSrcAttr: isProduction ? ["'none'"] : ["'unsafe-inline'"], // Allow Vite inline handlers in dev
       },
     },
     crossOriginEmbedderPolicy: false, // Required for some features
@@ -102,57 +88,19 @@ app.use(
 
 
 
-// Vault creation rate limiter: 10 per minute
-export const vaultCreateLimiter = rateLimit({
+// Global rate limiter: 50 requests per minute to protect all routes from bots
+const globalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 vault creations per minute
-  message: { message: "Too many vault creations. Please wait before creating another vault." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-export const codeLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 20, // 20 code resolution requests per minute
-  message: { message: "Too many code lookups. Please wait and try again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Relaxed rate limit for chunk uploads (to support large files)
-export const chunkUploadLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10000, // Massive headroom for stability
-  message: { message: "Chunk upload rate limit exceeded." },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost',
-});
-
-// General API rate limiter (for other routes)
-export const generalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 100, // 100 requests per minute for general API calls
+  max: 50,
   message: { message: "Too many requests. Please try again later." },
   standardHeaders: true,
-  skip: (req) => {
-    // 1. Never rate limit localhost/dev environments
-    const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost';
-    if (isLocal) return true;
-
-    // 2. Skip general rate limiting for high-frequency vault/chunk operations
-    // These routes have their own specific high-capacity limiters
-    const isHighFreqRoute = req.originalUrl.startsWith("/api/vaults/") || 
-                          req.originalUrl.startsWith("/api/chunks/");
-    
-    return isHighFreqRoute;
-  },
+  legacyHeaders: false,
 });
 
-// Applied to /api routes below to avoid blocking static assets/Vite in dev
+app.use(globalLimiter);  // Applied globally instead of just /api
 
 // Stricter rate limit for code resolution (anti-brute-force)
-export const codeLimiterStrict = rateLimit({
+export const codeLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5, // Only 5 attempts per minute
   message: { message: "Too many code attempts. Please wait before trying again." },
@@ -160,21 +108,18 @@ export const codeLimiterStrict = rateLimit({
   legacyHeaders: false,
 });
 
-// Upload rate limiter (increased for massive multi-file stability)
+// Upload rate limiter
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10000, // Effectively unlimited for chunked transfers
+  max: 20, // 20 uploads per minute
   message: { message: "Upload rate limit exceeded." },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost',
 });
 
 // =============================================================================
 // BODY PARSING
 // =============================================================================
-
-app.use(httpLogger);
 
 app.use(
   express.json({
@@ -189,7 +134,14 @@ app.use(express.urlencoded({ extended: false, limit: apiBodyLimit }));
 // =============================================================================
 
 export function log(message: string, source = "express") {
-  logger.info({ source }, message);
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
 }
 
 app.use((req, res, next) => {
@@ -246,7 +198,6 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 // =============================================================================
 
 (async () => {
-  await initializeTracing();
   await registerRoutes(httpServer, app);
   registerSeoRoutes(app);
 
@@ -255,7 +206,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
     await storage.reconcileStorageUsage();
     logStorageStatus();
   } catch (err) {
-    logger.error({ err }, "[Storage] Non-fatal: Failed to reconcile storage usage");
+    console.error("[Storage] Non-fatal: Failed to reconcile storage usage:", err);
   }
 
   // Start cleanup worker (Phase 1.2)
@@ -272,7 +223,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    logger.error({ path: req.path, err }, `[Internal Error] Path: ${req.path}`);
+    console.error(`[Internal Error] Path: ${req.path} | Error:`, err.stack || err);
 
     if (res.headersSent) {
       return next(err);
@@ -301,39 +252,40 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
 
   httpServer.on("error", (error: NodeJS.ErrnoException) => {
     if (error.code === "EADDRINUSE") {
-      logger.error({ port }, `[startup] Port ${port} is already in use. Stop the existing server process before running npm run dev.`);
+      console.error(
+        `[startup] Port ${port} is already in use. Stop the existing server process before running npm run dev.`
+      );
       process.exit(1);
     }
-    logger.error({ err: error }, "[startup] HTTP server failed to start");
+    console.error("[startup] HTTP server failed to start:", error);
     process.exit(1);
   });
 
   httpServer.listen(port, host, () => {
-    logger.info(`🔐 VaultBridge server running on http://${host}:${port}`);
-    logger.info(`📦 API body limit: ${apiBodyLimit}`);
-    logger.info(`🧹 Cleanup worker active (10 min interval)`);
+    log(`🔐 VaultBridge server running on http://${host}:${port}`);
+    log(`📦 API body limit: ${apiBodyLimit}`);
+    log(`🧹 Cleanup worker active (10 min interval)`);
   });
 
   // =============================================================================
   // GOOGLE CLOUD RUN OPTIMIZATIONS — GRACEFUL SHUTDOWN
   // =============================================================================
   const gracefulShutdown = (signal: string) => {
-    logger.info(`[Cloud Run] 🛑 Received ${signal}, initiating graceful shutdown for zero-downtime scaling...`);
-    void shutdownTracing();
+    log(`[Cloud Run] 🛑 Received ${signal}, initiating graceful shutdown for zero-downtime scaling...`);
 
     // Stop accepting new connections
     httpServer.close((err) => {
       if (err) {
-        logger.error({ err }, "[Cloud Run] Error during HTTP server close");
+        console.error("[Cloud Run] Error during HTTP server close:", err);
         process.exit(1);
       }
-      logger.info("[Cloud Run] ✅ HTTP Server closed cleanly.");
+      log("[Cloud Run] ✅ HTTP Server closed cleanly.");
       process.exit(0);
     });
 
     // Force shutdown if connections are hanging for too long (Cloud Run usually gives 10s)
     setTimeout(() => {
-      logger.error("[Cloud Run] ⚠️ Forced shutdown due to hanging connections.");
+      console.error("[Cloud Run] ⚠️ Forced shutdown due to hanging connections.");
       process.exit(1);
     }, 10000).unref();
   };

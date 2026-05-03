@@ -4,7 +4,6 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, lt } from "drizzle-orm";
-import { logger } from "./logger";
 
 // Smart Storage Router — manages R2 / Supabase / Local
 import {
@@ -160,7 +159,7 @@ export class DatabaseStorage implements IStorage {
     async updateChunkStatus(fileId: string, chunkIndex: number, storagePath: string): Promise<void> {
         const [file] = await db.select().from(files).where(eq(files.fileId, fileId));
         if (!file) {
-            logger.error({ fileId }, "File not found for ID during update");
+            console.error(`File not found for ID during update: ${fileId}`);
             return;
         }
 
@@ -169,16 +168,12 @@ export class DatabaseStorage implements IStorage {
             .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<{ success: boolean; count: number }> {
+    async incrementDownloadCount(vaultId: string): Promise<number> {
         const [updated] = await db.update(vaults)
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
-            .where(sql`${vaults.id} = ${vaultId} AND ${vaults.downloadCount} < ${vaults.maxDownloads}`)
+            .where(eq(vaults.id, vaultId))
             .returning();
-        
-        return {
-            success: !!updated,
-            count: updated?.downloadCount ?? -1
-        };
+        return updated?.downloadCount || 0;
     }
 
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
@@ -188,31 +183,27 @@ export class DatabaseStorage implements IStorage {
         remainingDownloads: number;
         isExhausted: boolean;
     }[]> {
-        return await db.transaction(async (tx) => {
-            const results = [];
+        const results = [];
 
-            for (const fileId of fileIds) {
-                const [updated] = await tx.update(files)
-                    .set({ downloadCount: sql`${files.downloadCount} + 1` })
-                    .where(eq(files.fileId, fileId), sql`${files.downloadCount} < ${files.maxDownloads}`)
-                    .returning();
+        for (const fileId of fileIds) {
+            const [updated] = await db.update(files)
+                .set({ downloadCount: sql`${files.downloadCount} + 1` })
+                .where(eq(files.fileId, fileId))
+                .returning();
 
-                if (!updated) {
-                    throw new Error("FILE_DOWNLOAD_LIMIT_EXCEEDED");
-                }
-
+            if (updated) {
                 const remaining = Math.max(0, updated.maxDownloads - updated.downloadCount);
                 results.push({
                     fileId: updated.fileId,
                     downloadCount: updated.downloadCount,
                     maxDownloads: updated.maxDownloads,
                     remainingDownloads: remaining,
-                    isExhausted: remaining <= 0,
+                    isExhausted: remaining <= 0
                 });
             }
+        }
 
-            return results;
-        });
+        return results;
     }
 
     async areAllFilesExhausted(vaultId: string): Promise<boolean> {
@@ -260,11 +251,11 @@ export class DatabaseStorage implements IStorage {
                 if (bytesPerProvider.supabase > 0) trackDeletion("supabase", bytesPerProvider.supabase);
             }
         } catch (err) {
-            logger.error({ err, vaultId: id }, "[Cleanup Error] Failed to delete physical files for vault");
+            console.error(`[Cleanup Error] Failed to delete physical files for vault ${id}:`, err);
         }
 
         await db.delete(vaults).where(eq(vaults.id, id));
-        logger.info({ vaultId: id }, "[Storage] Deleted vault and resources.");
+        console.log(`[Storage] Deleted vault ${id} and resources.`);
     }
 
     async cleanupExpiredVaults(): Promise<void> {
@@ -274,7 +265,7 @@ export class DatabaseStorage implements IStorage {
             .where(lt(vaults.expiresAt, now));
 
         if (expiredVaults.length > 0) {
-            logger.info({ count: expiredVaults.length }, "[Cleanup] Found expired vaults. Purging...");
+            console.log(`[Cleanup] Found ${expiredVaults.length} expired vaults. Purging...`);
             for (const vault of expiredVaults) {
                 await this.deleteVault(vault.id);
             }
@@ -298,7 +289,7 @@ export class DatabaseStorage implements IStorage {
         const storagePath = buildPrefixedPath(provider, rawPath);
 
         trackUpload(provider, chunkSize);
-        logger.debug({ provider, path: rawPath, size: chunkSize }, "[Storage Router] Upload route assigned");
+        console.log(`[Storage Router] Upload → ${provider.toUpperCase()} | ${rawPath} | ${chunkSize} bytes`);
 
         return { uploadUrl, storagePath, provider };
     }
@@ -340,13 +331,8 @@ export class DatabaseStorage implements IStorage {
 
             reconcileUsage(r2Total, supabaseTotal);
         } catch (err) {
-            logger.error({ err }, "[Storage] Failed to reconcile usage from DB");
+            console.error("[Storage] Failed to reconcile usage from DB:", err);
         }
-    }
-
-    async getActiveVaultsCount(): Promise<number> {
-        const [result] = await db.select({ count: sql<number>`count(*)` }).from(vaults).where(eq(vaults.isDeleted, false));
-        return Number(result?.count || 0);
     }
 }
 
@@ -387,11 +373,20 @@ class FallbackStorage implements IStorage {
                 || err.message?.includes('getaddrinfo');
 
             if (isFatalDb) {
-                const hasIpv6Issue = err.message?.includes('ENETUNREACH') || err.message?.includes('ENOTFOUND') || err.message?.includes('supabase');
-                logger.error(
-                    { reason: err.message, hasIpv6Issue },
-                    "DATABASE UNAVAILABLE — SWITCHING TO MEMORY STORAGE. Data will be lost on restart."
-                );
+                console.error("═══════════════════════════════════════════════════════════");
+                console.error("❌ DATABASE UNAVAILABLE — SWITCHING TO MEMORY STORAGE");
+                console.error("   Reason:", err.message);
+
+                if (err.message?.includes('ENETUNREACH') || err.message?.includes('ENOTFOUND') || err.message?.includes('supabase')) {
+                    console.error("   ⚠️ SUPABASE IPv6 CONNECTION ERROR DETECTED!");
+                    console.error("   Supabase has phased out IPv4 on direct connections (`db.[ref].supabase.co`).");
+                    console.error("   Render instances often fail to connect via IPv6 by default.");
+                    console.error("   FIX: Update your DATABASE_URL in Render to use the Connection Pooler URL.");
+                    console.error("   Go to Supabase -> Database -> Connection Pooler and copy the Session URL.");
+                }
+
+                console.error("   Note: Data will be lost when server restarts.");
+                console.error("═══════════════════════════════════════════════════════════");
                 this.usingMemory = true;
                 return operation(this.memory);
             }
@@ -453,9 +448,6 @@ class FallbackStorage implements IStorage {
     }
     async cleanupExpiredVaults(): Promise<void> {
         return this.execute(s => s.cleanupExpiredVaults());
-    }
-    async getActiveVaultsCount(): Promise<number> {
-        return this.execute(s => s.getActiveVaultsCount());
     }
 
     // --- Extended methods (not part of IStorage — always use primary) ---
