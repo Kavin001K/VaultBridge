@@ -122,10 +122,11 @@ export const codeLimiter = rateLimit({
 // Relaxed rate limit for chunk uploads (to support large files)
 export const chunkUploadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 2000, // Increased for stability
+  max: 10000, // Massive headroom for stability
   message: { message: "Chunk upload rate limit exceeded." },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost',
 });
 
 // General API rate limiter (for other routes)
@@ -134,11 +135,17 @@ export const generalLimiter = rateLimit({
   max: 100, // 100 requests per minute for general API calls
   message: { message: "Too many requests. Please try again later." },
   standardHeaders: true,
-  legacyHeaders: false,
   skip: (req) => {
-    const isChunkUploadUrl = req.method === "POST" && req.path.endsWith("/upload-url");
-    const isChunkUploadStatus = req.method === "PUT" && req.path.endsWith("/status");
-    return isChunkUploadUrl || isChunkUploadStatus;
+    // 1. Never rate limit localhost/dev environments
+    const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost';
+    if (isLocal) return true;
+
+    // 2. Skip general rate limiting for high-frequency vault/chunk operations
+    // These routes have their own specific high-capacity limiters
+    const isHighFreqRoute = req.originalUrl.startsWith("/api/vaults/") || 
+                          req.originalUrl.startsWith("/api/chunks/");
+    
+    return isHighFreqRoute;
   },
 });
 
@@ -153,13 +160,14 @@ export const codeLimiterStrict = rateLimit({
   legacyHeaders: false,
 });
 
-// Upload rate limiter (increased for multi-file stability)
+// Upload rate limiter (increased for massive multi-file stability)
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100, // Increased to 100 uploads per minute
+  max: 10000, // Effectively unlimited for chunked transfers
   message: { message: "Upload rate limit exceeded." },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost',
 });
 
 // =============================================================================

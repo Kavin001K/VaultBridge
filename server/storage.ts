@@ -169,12 +169,16 @@ export class DatabaseStorage implements IStorage {
             .where(sql`${chunks.fileId} = ${file.id} AND ${chunks.chunkIndex} = ${chunkIndex}`);
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<number> {
+    async incrementDownloadCount(vaultId: string): Promise<{ success: boolean; count: number }> {
         const [updated] = await db.update(vaults)
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
-            .where(eq(vaults.id, vaultId))
+            .where(sql`${vaults.id} = ${vaultId} AND ${vaults.downloadCount} < ${vaults.maxDownloads}`)
             .returning();
-        return updated?.downloadCount || 0;
+        
+        return {
+            success: !!updated,
+            count: updated?.downloadCount ?? -1
+        };
     }
 
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
@@ -339,6 +343,11 @@ export class DatabaseStorage implements IStorage {
             logger.error({ err }, "[Storage] Failed to reconcile usage from DB");
         }
     }
+
+    async getActiveVaultsCount(): Promise<number> {
+        const [result] = await db.select({ count: sql<number>`count(*)` }).from(vaults).where(eq(vaults.isDeleted, false));
+        return Number(result?.count || 0);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -444,6 +453,9 @@ class FallbackStorage implements IStorage {
     }
     async cleanupExpiredVaults(): Promise<void> {
         return this.execute(s => s.cleanupExpiredVaults());
+    }
+    async getActiveVaultsCount(): Promise<number> {
+        return this.execute(s => s.getActiveVaultsCount());
     }
 
     // --- Extended methods (not part of IStorage — always use primary) ---

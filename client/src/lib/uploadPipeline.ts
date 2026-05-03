@@ -81,31 +81,56 @@ export function shouldCompressFile(entropy: number, bandwidthBps: number, fileSi
   return entropy < 6.5 && bandwidthBps < 5_000_000 && fileSize > 50_000;
 }
 
-export function createConcurrencyLimiter(maxConcurrency: number) {
-  let active = 0;
-  const queue: Array<() => void> = [];
+/**
+ * Semaphore-based concurrency limiter with FIFO fairness
+ * Ensures fair queuing and predictable resource allocation
+ */
+export class ConcurrencyLimiter {
+  private permits: number;
+  private waitQueue: Array<() => void> = [];
 
-  const next = () => {
-    if (queue.length === 0 || active >= maxConcurrency) return;
-    active += 1;
-    const resolve = queue.shift();
-    resolve?.();
-  };
+  constructor(maxConcurrency: number) {
+    this.permits = maxConcurrency;
+  }
 
-  return async function <T>(work: () => Promise<T>): Promise<T> {
-    if (active >= maxConcurrency) {
-      await new Promise<void>((resolve) => queue.push(resolve));
-    } else {
-      active += 1;
+  async acquire(): Promise<void> {
+    if (this.permits > 0) {
+      this.permits--;
+      return;
     }
 
+    return new Promise<void>((resolve) => {
+      this.waitQueue.push(() => {
+        this.permits--;
+        resolve();
+      });
+    });
+  }
+
+  release(): void {
+    this.permits++;
+    const next = this.waitQueue.shift();
+    if (next) {
+      next();
+    }
+  }
+
+  async run<T>(work: () => Promise<T>): Promise<T> {
+    await this.acquire();
     try {
       return await work();
     } finally {
-      active -= 1;
-      next();
+      this.release();
     }
-  };
+  }
+}
+
+/**
+ * Legacy function wrapper for backward compatibility
+ */
+export function createConcurrencyLimiter(maxConcurrency: number) {
+  const limiter = new ConcurrencyLimiter(maxConcurrency);
+  return limiter.run.bind(limiter);
 }
 
 export class EncryptionWorkerPool {
@@ -116,45 +141,85 @@ export class EncryptionWorkerPool {
   }>;
   private nextId = 1;
   private roundRobin = 0;
+  private workerSemaphore: ConcurrencyLimiter;
+  private activeEncryptions = 0;
 
   constructor(workerCount: number) {
     this.workers = Array.from({ length: workerCount }, () => this.createWorker());
+    // Limit concurrent encryption operations to prevent memory spike
+    this.workerSemaphore = new ConcurrencyLimiter(workerCount);
   }
 
   private createWorker() {
     const worker = new Worker(new URL("../encryption.worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (event: MessageEvent) => {
-      const { id, type, iv, encryptedData, error } = event.data;
+      const { id, type, iv, encryptedData, compressedSize, originalSize, error } = event.data;
       const request = this.requestMap.get(id);
       if (!request) return;
       this.requestMap.delete(id);
 
       if (type === "encrypt_success") {
-        request.resolve({ iv, encryptedData });
+        request.resolve({ iv, encryptedData, compressedSize, originalSize });
       } else if (type === "error") {
         request.reject(new Error(error || "Encryption worker failed"));
+      }
+    };
+    worker.onerror = (event: ErrorEvent) => {
+      // Handle critical worker errors
+      const relatedRequests = Array.from(this.requestMap.entries()).slice(0, 1);
+      for (const [id, request] of relatedRequests) {
+        request.reject(new Error(`Worker crashed: ${event.message}`));
+        this.requestMap.delete(id);
       }
     };
     return worker;
   }
 
   async encrypt(data: ArrayBuffer, key: CryptoKey, compress: boolean): Promise<EncryptionResult> {
-    const id = this.nextId++;
-    const worker = this.workers[this.roundRobin];
-    this.roundRobin = (this.roundRobin + 1) % this.workers.length;
+    // Use semaphore to manage worker pool concurrency
+    return this.workerSemaphore.run(async () => {
+      const id = this.nextId++;
+      const worker = this.workers[this.roundRobin];
+      this.roundRobin = (this.roundRobin + 1) % this.workers.length;
+      this.activeEncryptions++;
 
-    return new Promise<EncryptionResult>((resolve, reject) => {
-      this.requestMap.set(id, { resolve, reject });
-      worker.postMessage(
-        {
-          type: compress ? "compress_and_encrypt" : "encrypt",
-          data,
-          key,
-          id,
-        },
-        [data]
-      );
+      try {
+        return await new Promise<EncryptionResult>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            this.requestMap.delete(id);
+            reject(new Error("Encryption worker timeout"));
+          }, 30000); // 30s timeout
+
+          this.requestMap.set(id, {
+            resolve: (result) => {
+              clearTimeout(timeout);
+              resolve(result);
+            },
+            reject: (error) => {
+              clearTimeout(timeout);
+              reject(error);
+            },
+          });
+
+          // Transfer ArrayBuffer to worker (zero-copy)
+          worker.postMessage(
+            {
+              type: compress ? "compress_and_encrypt" : "encrypt",
+              data,
+              key,
+              id,
+            },
+            [data] // Transfer ownership
+          );
+        });
+      } finally {
+        this.activeEncryptions--;
+      }
     });
+  }
+
+  getActiveEncryptions(): number {
+    return this.activeEncryptions;
   }
 
   terminate() {
@@ -174,18 +239,62 @@ export function combineIvAndEncrypted(result: EncryptionResult): Uint8Array {
 export async function uploadChunkBinary(
   uploadUrl: string,
   body: ArrayBuffer | Uint8Array,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  retries: number = 3
 ): Promise<void> {
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    body,
-    signal,
-    headers: {
-      "Content-Type": "application/octet-stream",
-    },
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      // Use ReadableStream for streaming large binary data if supported
+      let fetchBody: any = body;
+
+      // For large chunks, consider streaming
+      if (body.byteLength > 10_000_000) {
+        // > 10MB - use ReadableStream if available
+        if (typeof ReadableStream !== 'undefined') {
+          fetchBody = new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array(body));
+              controller.close();
+            },
+          });
+        }
+      }
+
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        body: fetchBody,
+        signal,
+        headers: {
+          // Use binary MIME type for maximum compatibility
+          "Content-Type": "application/octet-stream",
+          // Include size for the server to validate
+          "Content-Length": body.byteLength.toString(),
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      return; // Success
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on abort
+      if (signal?.aborted) {
+        throw lastError;
+      }
+
+      // Exponential backoff: 100ms, 200ms, 400ms
+      if (attempt < retries - 1) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 100 * Math.pow(2, attempt))
+        );
+      }
+    }
   }
+
+  throw lastError || new Error("Upload failed after retries");
 }

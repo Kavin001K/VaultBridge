@@ -167,11 +167,10 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Vault not found" });
     }
 
-    if (vault.downloadCount >= vault.maxDownloads) {
+    const { success, count: newCount } = await storage.incrementDownloadCount(vault.id);
+    if (!success) {
       return res.status(403).json({ message: "Download limit exceeded" });
     }
-
-    const newCount = await storage.incrementDownloadCount(vault.id);
 
     // BURNING LOGIC: If limit reached, delete immediately
     if (newCount >= vault.maxDownloads) {
@@ -743,6 +742,15 @@ export async function registerRoutes(
       timestamp: new Date().toISOString(),
       mode: "database"
     });
+  });
+
+  app.get("/api/stats/vaults", async (_req, res) => {
+    try {
+      const count = await storage.getActiveVaultsCount();
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
   });
 
   return httpServer;

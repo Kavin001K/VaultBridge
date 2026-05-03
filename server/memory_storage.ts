@@ -186,14 +186,14 @@ export class MemoryStorage implements IStorage {
         }
     }
 
-    async incrementDownloadCount(vaultId: string): Promise<number> {
+    async incrementDownloadCount(vaultId: string): Promise<{ success: boolean; count: number }> {
         const v = this.vaults.get(vaultId);
-        if (v) {
+        if (v && v.downloadCount < v.maxDownloads) {
             v.downloadCount += 1;
             this.vaults.set(vaultId, v);
-            return v.downloadCount;
+            return { success: true, count: v.downloadCount };
         }
-        return 0;
+        return { success: false, count: v?.downloadCount ?? -1 };
     }
 
     async incrementFileDownloadCount(fileIds: string[]): Promise<{
@@ -306,5 +306,9 @@ export class MemoryStorage implements IStorage {
                 await this.deleteVault(id);
             }
         }
+    }
+
+    async getActiveVaultsCount(): Promise<number> {
+        return Array.from(this.vaults.values()).filter(v => !v.isDeleted).length;
     }
 }

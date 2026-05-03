@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'wouter';
 import { Upload, KeyRound, Clipboard, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -36,6 +37,7 @@ export const Hero: React.FC<HeroProps> = ({
   vaultAccessPanelRef,
   vaultInputRef
 }) => {
+  const [, setLocation] = useLocation();
   return (
     <section className="relative pt-16 sm:pt-20 pb-10 sm:pb-16 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center overflow-hidden">
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center -z-10">
@@ -87,7 +89,7 @@ export const Hero: React.FC<HeroProps> = ({
               onClick={() => {
                 playSound('click');
                 if (action.onClick) action.onClick();
-                else if (action.href) window.location.hash = action.href; // simplified for this component
+                else if (action.href) setLocation(action.href);
               }}
               className="group relative flex flex-col items-center justify-center rounded-3xl border border-white/5 bg-white/[0.03] backdrop-blur-xl p-6 sm:py-10 cursor-pointer transition-all duration-300 shadow-2xl"
             >

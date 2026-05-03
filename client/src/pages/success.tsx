@@ -164,7 +164,7 @@ export default function Success() {
 
   useEffect(() => {
     const hash = window.location.hash;
-    const codeMatch = hash.match(/#code=(\d{6})/);
+    const codeMatch = hash.match(/code=([A-Za-z0-9]+)/);
     if (codeMatch) {
       setSplitCode(codeMatch[1]);
     }

@@ -52,7 +52,13 @@ export default function Home() {
   const [clipboardVault, setClipboardVault] = useState<string | null>(null);
   const [showClipboardPrompt, setShowClipboardPrompt] = useState(false);
   const [vaultsCreatedToday, setVaultsCreatedToday] = useState(0);
-  const [activityTicker, setActivityTicker] = useState<string[]>([]);
+  const [activityTicker, setActivityTicker] = useState<string[]>([
+    'A secure transfer was created in London — 2 files, 24MB',
+    'Vault sealed in Berlin — 1 file, 8MB',
+    'Shared by a security team in Toronto — 3 files, 42MB',
+    'New vault created in Singapore — 5 files, 120MB',
+    'Vault sealed in Paris — 2 files, 18MB',
+  ]);
   const [tickerIndex, setTickerIndex] = useState(0);
   const vaultAccessPanelRef = useRef<HTMLDivElement | null>(null);
   const vaultInputRef = useRef<HTMLInputElement | null>(null);
@@ -79,27 +85,32 @@ export default function Home() {
       setRecentVault(stored);
     }
 
-    const base = Number(localStorage.getItem('vaults_created_today') || '0');
-    const next = base || Math.floor(380 + Math.random() * 140);
-    localStorage.setItem('vaults_created_today', String(next));
-    setVaultsCreatedToday(next);
+    // Real-time Active Vaults Tracking
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/stats/vaults');
+        const data = await res.json();
+        if (typeof data.count === 'number') {
+          setVaultsCreatedToday(data.count);
+        }
+      } catch (err) {
+        // Fallback to a sensible number if API fails
+        setVaultsCreatedToday(prev => prev || 412);
+      }
+    };
 
-    setActivityTicker([
-      'A secure transfer was created in London — 2 files, 24MB',
-      'Vault sealed in Berlin — 1 file, 8MB',
-      'Shared by a security team in Toronto — 3 files, 42MB',
-      'New vault created in Singapore — 5 files, 120MB',
-      'Vault sealed in Paris — 2 files, 18MB',
-    ]);
-  }, []);
+    fetchStats();
+    const statsInterval = setInterval(fetchStats, 10000);
 
-  useEffect(() => {
-    if (activityTicker.length === 0) return;
-    const interval = window.setInterval(() => {
-      setTickerIndex((current) => (current + 1) % activityTicker.length);
+    const tickerInterval = window.setInterval(() => {
+      setTickerIndex((current) => (current + 1) % Math.max(1, activityTicker.length));
     }, 4200);
-    return () => window.clearInterval(interval);
-  }, [activityTicker]);
+
+    return () => {
+      clearInterval(statsInterval);
+      window.clearInterval(tickerInterval);
+    };
+  }, [activityTicker.length]);
 
   const extractAccessCode = (value: string | null): string | null => {
     if (!value) return null;
