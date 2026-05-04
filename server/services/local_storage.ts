@@ -11,9 +11,26 @@ if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+/**
+ * Sanitize and validate a file path to prevent path traversal attacks.
+ * Ensures the resolved path is always within UPLOAD_DIR.
+ */
+function safePath(filename: string): string {
+    // Remove null bytes and normalize
+    const sanitized = filename.replace(/\0/g, '');
+    const resolved = path.resolve(UPLOAD_DIR, sanitized);
+    
+    // SECURITY: Ensure the resolved path is within UPLOAD_DIR
+    if (!resolved.startsWith(UPLOAD_DIR + path.sep) && resolved !== UPLOAD_DIR) {
+        throw new Error("Path traversal detected: access denied");
+    }
+    
+    return resolved;
+}
+
 export const localStorage = {
     async uploadFile(filename: string, fileStream: any) {
-        const filePath = path.join(UPLOAD_DIR, filename);
+        const filePath = safePath(filename);
 
         // Ensure parent directory exists
         const dir = path.dirname(filePath);
@@ -27,7 +44,7 @@ export const localStorage = {
     },
 
     async downloadFile(filename: string) {
-        const filePath = path.join(UPLOAD_DIR, filename);
+        const filePath = safePath(filename);
         if (!fs.existsSync(filePath)) {
             throw new Error("File not found on local disk");
         }
@@ -35,7 +52,7 @@ export const localStorage = {
     },
 
     async deleteFile(filename: string) {
-        const filePath = path.join(UPLOAD_DIR, filename);
+        const filePath = safePath(filename);
         if (fs.existsSync(filePath)) {
             await fs.promises.unlink(filePath);
         }

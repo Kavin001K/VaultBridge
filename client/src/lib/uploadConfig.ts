@@ -59,7 +59,7 @@ export function getUploadConfig(files: File[]): UploadConfig {
         return {
             size: totalSize,
             isValid: false,
-            errorMessage: `File "${oversizedFile?.name}" exceeds 500MB limit (${formatBytes(largestFile)})`,
+            errorMessage: `File "${oversizedFile?.name}" exceeds 1GB limit (${formatBytes(largestFile)})`,
             formattedSize: formatBytes(totalSize),
             estimatedUploadTime: 0
         };
@@ -70,7 +70,7 @@ export function getUploadConfig(files: File[]): UploadConfig {
         return {
             size: totalSize,
             isValid: false,
-            errorMessage: `Total upload size ${formatBytes(totalSize)} exceeds 500MB limit`,
+            errorMessage: `Total upload size ${formatBytes(totalSize)} exceeds 2GB limit`,
             formattedSize: formatBytes(totalSize),
             estimatedUploadTime: 0
         };
@@ -94,7 +94,7 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
     if (file.size > MAX_FILE_SIZE) {
         return {
             valid: false,
-            error: `File "${file.name}" exceeds 500MB limit (${formatBytes(file.size)})`
+            error: `File "${file.name}" exceeds 1GB limit (${formatBytes(file.size)})`
         };
     }
     return { valid: true };

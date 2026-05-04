@@ -89,8 +89,8 @@ if (isProduction) {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'", "https://plausible.io", "https://static.cloudflareinsights.com"], 
-          scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"], 
+          scriptSrc: ["'self'", "'unsafe-hashes'", "https://plausible.io", "https://static.cloudflareinsights.com"], 
+          scriptSrcAttr: ["'unsafe-hashes'"], 
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
           imgSrc: ["'self'", "data:", "blob:"],
@@ -116,15 +116,15 @@ if (isProduction) {
 
 const limiterConfig = {
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 20, // Limit each IP to 20 requests per windowMs
+  max: 60, // Limit each IP to 60 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many requests. Please try again later." }
 };
 
 export const globalLimiter = rateLimit(limiterConfig);
-export const codeLimiter = rateLimit({ ...limiterConfig, max: 15 }); // Slightly tighter for brute-force protection
-export const uploadLimiter = rateLimit({ ...limiterConfig, max: 10, windowMs: 1 * 60 * 1000 }); // Strictest for upload initialization
+export const codeLimiter = rateLimit({ ...limiterConfig, max: 15 }); // Tight for brute-force protection on access codes
+export const uploadLimiter = rateLimit({ ...limiterConfig, max: 300, windowMs: 1 * 60 * 1000 }); // High ceiling for chunked uploads (each chunk needs 2 API calls)
 
 // =============================================================================
 // BODY PARSING

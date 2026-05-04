@@ -26,7 +26,7 @@ const springConfig = { type: "spring", stiffness: 400, damping: 25 };
 const hoverSpring = { type: "spring", stiffness: 300, damping: 20 };
 const RECENT_VAULT_STORAGE_KEY = "vaultbridge_recent";
 const LEGACY_RECENT_VAULT_STORAGE_KEY = "vaultbridge-recent-vault-link";
-const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{3}$/;
+const ACCESS_CODE_PATTERN = /^[A-Za-z0-9]{3}[-\s]?[A-Za-z0-9]{5}$/;
 
 const normalizeVaultPath = (pathname: string) =>
   pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -88,7 +88,7 @@ export default function Home() {
   const extractAccessCode = (value: string | null): string | null => {
     if (!value) return null;
     const direct = value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-    if (direct.length === 6) return direct;
+    if (direct.length === 8) return direct;
 
     try {
       const parsed = value.startsWith("http")
@@ -97,13 +97,13 @@ export default function Home() {
       const queryCode = parsed.searchParams.get("code");
       if (queryCode) {
         const cleaned = queryCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        if (cleaned.length === 6) return cleaned;
+        if (cleaned.length === 8) return cleaned;
       }
       const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
       const hashCode = new URLSearchParams(hash).get("code");
       if (hashCode) {
         const cleaned = hashCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        if (cleaned.length === 6) return cleaned;
+        if (cleaned.length === 8) return cleaned;
       }
     } catch {
       return null;
@@ -158,7 +158,7 @@ export default function Home() {
   const openVault = (rawInput: string) => {
     const destination = normalizeVaultDestination(rawInput);
     if (!destination) {
-      setVaultInputError("Paste a valid vault link or a 6-character access code.");
+      setVaultInputError("Paste a valid vault link or an 8-character access code (XXX-XXXXX).");
       return;
     }
 
@@ -359,7 +359,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-xl mb-5 sm:mb-8">
-              Encrypt files in your browser and share with a 6-digit code. Gone after first read.
+              Encrypt files in your browser and share with a secure code. Gone after first read.
             </p>
 
             {/* Vault Dial Hero Element */}
@@ -465,7 +465,7 @@ export default function Home() {
                           if (vaultInputError) setVaultInputError(null);
                         }}
                         onKeyDown={(e) => { if (e.key === "Enter") openVault(vaultInput); }}
-                        placeholder="Enter Access Code or Paste Link"
+                        placeholder="Enter Code (XXX-XXXXX) or Paste Link"
                         className="w-full h-12 sm:h-14 pl-12 rounded-2xl border-white/5 bg-zinc-900/50 text-base font-mono text-white placeholder:text-zinc-700 focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all shadow-inner"
                       />
                     </div>
@@ -643,7 +643,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
             {[
-              { num: "01", title: "Upload your file", desc: "Drag and drop any file up to 500MB directly into your browser." },
+              { num: "01", title: "Upload your file", desc: "Drag and drop any file up to 1GB directly into your browser." },
               { num: "02", title: "We encrypt it", desc: "Files are encrypted locally using AES-256 before upload. We never see the key." },
               { num: "03", title: "Share instantly", desc: "Copy the secure link and send it. Set it to self-destruct after downloading." }
             ].map((step, i) => (

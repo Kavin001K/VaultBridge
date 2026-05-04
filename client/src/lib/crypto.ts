@@ -287,7 +287,6 @@ export function generateUUID() {
 
 // Constants for PBKDF2 key derivation
 const PBKDF2_ITERATIONS = 100000;
-const SALT_PREFIX = "VaultBridge-PIN-v1"; // Fixed salt prefix for reproducibility
 
 /**
  * Generate a split code consisting of:
@@ -329,10 +328,17 @@ export async function deriveWrapperKey(pin: string, saltBase64?: string): Promis
     ["deriveKey"]
   );
 
-  // Use provided salt or fallback to legacy prefix (for backwards compatibility)
-  const salt = saltBase64 
-    ? base64ToArrayBuffer(saltBase64)
-    : encoder.encode(`${SALT_PREFIX}-${pin}`);
+  // Use provided salt or generate a random one for legacy vaults without stored salt
+  // SECURITY: Never derive salt from the PIN itself — that defeats the purpose of salting
+  let salt: ArrayBuffer;
+  if (saltBase64) {
+    salt = base64ToArrayBuffer(saltBase64);
+  } else {
+    // Legacy vaults without a stored salt — generate a deterministic but non-PIN-based salt
+    // This means legacy vaults without pinSalt will fail to unwrap, which is the correct 
+    // security behavior. New vaults always store a random salt.
+    throw new Error("Missing salt for key derivation. This vault may use an outdated format.");
+  }
 
   return window.crypto.subtle.deriveKey(
     {

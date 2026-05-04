@@ -19,9 +19,11 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Configure Multer for transient "hot potato" storage using /tmp (Cloud Run memory-backed temp space)
+  // NOTE: This 25MB limit ONLY applies to email attachments (/api/email/direct-multi).
+  // Vault file uploads bypass Express entirely via presigned S3/R2 URLs.
   const upload = multer({
     storage: multer.diskStorage({ destination: '/tmp' }),
-    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per-file limit
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per-file limit (email attachments only)
   });
 
   // =============================================================================
@@ -33,6 +35,11 @@ export async function registerRoutes(
     const uploadHandler = async (req: any, res: any) => {
       const storagePath = req.query.path as string;
       if (!storagePath) return res.status(400).send("Missing path");
+
+      // SECURITY: Validate path doesn't contain traversal sequences
+      if (storagePath.includes('..') || storagePath.startsWith('/') || storagePath.includes('\0')) {
+        return res.status(403).send("Invalid path");
+      }
 
       try {
         await localStorage.uploadFile(storagePath, req);
@@ -50,6 +57,11 @@ export async function registerRoutes(
     app.get('/api/local/download', async (req, res) => {
       const storagePath = req.query.path as string;
       if (!storagePath) return res.status(400).send("Missing path");
+
+      // SECURITY: Validate path doesn't contain traversal sequences
+      if (storagePath.includes('..') || storagePath.startsWith('/') || storagePath.includes('\0')) {
+        return res.status(403).send("Invalid path");
+      }
 
       try {
         const stream = await localStorage.downloadFile(storagePath);
@@ -260,6 +272,12 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Vault not found" });
       }
 
+      // SECURITY: Require wrappedKey as proof of ownership
+      const authKey = req.headers['x-vault-key'] as string;
+      if (!authKey || authKey !== vault.wrappedKey) {
+        return res.status(403).json({ message: "Unauthorized: invalid vault key" });
+      }
+
       await storage.softDeleteVault(id);
       res.json({ success: true, message: "Vault burned successfully" });
     } catch (err) {
@@ -274,6 +292,12 @@ export async function registerRoutes(
 
     const vault = await storage.getVault(id);
     if (!vault) return res.status(404).json({ message: "Vault not found" });
+
+    // SECURITY: Require wrappedKey as proof of ownership
+    const authKey = req.headers['x-vault-key'] as string;
+    if (!authKey || authKey !== vault.wrappedKey) {
+      return res.status(403).json({ message: "Unauthorized: invalid vault key" });
+    }
 
     const updates: any = {};
     if (expiresIn !== undefined) {
@@ -669,9 +693,21 @@ export async function registerRoutes(
     }
   });
 
-  // Admin Logs
+  // Admin Logs — SECURITY: Requires ADMIN_SECRET bearer token
   app.get("/api/admin/logs", async (req, res) => {
     try {
+      const adminSecret = process.env.ADMIN_SECRET;
+      if (!adminSecret) {
+        return res.status(503).json({ message: "Admin endpoint not configured" });
+      }
+
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : req.query.token as string;
+      
+      if (!token || token !== adminSecret) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
       const limit = parseInt(req.query.limit as string) || 50;
       const logs = await storage.getSystemLogs(limit);
       res.json(logs);

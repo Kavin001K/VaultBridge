@@ -106,16 +106,22 @@ export default function AccessPage() {
     useEffect(() => {
         const hash = window.location.hash;
         const hashParams = new URLSearchParams(hash.replace("#", ""));
-        const code = hashParams.get("code");
+        const code = hashParams.get("code") || new URLSearchParams(window.location.search).get("code");
         
         if (code) {
             const clean = code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
             if (clean.length === 8) {
-                setAccessCode(clean);
+                setAccessCode(formatAccessCode(clean));
                 setTimeout(() => submitCode(clean), 500);
             }
         }
     }, []);
+
+    const formatAccessCode = (raw: string): string => {
+        const clean = raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8);
+        if (clean.length > 3) return clean.slice(0, 3) + "-" + clean.slice(3);
+        return clean;
+    };
 
     const submitCode = async (overrideCode?: string) => {
         const cleanCode = (overrideCode || accessCode).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -182,7 +188,7 @@ export default function AccessPage() {
             }
         } catch (err) {
             setStage("input");
-            toast({ variant: "destructive", title: "ACCESS_DENIED", description: "Verification failure. Code may be invalid or expired." });
+            toast({ variant: "destructive", title: "Access Denied", description: "Verification failed. The code may be invalid or the vault has expired." });
         }
     };
 
@@ -237,7 +243,7 @@ export default function AccessPage() {
                 if (res.vaultExhausted) setIsBurned(true);
             }
         } catch (e) {
-            toast({ variant: "destructive", title: "DOWNLOAD_ERROR", description: "Packet loss or encryption failure." });
+            toast({ variant: "destructive", title: "Download Failed", description: "Could not complete the download. Please check your connection and try again." });
         }
     };
 
@@ -307,7 +313,7 @@ export default function AccessPage() {
                                     <Input
                                         placeholder="XXX-XXXXX"
                                         value={accessCode}
-                                        onChange={e => setAccessCode(e.target.value.toUpperCase())}
+                                        onChange={e => setAccessCode(formatAccessCode(e.target.value))}
                                         onKeyDown={e => e.key === 'Enter' && submitCode()}
                                         className="h-20 bg-zinc-950 border-white/10 rounded-2xl text-center text-3xl font-mono font-black tracking-[0.3em] text-white focus:border-primary/50 transition-all shadow-2xl"
                                     />
@@ -315,7 +321,7 @@ export default function AccessPage() {
 
                                 <Button 
                                     onClick={() => submitCode()} 
-                                    disabled={accessCode.length < 8}
+                                    disabled={accessCode.replace(/[^a-zA-Z0-9]/g, '').length < 8}
                                     className="w-full h-20 rounded-[1.5rem] bg-gradient-to-br from-emerald-400 to-emerald-600 text-zinc-950 font-black uppercase tracking-[0.2em] text-xl shadow-[0_20px_60px_rgba(16,185,129,0.4)] hover:brightness-110 hover:-translate-y-1 active:scale-[0.98] transition-all flex items-center justify-center"
                                 >
                                     Establish Handshake

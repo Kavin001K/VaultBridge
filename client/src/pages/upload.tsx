@@ -97,6 +97,10 @@ export default function UploadPage() {
     const [masterKeyString, setMasterKeyString] = useState<string | undefined>();
     const backgroundQueueRef = useRef<ParallelUploadQueue | null>(null);
     const isPreparingRef = useRef(false);
+    const stageRef = useRef<UploadStage>("idle");
+
+    // Keep stageRef in sync with stage state
+    useEffect(() => { stageRef.current = stage; }, [stage]);
 
     const CHUNK_SIZE = 5 * 1024 * 1024;
 
@@ -197,14 +201,14 @@ export default function UploadPage() {
                     concurrency: 6,
                     maxRetries: 15,
                     onProgress: (perc, stats) => {
-                        if (stage === "uploading") {
+                        if (stageRef.current === "uploading") {
                             setProgress(10 + (perc * 0.9));
                             if (stats) setUploadStats(stats);
                         }
                     },
                     onError: (err) => {
                         console.error("[Background Queue Error]", err);
-                        if (stage === "uploading") {
+                        if (stageRef.current === "uploading") {
                             setUploadError(err.message);
                             setStage("idle");
                         }
@@ -257,7 +261,7 @@ export default function UploadPage() {
                 };
 
                 queue.start(uploadFn).then(() => {
-                    if (stage === "uploading") {
+                    if (stageRef.current === "uploading") {
                         finalizeUpload(vaultResult!.id, splitCodeResult!.fullCode);
                     }
                 });
