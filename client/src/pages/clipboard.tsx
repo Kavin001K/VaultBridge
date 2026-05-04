@@ -300,6 +300,7 @@ export default function UniversalClipboard() {
                                            <DialogContent className="bg-zinc-950 border-white/5 text-white max-w-sm rounded-3xl p-8">
                                                <DialogHeader className="mb-6">
                                                    <DialogTitle className="text-center uppercase italic font-black">Secure Link</DialogTitle>
+                                                   <DialogDescription className="sr-only">Scan the QR code to access the secure link.</DialogDescription>
                                                </DialogHeader>
                                                <div className="bg-white p-6 rounded-3xl flex justify-center mb-6">
                                                   <QRCodeSVG value={`${window.location.origin}/access#code=${vaultData?.fullCode}`} size={200} />

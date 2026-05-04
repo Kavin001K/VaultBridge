@@ -1,3 +1,4 @@
+import {
     type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats, type SystemLog
 } from "@shared/schema";
 import { randomUUID } from "node:crypto";

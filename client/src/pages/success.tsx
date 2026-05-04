@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Sparkles, AlertTriangle, Copy, Check, Key,
   Share2, Mail, Trash2, Smartphone, Monitor, Shield, ExternalLink, Loader2,
-  Clock, Download, HardDrive, Timer, Zap, Activity, ChevronRight, Binary, Cpu, CheckCircle2
+  Clock, Download, HardDrive, Timer, Zap, Activity, ChevronRight, Binary, Cpu, CheckCircle2, Send
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -325,6 +325,8 @@ export default function SuccessPage() {
       {/* Spam Alert Dialog */}
       <Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert}>
         <DialogContent className="bg-zinc-950 border border-white/5 text-zinc-100 p-0 overflow-hidden rounded-3xl max-w-sm">
+          <DialogTitle className="sr-only">Dispatch Logged</DialogTitle>
+          <DialogDescription className="sr-only">Notification has been transmitted through our secure SMTP relay.</DialogDescription>
           <div className="h-2 bg-primary animate-pulse" />
           <div className="p-8 text-center space-y-6">
              <div className="w-16 h-16 bg-primary/10 rounded-2xl border border-primary/20 flex items-center justify-center mx-auto">

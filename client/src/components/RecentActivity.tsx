@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -88,7 +88,7 @@ function LiveCountdown({ expiresAt }: { expiresAt: number }) {
 }
 
 // ─── Single Record Card ──────────────────────────────────────────────────────
-function RecordCard({ record, onRemove, onCopy, onDeleteVault }: any) {
+const RecordCard = forwardRef<HTMLDivElement, any>(({ record, onRemove, onCopy, onDeleteVault }, ref) => {
     const [copied, setCopied] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -118,6 +118,7 @@ function RecordCard({ record, onRemove, onCopy, onDeleteVault }: any) {
 
     return (
         <motion.div 
+            ref={ref}
             layout 
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
@@ -249,7 +250,7 @@ function RecordCard({ record, onRemove, onCopy, onDeleteVault }: any) {
             </AnimatePresence>
         </motion.div>
     );
-}
+});
 
 export function RecentActivity() {
     const { records, removeRecord, updateRecord, clearAll } = useVaultHistory();

@@ -187,6 +187,10 @@ async function prerenderStatic() {
   const prerenderer = new Prerenderer({
     staticDir,
     routes,
+    server: {
+      port: 52199,
+      host: '127.0.0.1'
+    },
     renderer: new PuppeteerRenderer({
       headless: true,
       renderAfterTime: 500, // wait a moment for app hydration/SEO hook to run

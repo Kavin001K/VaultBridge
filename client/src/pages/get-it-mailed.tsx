@@ -497,7 +497,10 @@ export default function GetItMailedPage() {
                 <DialogContent className="sm:max-w-md bg-zinc-950 border border-white/5 text-zinc-100 p-0 overflow-hidden rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
                     <div className="h-24 bg-zinc-900 flex items-center justify-center relative"><div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1),transparent)]" /><Send className="w-8 h-8 text-primary relative z-10" /></div>
                     <div className="px-8 pb-8 pt-4">
-                        <DialogHeader className="mb-6"><DialogTitle className="text-lg font-black text-center uppercase tracking-widest italic">Final Authorization</DialogTitle></DialogHeader>
+                        <DialogHeader className="mb-6">
+                            <DialogTitle className="text-lg font-black text-center uppercase tracking-widest italic">Final Authorization</DialogTitle>
+                            <DialogDescription className="sr-only">Confirm final authorization to distribute the encrypted fragments.</DialogDescription>
+                        </DialogHeader>
                         <div className="space-y-4 bg-black/40 rounded-2xl p-5 border border-white/5 text-[10px] font-bold uppercase italic">
                             <div className="flex justify-between"><span>Package:</span><span className="text-primary">{emailFiles.length} fragments</span></div>
                             <div className="flex justify-between"><span>Payload:</span><span className="text-primary">{formatSize(totalEmailSize)}</span></div>
@@ -514,7 +517,10 @@ export default function GetItMailedPage() {
                 <DialogContent className="sm:max-w-md bg-zinc-950 border border-white/5 text-zinc-100 p-0 overflow-hidden rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
                     <div className="h-24 bg-zinc-900 flex items-center justify-center relative"><CheckCircle2 className="w-10 h-10 text-primary relative z-10" /></div>
                     <div className="px-8 pb-8 pt-4 text-center">
-                        <DialogHeader className="mb-6"><DialogTitle className="text-lg font-black text-center uppercase tracking-widest italic">Relay Successful</DialogTitle></DialogHeader>
+                        <DialogHeader className="mb-6">
+                            <DialogTitle className="text-lg font-black text-center uppercase tracking-widest italic">Relay Successful</DialogTitle>
+                            <DialogDescription className="sr-only">The encrypted payload has been successfully dispatched to the target handlers.</DialogDescription>
+                        </DialogHeader>
                         <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 mb-8"><p className="text-[9px] font-black text-primary uppercase tracking-wider">Reminder: Targets should check their spam folder if the relay doesn't arrive within 60 seconds.</p></div>
                         <Button onClick={() => setShowSpamAlert(false)} className="w-full h-12 rounded-xl bg-primary text-primary-foreground text-[10px] font-black uppercase">Return to Portal</Button>
                     </div>

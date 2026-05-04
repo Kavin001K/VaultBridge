@@ -124,7 +124,7 @@ const limiterConfig = {
 
 export const globalLimiter = rateLimit(limiterConfig);
 export const codeLimiter = rateLimit({ ...limiterConfig, max: 15 }); // Tight for brute-force protection on access codes
-export const uploadLimiter = rateLimit({ ...limiterConfig, max: 300, windowMs: 1 * 60 * 1000 }); // High ceiling for chunked uploads (each chunk needs 2 API calls)
+export const uploadLimiter = rateLimit({ ...limiterConfig, max: 2000, windowMs: 1 * 60 * 1000 }); // Extremely high ceiling for chunked uploads (each chunk needs 2 API calls)
 
 // =============================================================================
 // BODY PARSING
