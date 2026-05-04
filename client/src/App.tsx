@@ -13,6 +13,8 @@ import { useHaptics } from "@/hooks/useHaptics";
 
 import ClipboardPage from "@/pages/clipboard";
 
+const isProduction = import.meta.env.PROD;
+
 // Lazy Load Pages
 const Home = lazy(() => import("@/pages/home"));
 
@@ -31,6 +33,7 @@ const Roadmap = lazy(() => import("@/pages/roadmap"));
 const SEOLandingPage = lazy(() => import("@/pages/seo-landing"));
 const BlogsPage = lazy(() => import("@/pages/blogs"));
 const BlogPostPage = lazy(() => import("@/pages/blog-post"));
+const DashboardPage = lazy(() => import("@/pages/dashboard"));
 
 function LoadingFallback() {
   return (
@@ -70,6 +73,7 @@ function Router() {
       <Route path="/roadmap" component={Roadmap} />
       <Route path="/blog" component={BlogsPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
+      <Route path="/admin/stats" component={DashboardPage} />
 
       {/* Programmatically Generated SEO Routes */}
       {Object.keys(generateSEOPages()).map((slug) => (
@@ -179,11 +183,11 @@ function App() {
     }
   }, [minTimeElapsed, appMounted]);
 
-  // Background Route Prefetching (Smart Preloading)
+  // Background Route Prefetching (Smart Preloading) - DISABLED IN DEV
   useEffect(() => {
-    if (!showSplash) {
+    if (!showSplash && isProduction) {
       // Use requestIdleCallback so prefetching absolutely doesn't interfere with main thread interactivity
-      const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000));
+      const idleCallback = (window as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 1000));
       idleCallback(() => {
         setTimeout(() => {
           const prefetch = async () => {

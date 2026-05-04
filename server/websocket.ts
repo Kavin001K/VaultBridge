@@ -7,10 +7,11 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 
 interface SignalingMessage {
-    type: "join" | "offer" | "answer" | "ice-candidate" | "error" | "joined" | "ready" | "leave";
+    type: "join" | "offer" | "answer" | "ice-candidate" | "error" | "joined" | "ready" | "leave" | "peer-left";
     roomId: string;
     senderId?: string;
     payload?: any;
+    reason?: string;
 }
 
 export function setupWebsocketSignaling(server: Server) {
@@ -162,8 +163,9 @@ export function setupWebsocketSignaling(server: Server) {
             // Notify remaining peer that other left
             room.forEach(client => {
                 safeSend(client, {
-                    type: "error",
-                    payload: "Peer disconnected"
+                    type: "peer-left",
+                    roomId,
+                    reason: "clean-disconnect"
                 });
             });
         }

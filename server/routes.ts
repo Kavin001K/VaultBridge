@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { sendVaultEmail, getRemainingEmailQuota, sendDirectAttachment } from "./services/email";
+import { taskQueue } from "./lib/queue";
+import { sendVaultEmail, sendDirectAttachment } from "./services/email";
 import { codeLimiter, uploadLimiter } from "./index";
 import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
@@ -171,10 +172,11 @@ export async function registerRoutes(
 
     const newCount = await storage.incrementDownloadCount(vault.id);
 
-    // BURNING LOGIC: If limit reached, delete immediately
+    // BURNING LOGIC: If limit reached, delete immediately via queue
     if (newCount >= vault.maxDownloads) {
-      console.log(`[Vault ${vault.id}] Burn-on-read triggered. Deleting...`);
-      await storage.deleteVault(vault.id);
+      console.log(`[Vault ${vault.id}] Burn-on-read triggered. Queueing for deletion...`);
+      await storage.softDeleteVault(vault.id);
+      await taskQueue.add("burn_vault", { vaultId: vault.id });
       res.json({ success: true, remainingDownloads: 0 });
     } else {
       res.json({ success: true, remainingDownloads: vault.maxDownloads - newCount });
@@ -198,7 +200,7 @@ export async function registerRoutes(
 
       // Check if vault has expired
       if (new Date() > vault.expiresAt) {
-        await storage.deleteVault(vault.id);
+        await storage.softDeleteVault(vault.id);
         return res.status(410).json({ message: "Vault has expired" });
       }
 
@@ -225,10 +227,11 @@ export async function registerRoutes(
       // Check if ALL files in the vault are now exhausted
       const allVaultFilesExhausted = await storage.areAllFilesExhausted(vault.id);
 
-      // BURNING LOGIC: If all files exhausted, delete the vault
+      // BURNING LOGIC: If all files exhausted, delete the vault via queue
       if (allVaultFilesExhausted) {
-        console.log(`[Vault ${vault.id}] All files exhausted. Initiating burn...`);
-        await storage.deleteVault(vault.id);
+        console.log(`[Vault ${vault.id}] All files exhausted. Queueing for burn...`);
+        await storage.softDeleteVault(vault.id);
+        await taskQueue.add("burn_vault", { vaultId: vault.id });
       }
 
       res.json({
@@ -257,12 +260,31 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Vault not found" });
       }
 
-      await storage.deleteVault(id);
+      await storage.softDeleteVault(id);
       res.json({ success: true, message: "Vault burned successfully" });
     } catch (err) {
       console.error("Delete failed:", err);
       res.status(500).json({ message: "Failed to delete vault" });
     }
+  });
+
+  app.patch(api.vaults.update.path, async (req, res) => {
+    const { id } = req.params;
+    const { expiresIn, maxDownloads } = req.body;
+
+    const vault = await storage.getVault(id);
+    if (!vault) return res.status(404).json({ message: "Vault not found" });
+
+    const updates: any = {};
+    if (expiresIn !== undefined) {
+      updates.expiresAt = new Date(Date.now() + expiresIn * 60 * 60 * 1000);
+    }
+    if (maxDownloads !== undefined) {
+      updates.maxDownloads = maxDownloads;
+    }
+
+    await storage.updateVault(id, updates);
+    res.json({ success: true });
   });
 
   // =============================================================================
@@ -278,9 +300,12 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Invalid code or vault expired" });
     }
 
-    // Check if expired
+    // Check if expired or burned
     if (new Date() > vault.expiresAt) {
       return res.status(410).json({ message: "Vault expired" });
+    }
+    if (vault.isDeleted) {
+      return res.status(410).json({ message: "Vault has been burned" });
     }
 
     // Crucial: We return the wrappedKey, but NOT the PIN
@@ -298,6 +323,7 @@ export async function registerRoutes(
     res.json({
       id: vault.id,
       wrappedKey: vault.wrappedKey,
+      pinSalt: vault.pinSalt, // Include salt for PBKDF2
       encryptedMetadata: vault.encryptedMetadata,
       encryptedClipboardText: vault.encryptedClipboardText, // Include clipboard text if present
       expiresAt: vault.expiresAt.toISOString(),
@@ -332,9 +358,12 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Vault not found" });
       }
 
-      // Check if expired
+      // Check if expired or burned
       if (new Date() > vault.expiresAt) {
         return res.status(410).json({ message: "Vault expired" });
+      }
+      if (vault.isDeleted) {
+        return res.status(410).json({ message: "Vault has been burned" });
       }
 
       // Security check: Ensure the client providing the update actually has the correct wrappedKey
@@ -561,8 +590,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Vault not found" });
       }
 
-      // Check quota
-      const remaining = getRemainingEmailQuota(id);
+      // Check quota (persistent via vault.emailSentCount)
+      const MAX_EMAILS_PER_VAULT = 3;
+      const remaining = Math.max(0, MAX_EMAILS_PER_VAULT - (vault.emailSentCount || 0));
       if (remaining <= 0) {
         return res.status(429).json({ message: "Email limit reached for this vault" });
       }
@@ -614,6 +644,27 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/storage/reconcile", async (_req, res) => {
+    try {
+      await storage.reconcileStorageUsage();
+      const status = storage.getStorageStatus();
+      res.json({ success: true, status });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to reconcile storage usage" });
+    }
+  });
+
+  // Global Platform Stats
+  app.get("/api/stats", async (_req, res) => {
+    try {
+      const stats = await storage.getGlobalStats();
+      res.json(stats);
+    } catch (err) {
+      console.error("[Stats API Error]", err);
+      res.status(500).json({ message: "Failed to get global stats" });
+    }
+  });
+
   app.post(api.chunks.getUploadUrl.path, uploadLimiter, async (req, res) => {
     const id = req.params.id as string;
     const fileId = req.params.fileId as string;
@@ -623,6 +674,14 @@ export async function registerRoutes(
     const vault = await storage.getVault(id);
     if (!vault) {
       return res.status(404).json({ message: "Vault not found" });
+    }
+
+    // Check if expired or burned
+    if (new Date() > vault.expiresAt) {
+      return res.status(410).json({ message: "Vault expired" });
+    }
+    if (vault.isDeleted) {
+      return res.status(410).json({ message: "Vault has been burned" });
     }
 
     // Ensure the chunk record exists (idempotent)
@@ -652,6 +711,15 @@ export async function registerRoutes(
     const chunkIndex = req.params.chunkIndex as string;
     const { storagePath } = req.body;
 
+    const vault = await storage.getVault(id);
+    if (!vault) {
+      return res.status(404).json({ message: "Vault not found" });
+    }
+
+    if (new Date() > vault.expiresAt || vault.isDeleted) {
+      return res.status(410).json({ message: "Vault no longer active" });
+    }
+
     await storage.updateChunkStatus(fileId, parseInt(chunkIndex), storagePath);
     res.json({ success: true });
   });
@@ -668,6 +736,15 @@ export async function registerRoutes(
     const chunkIndex = req.params.chunkIndex as string;
 
     try {
+      const vault = await storage.getVault(id);
+      if (!vault) {
+        return res.status(404).json({ message: "Vault not found" });
+      }
+
+      if (new Date() > vault.expiresAt || vault.isDeleted) {
+        return res.status(410).json({ message: "Vault no longer active" });
+      }
+
       const chunk = await storage.getChunk(fileId, parseInt(chunkIndex));
 
       if (!chunk) {

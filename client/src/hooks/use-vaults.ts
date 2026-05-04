@@ -215,6 +215,23 @@ export function useTrackFileDownload() {
   });
 }
 
+// Update Vault Settings
+export function useUpdateVault() {
+  return useMutation({
+    mutationFn: async ({ id, expiresIn, maxDownloads }: { id: string, expiresIn?: number, maxDownloads?: number }) => {
+      const url = buildUrl(api.vaults.update.path, { id });
+      const res = await fetch(url, {
+        method: api.vaults.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn, maxDownloads })
+      });
+
+      if (!res.ok) throw new Error("Failed to update vault settings");
+      return api.vaults.update.responses[200].parse(await res.json());
+    }
+  });
+}
+
 // Split-code lookup: Get vault by 3-digit lookupId (zero-knowledge access)
 export function useCodeLookup() {
   return useMutation({
@@ -281,5 +298,47 @@ export function useClipboardSync(lookupId: string, enabled: boolean) {
     enabled: enabled && !!lookupId,
     refetchInterval: 3000, // Poll every 3s
     retry: false
+  });
+}
+
+// Get Global Stats
+export function useGlobalStats() {
+  return useQuery({
+    queryKey: ["/api/stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats");
+      if (res.status === 429) {
+        throw new Error("RATE_LIMIT");
+      }
+      if (!res.ok) throw new Error("Failed to fetch global stats");
+      return await res.json();
+    },
+    refetchInterval: 10000, // Refresh every 10s for real-time feel
+    retry: (failureCount, error: any) => {
+      if (error.message === "RATE_LIMIT") return failureCount < 5;
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+}
+
+// Get Storage Status
+export function useStorageStatus() {
+  return useQuery({
+    queryKey: ["/api/storage/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/storage/status");
+      if (res.status === 429) {
+        throw new Error("RATE_LIMIT");
+      }
+      if (!res.ok) throw new Error("Failed to fetch storage status");
+      return await res.json();
+    },
+    refetchInterval: 30000,
+    retry: (failureCount, error: any) => {
+      if (error.message === "RATE_LIMIT") return failureCount < 5;
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }

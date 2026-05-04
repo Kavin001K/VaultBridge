@@ -1,235 +1,147 @@
-import { Link } from "wouter";
-import { ArrowLeft, Shield, Lock, ChevronUp, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { Link } from "wouter";
+import { Shield, Lock, Eye, ArrowLeft, Activity, ShieldCheck, ChevronUp, Cpu, Network, Database } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 
 export default function PrivacyPage() {
     const [showBackToTop, setShowBackToTop] = useState(false);
 
     useEffect(() => {
-        const handleScroll = () => {
-            setShowBackToTop(window.scrollY > 500);
-        };
+        const handleScroll = () => setShowBackToTop(window.scrollY > 500);
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const scrollToTop = () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const renderContent = (text: string) => {
-        const parts = text.split(/(\*\*.*?\*\*)/g);
-        return parts.map((part, index) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={index} className="text-emerald-400 font-bold">{part.slice(2, -2)}</strong>;
-            }
-            return part;
-        });
-    };
+    const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
     const sections = [
         {
             id: "core-axiom",
-            title: "1. The Core Axiom",
-            content: `
-### We cannot disclose what we do not know.
-
-VaultBridge is architected to be "blind." We strictly limit our technical capability to collect data. If a government agency, hacker, or alien civilization demanded your data, we could only offer them encrypted static—mathematical noise that is useless without the keys held exclusively in your volatile memory.
-            `
+            title: "The Core Axiom",
+            content: "We cannot disclose what we do not know. VaultBridge is architected to be 'blind.' We strictly limit our technical capability to collect data. If any entity demanded your data, we could only offer encrypted static—mathematical noise that is useless without the keys held exclusively in your volatile memory."
         },
         {
-            id: "live-clipboard",
-            title: "2. Live Clipboard Specifics",
-            content: `
-When utilizing the Universal Live Clipboard feature:
-
-1.  **Transient State**: Data is treated as a WebSocket "stream." It flows through our volatile memory (RAM) only to route it to your other devices.
-2.  **Encryption Layer**: Content is wrapped in AES-256-GCM client-side. The server sees only the encrypted blob and the routing metadata.
-3.  **Persistence**: Unlike Vault files, Clipboard data is NEVER written to disk. It vanishes instantly upon session termination or server restart.
-4.  **Termination**: The "Burn" or "Terminate" command executes a cryptographic erase of your session keys locally and force-closes the server connection.
-            `
+            id: "encryption-protocol",
+            title: "Encryption Protocol",
+            content: "Security is implemented via AES-256-GCM client-side. Decryption keys never touch our servers. Even when using QR codes or direct links, the PIN is passed via URL hash fragments (#code), ensuring it remains invisible to network logs and infrastructure."
         },
         {
-            id: "data-collection",
-            title: "3. Data Collection Manifesto",
-            content: `
-### What We Collect (The Minimum Viable)
-* **Encrypted Blobs**: The AES-256 encrypted binary data.
-* **Routing IDs (Partial Keys)**: We see the first 3 digits of your Access Code to route traffic. We DO NOT see the full 6-digit PIN used for decryption.
-* **Ephemeral Metadata**: File size, upload timestamp, and expiration timer (TTL).
-* **Access Logs**: IP addresses are logged for 24 hours strictly for DDoS mitigation and abuse prevention, then sanitized.
-
-### Storage Architecture
-* **Multi-Cloud Redundancy**: Encrypted blobs are distributed across Cloudflare R2 (Primary) and Supabase Storage (Secondary). We hold no keys for either.
-* **Memory-Only Mode**: During database outages, the system fails over to volatile RAM. Metadata stored in this state is lost instantly upon server restart.
-
-### What We DO NOT Collect
-* **Your Decryption Keys**: The full 6-digit PIN never leaves your device. Even when sharing via QR Codes or direct links, the PIN is passed exclusively via URL hash fragments (#code), ensuring it is completely invisible to our servers and network logs.
-* **Your Content**: Streaming decryption ensures even large files are never realized on our server's disk in plaintext.
-* **Lost Codes / PINs**: We offer **absolutely no code recovery options**. If you lose your 6-digit access PIN, your encrypted data is permanently inaccessible. We cannot recover it for you because we never had it to begin with.
-* **Your Identity**: No accounts. No emails.
-* **Analytics**: No Google Analytics. No Facebook Pixels. No tracking cookies.
-            `
+            id: "ephemeral-state",
+            title: "Ephemeral State",
+            content: "Data in the relay is transient. Upon retrieval or TTL expiration, all fragments are cryptographically purged from memory and storage. No residual traces, no recovery options. Your privacy is enforced by the laws of mathematics."
         },
         {
-            id: "infrastructure",
-            title: "4. Infrastructure",
-            content: `
-Our servers act as a blind courier. They take a locked briefcase (your encrypted data) from Point A and hand it to Point B. They do not have the key to the briefcase, nor do they care what is inside.
-
-* **Hardware-Accelerated Edge Loading**: We use dynamic ultra-fast edge loading with native splash screens to minimize time-to-interact to near zero milliseconds. No data rests in these edge caches.
-* **Adaptive Streaming**: Large files are piped directly to your browser without caching fully on our side.
-* **Volatile Fallback**: We maintain a "break-glass" in-memory database that activates automatically if our primary storage goes dark, ensuring uptime without persistence.
-            `
-        },
-        {
-            id: "legal-compliance",
-            title: "5. Legal Compliance & Disclosure",
-            content: `
-Because we possess zero knowledge of content:
-1.  We cannot comply with DMCA takedowns regarding specific content (we can't see it).
-2.  We cannot provide decrypted data to law enforcement.
-
-*Your privacy is not a policy. It is physics.*
-            `
+            id: "data-minimization",
+            title: "Data Minimization",
+            content: "We collect only the bare essentials: encrypted blobs, partial routing IDs (first 3 digits only), and ephemeral metadata (file size, timestamp). IP addresses are purged every 24 hours. No accounts, no emails, no tracking pixels."
         }
     ];
 
     return (
-        <div className="min-h-screen bg-black text-zinc-300 font-sans selection:bg-emerald-500/30">
+        <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
+            {/* Background Effects */}
+            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
+            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
+            <div className="scanline pointer-events-none opacity-10" />
+
             {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 backdrop-blur-xl">
-                <div className="container flex h-16 items-center justify-between px-4 max-w-5xl mx-auto">
+            <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-5 flex items-center justify-between">
                     <Link href="/">
-                        <div className="flex items-center gap-2 cursor-pointer group">
-                            <Shield className="w-5 h-5 text-emerald-500 transition-colors group-hover:text-emerald-400" />
-                            <span className="text-lg font-bold tracking-tight text-white group-hover:text-emerald-50 transition-colors">
-                                VAULT<span className="text-emerald-500">BRIDGE</span>
-                            </span>
-                        </div>
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 cursor-pointer group">
+                            <div className="w-9 h-9 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-all duration-500 shadow-2xl overflow-hidden">
+                                <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1.5 group-hover:scale-110 transition-transform duration-500" />
+                            </div>
+                            <h1 className="text-lg font-black font-mono tracking-widest text-white leading-none uppercase">VAULT<span className="text-primary">BRIDGE</span></h1>
+                        </motion.div>
                     </Link>
+
                     <Link href="/">
-                        <Button variant="ghost" size="sm" className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5">
+                        <Button variant="ghost" size="sm" className="rounded-full text-zinc-400 hover:text-white hover:bg-white/5 px-4 text-xs font-bold gap-2">
                             <ArrowLeft className="w-4 h-4" />
-                            <span className="hidden sm:inline">Return Home</span>
+                            Return
                         </Button>
                     </Link>
                 </div>
             </header>
 
-            <main className="container max-w-4xl mx-auto px-4 py-12 md:py-16">
-
-                {/* Title Section */}
-                <div className="mb-12 md:mb-16 space-y-4">
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono uppercase tracking-wider"
-                    >
-                        <Lock className="w-3 h-3" />
-                        Effective Immediately
-                    </motion.div>
-
-                    <motion.h1
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="text-4xl md:text-5xl font-black text-white tracking-tight"
-                    >
-                        Privacy Protocol
-                    </motion.h1>
-
-                    <motion.p
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="text-lg md:text-xl text-zinc-400 max-w-2xl leading-relaxed"
-                    >
-                        Security Level: <span className="text-emerald-400 font-bold">Zero-Knowledge</span>
-                    </motion.p>
-                </div>
-
-                <div className="grid md:grid-cols-[240px_1fr] gap-12 items-start">
-                    {/* Table of Contents - Sticky Sidebar */}
-                    <div className="hidden md:block sticky top-24 space-y-1">
-                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 px-2">Contents</p>
-                        {sections.map((section) => (
-                            <a
-                                key={section.id}
-                                href={`#${section.id}`}
-                                className="block px-3 py-2 text-sm text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/5 rounded-lg transition-colors border-l-2 border-transparent hover:border-emerald-500"
-                            >
-                                {section.title.split('. ')[1]}
-                            </a>
-                        ))}
+            <main className="relative z-10 flex-1 w-full max-w-3xl mx-auto px-4 pt-28 pb-20">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-primary text-[10px] font-mono font-black tracking-[0.2em] uppercase mb-4">
+                        <Lock className="w-3.5 h-3.5" />
+                        PRIVACY_PROTOCOL_ACTIVE
                     </div>
+                    <h2 className="text-4xl sm:text-5xl font-black mb-4 tracking-tight text-white uppercase italic">
+                        Privacy <span className="text-primary">Manifesto</span>
+                    </h2>
+                    <p className="text-zinc-500 text-sm font-medium max-w-sm mx-auto uppercase italic">
+                        Your privacy is not a policy. It is physics.
+                    </p>
+                </motion.div>
 
-                    {/* Content */}
-                    <div className="space-y-16">
-                        {sections.map((section, index) => (
-                            <motion.section
-                                key={section.id}
-                                id={section.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true, margin: "-50px" }}
-                                transition={{ duration: 0.5 }}
-                                className="scroll-mt-24"
-                            >
-                                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                                    {section.title}
-                                </h2>
-                                <div className="prose prose-invert prose-zinc max-w-none prose-emerald prose-headings:text-zinc-100 prose-p:text-zinc-400 prose-li:text-zinc-400 prose-strong:text-emerald-400">
-                                    {section.content.split('\n').map((line, i) => {
-                                        const trimmed = line.trim();
-                                        if (trimmed.startsWith('###')) return <h3 key={i} className="text-xl font-bold text-white mt-6 mb-3">{renderContent(trimmed.replace('###', '').trim())}</h3>;
-                                        if (trimmed.startsWith('* ')) return <li key={i} className="ml-4 list-disc pl-1">{renderContent(trimmed.replace('* ', '').trim())}</li>;
-                                        if (trimmed.match(/^\d+\./)) return <li key={i} className="ml-4 list-decimal pl-1">{renderContent(trimmed.replace(/^\d+\./, '').trim())}</li>;
-                                        if (trimmed === '') return <br key={i} />;
-
-                                        // Handle italic block at the end specially
-                                        if (trimmed.startsWith('*') && trimmed.endsWith('*') && trimmed.length > 2) {
-                                            return <p key={i} className="text-emerald-400/80 italic text-center mt-8 text-lg font-mono border-t border-emerald-500/20 pt-8">{trimmed.slice(1, -1)}</p>;
-                                        }
-
-                                        return <p key={i}>{renderContent(line)}</p>;
-                                    })}
+                <div className="space-y-8">
+                    {sections.map((section, idx) => (
+                        <motion.section
+                            key={section.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: idx * 0.1 }}
+                            className="glass-card p-8 group hover:border-primary/30 transition-all duration-500"
+                        >
+                            <div className="flex gap-5">
+                                <div className="shrink-0 pt-1">
+                                    <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center group-hover:border-primary/40 group-hover:bg-primary/5 transition-all duration-500">
+                                        <span className="text-xs font-mono font-black text-primary/40 group-hover:text-primary">0{idx + 1}</span>
+                                    </div>
                                 </div>
-                            </motion.section>
-                        ))}
-                    </div>
-                </div>
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-black text-white uppercase tracking-widest italic">{section.title}</h3>
+                                    <p className="text-xs font-bold text-zinc-500 uppercase italic leading-relaxed group-hover:text-zinc-400 transition-colors">
+                                        {section.content}
+                                    </p>
+                                </div>
+                            </div>
+                        </motion.section>
+                    ))}
 
-                {/* Back to Top */}
-                <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: showBackToTop ? 1 : 0 }}
-                    onClick={scrollToTop}
-                    className="fixed bottom-8 right-8 p-3 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-500 transition-colors z-50"
-                >
-                    <ChevronUp className="w-5 h-5" />
-                </motion.button>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        className="p-8 bg-primary/5 border border-primary/10 rounded-3xl text-center"
+                    >
+                        <ShieldCheck className="w-10 h-10 text-primary mx-auto mb-4" />
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-2">Zero-Knowledge Verification</p>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase italic max-w-xs mx-auto">
+                            The security of your data is guaranteed by cryptographic truth. We are incapable of disclosure.
+                        </p>
+                    </motion.div>
+                </div>
             </main>
 
-            <footer className="border-t border-white/5 py-12 mt-24 bg-zinc-950 text-center overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/20 to-transparent pointer-events-none" />
-                <div className="container px-4 text-center max-w-4xl mx-auto relative z-10">
-                    <ShieldCheck className="w-12 h-12 text-zinc-900 mx-auto mb-6" />
-                    <p className="text-zinc-600 text-sm font-mono uppercase tracking-widest">
-                        Last Updated: 2026 • VaultBridge Security Team
+            <footer className="relative z-10 py-10 border-t border-white/5 bg-zinc-950/40 backdrop-blur-md text-center">
+                <div className="max-w-7xl mx-auto px-4">
+                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em]">
+                        VAULTBRIDGE INFRASTRUCTURE • PRIVACY_BY_DESIGN
                     </p>
-
-                    <motion.div
-                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800/50 mt-4 cursor-default group hover:border-emerald-500/20 transition-colors"
-                        whileHover={{ scale: 1.05 }}
-                    >
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-mono text-zinc-400 group-hover:text-emerald-400 transition-colors">v1.3.0 (Quantum + R2)</span>
-                    </motion.div>
                 </div>
             </footer>
+
+            {/* Back to Top */}
+            <AnimatePresence>
+                {showBackToTop && (
+                    <motion.button
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        onClick={scrollToTop}
+                        className="fixed bottom-8 right-8 w-12 h-12 bg-primary text-black rounded-2xl flex items-center justify-center shadow-2xl hover:bg-primary/90 transition-all z-50"
+                    >
+                        <ChevronUp className="w-6 h-6" />
+                    </motion.button>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

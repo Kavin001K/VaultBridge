@@ -27,17 +27,6 @@
     ]
   },
   "handle_links": "preferred",
-  "scope_extensions": [
-    {
-      "origin": "https://vaultbridge.org"
-    },
-    {
-      "origin": "https://www.vaultbridge.org"
-    },
-    {
-      "origin": "https://vaultbridge.onrender.com"
-    }
-  ],
   "url_handlers": [
     {
       "origin": "https://vaultbridge.org"

@@ -13,14 +13,14 @@
 // ============================================================================
 
 /**
- * Maximum file size allowed (500MB)
+ * Maximum file size allowed (1GB)
  */
-export const MAX_FILE_SIZE = 500 * 1024 * 1024;
+export const MAX_FILE_SIZE = 1024 * 1024 * 1024;
 
 /**
- * Maximum total upload size (all files combined)
+ * Maximum total upload size (all files combined) (2GB)
  */
-export const MAX_TOTAL_SIZE = 500 * 1024 * 1024;
+export const MAX_TOTAL_SIZE = 2 * 1024 * 1024 * 1024;
 
 // ============================================================================
 // TYPES

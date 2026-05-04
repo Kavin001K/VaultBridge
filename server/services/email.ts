@@ -8,6 +8,7 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { log } from "../index";
+import { storage } from "../storage";
 import { getEmailProvider, incrementEmailUsage, type EmailProvider } from "./emailQuota";
 
 // Resend Configuration
@@ -29,8 +30,7 @@ const BREVO_SENDER_EMAIL =
   "delivery@acedigital.space";
 const ENABLE_MSG91 = process.env.ENABLE_MSG91 === "true";
 
-// Rate limit tracking per vault
-const emailsSentPerVault: Map<string, number> = new Map();
+// MAX_EMAILS_PER_VAULT is now enforced in routes.ts and sendVaultEmail via DB check
 const MAX_EMAILS_PER_VAULT = 3;
 
 // Production domain resolution — NEVER allow localhost in production emails
@@ -647,7 +647,9 @@ export async function sendVaultEmail(input: SendVaultEmailInput): Promise<SendEm
     // Normalize email to lowercase for case-insensitive handling (handles ALL CAPS, Mixed Case, etc.)
     const normalizedTo = input.to.trim().toLowerCase();
 
-    const sentCount = emailsSentPerVault.get(input.vaultId) || 0;
+    // Check quota from database instead of memory
+    const vault = await storage.getVault(input.vaultId);
+    const sentCount = vault?.emailSentCount || 0;
     if (sentCount >= MAX_EMAILS_PER_VAULT) {
       return { success: false, error: `Maximum ${MAX_EMAILS_PER_VAULT} emails per vault reached.` };
     }
@@ -740,7 +742,7 @@ Expires: ${expiryFormatted}
         }
 
         await incrementEmailUsage("RESEND");
-        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+        await storage.incrementVaultEmailCount(input.vaultId);
         log(`Vault email sent to ${normalizedTo} via RESEND`, "email");
         return { success: true, messageId: data?.id };
       }
@@ -766,7 +768,7 @@ Expires: ${expiryFormatted}
         }
 
         await incrementEmailUsage("BREVO");
-        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+        await storage.incrementVaultEmailCount(input.vaultId);
         log(`Vault email sent to ${normalizedTo} via BREVO`, "email");
         return { success: true, messageId: result.messageId };
       }
@@ -789,7 +791,7 @@ Expires: ${expiryFormatted}
       }
 
       await incrementEmailUsage("MSG91");
-      emailsSentPerVault.set(input.vaultId, sentCount + 1);
+      await storage.incrementVaultEmailCount(input.vaultId);
       log(`Vault email sent to ${normalizedTo} via MSG91`, "email");
       return { success: true, messageId: result.messageId };
     }
@@ -805,7 +807,7 @@ Expires: ${expiryFormatted}
       });
 
       if (smtpResult.success) {
-        emailsSentPerVault.set(input.vaultId, sentCount + 1);
+        await storage.incrementVaultEmailCount(input.vaultId);
         log(`Vault email sent to ${normalizedTo} via SMTP fallback`, "email");
         return smtpResult;
       }
@@ -1167,7 +1169,4 @@ ${files.map(f => `• ${f.filename}`).join('\n')}
 // UTILITIES
 // ============================================
 
-export function getRemainingEmailQuota(vaultId: string): number {
-  const sent = emailsSentPerVault.get(vaultId) || 0;
-  return Math.max(0, MAX_EMAILS_PER_VAULT - sent);
-}
+// getRemainingEmailQuota removed as it's now handled by checking vault.emailSentCount in routes.ts

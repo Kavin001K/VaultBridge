@@ -5,7 +5,7 @@ import {
   Lock, Upload, KeyRound, Shield, Zap, Eye,
   ArrowRight, RefreshCw, Sparkles, Mail, Send, CheckCircle2, AlertCircle,
   Clipboard, AlertTriangle, Check, Github, Volume2, VolumeX,
-  ServerOff, Globe, Users, Code, Building, GraduationCap, X
+  ServerOff, Globe, Users, Code, Building, GraduationCap, X, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
 import { useSounds } from "@/hooks/useSounds";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { RecentActivity } from "@/components/RecentActivity";
+import { VaultDial } from "@/components/VaultDial";
 
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
@@ -51,6 +52,7 @@ export default function Home() {
   const [showClipboardPrompt, setShowClipboardPrompt] = useState(false);
   const vaultAccessPanelRef = useRef<HTMLDivElement | null>(null);
   const vaultInputRef = useRef<HTMLInputElement | null>(null);
+  const [stats, setStats] = useState<{ totalVaultsCreated: number, activeVaultsCount: number } | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -64,6 +66,14 @@ export default function Home() {
         }
       })
       .catch(err => console.error("Failed to fetch Github stars", err));
+  }, []);
+
+  // Fetch Global Stats
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => setStats(data))
+      .catch(err => console.error("Failed to fetch stats", err));
   }, []);
 
   useEffect(() => {
@@ -236,27 +246,41 @@ export default function Home() {
       <div className="scanline pointer-events-none opacity-20" />
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
 
-      {/* Header */}
-      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md safe-top">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="w-8 h-8 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-              <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1" />
+      {/* Header (Premium Navigation) */}
+      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-5 flex items-center justify-between">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            className="flex items-center gap-2 sm:gap-4 cursor-pointer shrink-0 group" 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
+            <div className="relative w-9 h-9 sm:w-11 sm:h-11 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-all duration-500 shadow-2xl overflow-hidden">
+              <div className="absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-colors" />
+              <img src="/icon-192x192.png" alt="VaultBridge" className="relative w-full h-full object-cover p-1.5 sm:p-2 group-hover:scale-110 transition-transform duration-500" />
             </div>
-            <h1 className="text-base sm:text-lg md:text-xl font-bold font-mono tracking-tight">VAULT<span className="text-primary">BRIDGE</span></h1>
+            <div className="flex flex-col -gap-1">
+              <h1 className="text-sm sm:text-lg font-black font-mono tracking-widest text-white leading-none">VAULT<span className="text-primary">BRIDGE</span></h1>
+              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Zero-Knowledge</span>
+            </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 sm:gap-3">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 sm:gap-4">
             {!isMobile && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-full border-zinc-700 bg-zinc-900/50 px-5 text-zinc-200 hover:border-primary/60 hover:bg-zinc-900"
-                onClick={focusVaultAccess}
-              >
-                Access Vault
-              </Button>
+              <div className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-white/5 mr-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider">System Operational</span>
+              </div>
             )}
+            
+            <Button
+              size="sm"
+              variant="ghost"
+              className="rounded-full text-zinc-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold"
+              onClick={focusVaultAccess}
+            >
+              Access
+            </Button>
             <Button
               size="sm"
               className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full px-4 sm:px-6 text-xs sm:text-sm"
@@ -318,120 +342,159 @@ export default function Home() {
               Encrypt files in your browser and share with a 6-digit code. Gone after first read.
             </p>
 
-            {/* ── 3 Big Action Cards ── */}
-            <div className="w-full grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
-              {/* Upload */}
+            {/* Vault Dial Hero Element */}
+            <div className="mb-8 sm:mb-12">
+              <VaultDial 
+                totalVaults={stats?.totalVaultsCreated || 0} 
+                activeVaults={stats?.activeVaultsCount || 0} 
+              />
+            </div>
+
+            {/* ── 3 Big Action Cards (Premium Glassmorphism) ── */}
+            <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+              {/* Upload Card */}
               <Link href="/upload" className="h-full">
                 <motion.div
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ y: -5, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => playSound('click')}
-                  className="group relative flex flex-col items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/80 hover:border-primary/30 transition-all p-4 py-6 sm:p-6 sm:py-8 cursor-pointer overflow-hidden h-full aspect-square sm:aspect-auto sm:min-h-[140px]"
+                  className="group relative flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-primary/40 transition-all p-6 py-8 sm:p-8 sm:py-10 cursor-pointer overflow-hidden h-full shadow-xl"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
-                    <Upload className="w-5 h-5 sm:w-7 sm:h-7 text-primary" />
+                  {/* Glass highlight */}
+                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  
+                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-[1.5rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-primary/50 transition-all duration-500 shadow-inner">
+                    <div className="absolute inset-0 bg-primary/5 blur-xl group-hover:bg-primary/20 transition-colors" />
+                    <Upload className="w-7 h-7 sm:w-9 sm:h-9 text-primary drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                   </div>
-                  <p className="relative text-sm sm:text-base font-bold text-zinc-100 group-hover:text-primary transition-colors">Upload</p>
-                  <p className="relative text-[10px] sm:text-xs text-zinc-500 mt-1 hidden sm:block text-center">Encrypt & Share</p>
+                  
+                  <div className="text-center relative">
+                    <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-primary transition-colors tracking-tight">Upload</h3>
+                    <p className="text-xs sm:text-sm text-zinc-500 mt-1.5 font-medium leading-tight">Encrypt & Share Files</p>
+                  </div>
                 </motion.div>
               </Link>
 
-              {/* Access Vault */}
+              {/* Access Card */}
               <motion.div
                 ref={vaultAccessPanelRef}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => { playSound('click'); focusVaultAccess(); }}
-                className="group relative flex flex-col items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/80 hover:border-cyan-500/30 transition-all p-4 py-6 sm:p-6 sm:py-8 cursor-pointer overflow-hidden h-full aspect-square sm:aspect-auto sm:min-h-[140px]"
+                className="group relative flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-cyan-500/40 transition-all p-6 py-8 sm:p-8 sm:py-10 cursor-pointer overflow-hidden h-full shadow-xl"
               >
-                <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all duration-300">
-                  <KeyRound className="w-5 h-5 sm:w-7 sm:h-7 text-cyan-400" />
+                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-[1.5rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-cyan-400/50 transition-all duration-500 shadow-inner">
+                  <div className="absolute inset-0 bg-cyan-500/5 blur-xl group-hover:bg-cyan-500/20 transition-colors" />
+                  <KeyRound className="w-7 h-7 sm:w-9 sm:h-9 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
                 </div>
-                <p className="relative text-sm sm:text-base font-bold text-zinc-100 group-hover:text-cyan-400 transition-colors">Access</p>
-                <p className="relative text-[10px] sm:text-xs text-zinc-500 mt-1 hidden sm:block text-center">Unlock Vault</p>
+                
+                <div className="text-center relative">
+                  <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-cyan-400 transition-colors tracking-tight">Access</h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 mt-1.5 font-medium leading-tight">Unlock Secure Vault</p>
+                </div>
               </motion.div>
 
-              {/* Clipboard */}
+              {/* Clipboard Card */}
               <motion.div
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => { playSound('click'); setLocation('/clipboard'); }}
-                className="group relative flex flex-col items-center justify-center rounded-2xl border border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/80 hover:border-emerald-500/30 transition-all p-4 py-6 sm:p-6 sm:py-8 cursor-pointer overflow-hidden h-full aspect-square sm:aspect-auto sm:min-h-[140px]"
+                className="group relative flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-emerald-500/40 transition-all p-6 py-8 sm:p-8 sm:py-10 cursor-pointer overflow-hidden h-full shadow-xl"
               >
-                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all duration-300">
-                  <Clipboard className="w-5 h-5 sm:w-7 sm:h-7 text-emerald-400" />
+                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-[1.5rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-emerald-400/50 transition-all duration-500 shadow-inner">
+                  <div className="absolute inset-0 bg-emerald-500/5 blur-xl group-hover:bg-emerald-500/20 transition-colors" />
+                  <Clipboard className="w-7 h-7 sm:w-9 sm:h-9 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
                 </div>
-                <p className="relative text-sm sm:text-base font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">Clipboard</p>
-                <p className="relative text-[10px] sm:text-xs text-zinc-500 mt-1 hidden sm:block text-center">Sync Text</p>
+                
+                <div className="text-center relative">
+                  <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-emerald-400 transition-colors tracking-tight">Clipboard</h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 mt-1.5 font-medium leading-tight">Zero-Knowledge Sync</p>
+                </div>
               </motion.div>
             </div>
 
-            {/* ── Vault Access Input Panel ── */}
-            <div className="w-full rounded-xl sm:rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-4 text-left backdrop-blur-sm">
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-2">
-                  <Input
-                    ref={vaultInputRef}
-                    type="text"
-                    value={vaultInput}
-                    onChange={(e) => {
-                      setVaultInput(e.target.value);
-                      if (vaultInputError) setVaultInputError(null);
-                    }}
-                    onKeyDown={(e) => { if (e.key === "Enter") openVault(vaultInput); }}
-                    placeholder="Paste vault link or 6-digit code…"
-                    className="flex-1 h-10 sm:h-11 border-zinc-700 bg-zinc-950/70 text-sm text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-primary/40"
-                  />
-                  <Button
-                    type="button"
-                    className="h-10 sm:h-11 rounded-xl bg-primary px-4 sm:px-5 font-semibold text-sm text-primary-foreground hover:bg-primary/90 flex-shrink-0"
-                    onClick={() => openVault(vaultInput)}
-                  >
-                    Open
-                  </Button>
-                </div>
+            {/* ── Secure Access Port (Input Panel) ── */}
+            <div className="w-full relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-cyan-500/20 to-emerald-500/20 rounded-[2rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
+              <div className="relative w-full rounded-[2rem] border border-white/10 bg-zinc-950/80 p-4 sm:p-6 text-left backdrop-blur-xl shadow-2xl">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-[0.2em]">Secure Entry Port</span>
+                  </div>
+                  
+                  <div className="flex gap-2 sm:gap-3">
+                    <div className="relative flex-1">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-primary transition-colors" />
+                      <Input
+                        ref={vaultInputRef}
+                        type="text"
+                        value={vaultInput}
+                        onChange={(e) => {
+                          setVaultInput(e.target.value);
+                          if (vaultInputError) setVaultInputError(null);
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") openVault(vaultInput); }}
+                        placeholder="Enter Access Code or Paste Link"
+                        className="w-full h-12 sm:h-14 pl-12 rounded-2xl border-white/5 bg-zinc-900/50 text-base font-mono text-white placeholder:text-zinc-700 focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all shadow-inner"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      className="h-12 sm:h-14 rounded-2xl bg-primary px-6 sm:px-10 font-bold text-base text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                      onClick={() => openVault(vaultInput)}
+                    >
+                      Authenticate
+                    </Button>
+                  </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePasteFromClipboard}
-                    className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-zinc-400 bg-zinc-800/60 hover:bg-zinc-700/60 border border-zinc-700/60 transition-colors"
-                  >
-                    <Clipboard className="h-3.5 w-3.5" />
-                    Paste
-                  </button>
-                  {recentVault && (
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
                       type="button"
-                      onClick={() => openVault(recentVault)}
-                      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-zinc-400 bg-zinc-800/60 hover:bg-zinc-700/60 border border-zinc-700/60 transition-colors"
+                      onClick={handlePasteFromClipboard}
+                      className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-bold text-zinc-400 bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
                     >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Recent Vault
+                      <Clipboard className="h-3.5 w-3.5" />
+                      Paste from Clipboard
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => { playSound('click'); setLocation('/get-it-mailed'); }}
-                    className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 transition-colors"
-                  >
-                    <Mail className="h-3.5 w-3.5" />
-                    Get It Mailed
-                  </button>
-                </div>
+                    {recentVault && (
+                      <button
+                        type="button"
+                        onClick={() => openVault(recentVault)}
+                        className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-bold text-zinc-400 bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Reconnect to Recent
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { playSound('click'); setLocation('/get-it-mailed'); }}
+                      className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-bold text-cyan-400 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/10 transition-all"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      Get via Email
+                    </button>
+                  </div>
 
-                {recentVault && (
-                  <p className="truncate text-xs text-zinc-600">Recent: {recentVault}</p>
-                )}
-                {vaultInputError && (
-                  <p className="text-xs text-rose-400 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                    {vaultInputError}
-                  </p>
-                )}
+                  {vaultInputError && (
+                    <motion.p 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xs font-bold text-rose-500 flex items-center gap-2 mt-1"
+                    >
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                      Authentication Failed: {vaultInputError}
+                    </motion.p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -801,65 +864,74 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
-      {/* SECTION 9 — Footer (SEO Critical) */}
-      <footer className="relative z-10 border-t border-zinc-800 bg-zinc-950 pt-10 sm:pt-16 pb-6 sm:pb-8 px-3 sm:px-6 lg:px-8 safe-bottom">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-6 sm:gap-12 mb-8 sm:mb-12">
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
-                <img src="/icon-192x192.png" alt="VaultBridge Logo" className="w-full h-full object-cover p-1" />
+      {/* ── Executive Footer (SEO & Trust) ── */}
+      <footer className="relative z-10 border-t border-white/5 bg-zinc-950 pt-16 sm:pt-24 pb-8 px-4 sm:px-6 lg:px-8 safe-bottom">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-8 sm:gap-16 mb-16">
+          <div className="col-span-2 md:col-span-2">
+            <div className="flex items-center gap-3 mb-8 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              <div className="w-10 h-10 bg-zinc-900 border border-white/10 rounded-2xl flex items-center justify-center group-hover:border-primary/50 transition-all duration-500 shadow-xl overflow-hidden">
+                <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-2 group-hover:scale-110 transition-transform duration-500" />
               </div>
-              <span className="font-bold text-xl tracking-tight">VAULTBRIDGE</span>
+              <div className="flex flex-col -gap-1">
+                <span className="font-black text-xl tracking-widest text-white leading-none">VAULT<span className="text-primary">BRIDGE</span></span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Secure Infrastructure</span>
+              </div>
             </div>
-            <p className="text-zinc-400 max-w-sm mb-6">
-              The premier platform for Secure File Sharing, Encrypted Transfer, and Private Uploads.
+            
+            <p className="text-zinc-500 text-sm leading-relaxed max-w-sm mb-8 font-medium">
+              VaultBridge is a high-performance, zero-knowledge platform engineered for military-grade file encryption and ultra-secure sharing. Built for privacy, scaled for performance.
             </p>
+            
             <div className="flex gap-4">
-              <a href="https://github.com/Kavin001K/VaultBridge" aria-label="VaultBridge GitHub Repository" className="text-zinc-400 hover:text-white"><Github className="w-5 h-5" /></a>
+              <a href="https://github.com/Kavin001K/VaultBridge" aria-label="Github" className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 hover:border-white/10 transition-all">
+                <Github className="w-5 h-5" />
+              </a>
+              <div className="px-4 h-10 rounded-xl bg-primary/5 border border-primary/10 flex items-center gap-2 text-primary font-mono text-[10px] font-bold uppercase tracking-widest">
+                <Activity className="w-3 h-3 animate-pulse" />
+                Core: v2.4.0 Active
+              </div>
             </div>
           </div>
 
           <div>
-            <h3 className="font-bold text-white mb-4">Product</h3>
-            <ul className="space-y-3 text-sm text-zinc-400">
+            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-6">Product</h3>
+            <ul className="space-y-4 text-sm text-zinc-500 font-medium">
               <li><Link href="/upload"><span className="hover:text-primary cursor-pointer transition-colors">Secure Upload</span></Link></li>
-              <li><Link href="/access"><span className="hover:text-primary cursor-pointer transition-colors">Access Vault</span></Link></li>
-              <li><Link href="/get-it-mailed"><span className="hover:text-primary cursor-pointer transition-colors">Secure Email Relay</span></Link></li>
-              <li><Link href="/clipboard"><span className="hover:text-primary cursor-pointer transition-colors">Encrypted Clipboard</span></Link></li>
+              <li><Link href="/access"><span className="hover:text-primary cursor-pointer transition-colors">Open Vault</span></Link></li>
+              <li><Link href="/clipboard"><span className="hover:text-primary cursor-pointer transition-colors">Cloud Clipboard</span></Link></li>
+              <li><Link href="/get-it-mailed"><span className="hover:text-primary cursor-pointer transition-colors">Secure Relay</span></Link></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-bold text-white mb-4">Resources</h3>
-            <ul className="space-y-3 text-sm text-zinc-400">
-              <li><Link href="/blog"><span className="hover:text-primary cursor-pointer transition-colors">Blog Hub</span></Link></li>
-              <li><Link href="/security"><span className="hover:text-primary cursor-pointer transition-colors">Security</span></Link></li>
+            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-6">Security</h3>
+            <ul className="space-y-4 text-sm text-zinc-500 font-medium">
+              <li><Link href="/security"><span className="hover:text-primary cursor-pointer transition-colors">Whitepaper</span></Link></li>
               <li><Link href="/privacy-manifesto"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Manifesto</span></Link></li>
-              <li><Link href="/roadmap"><span className="hover:text-primary cursor-pointer transition-colors">Roadmap</span></Link></li>
-              <li><Link href="/how-it-works"><span className="hover:text-primary cursor-pointer transition-colors">How it Works</span></Link></li>
-              <li><Link href="/privacy"><span className="hover:text-primary cursor-pointer transition-colors">Privacy Policy</span></Link></li>
-              <li><Link href="/terms"><span className="hover:text-primary cursor-pointer transition-colors">Terms of Service</span></Link></li>
-              <li><a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-primary cursor-pointer transition-colors">Sitemap</a></li>
+              <li><Link href="/admin/stats"><span className="hover:text-primary cursor-pointer transition-colors">Status Console</span></Link></li>
+              <li><Link href="/how-it-works"><span className="hover:text-primary cursor-pointer transition-colors">Protocol</span></Link></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-bold text-white mb-4">Blogs</h3>
-            <ul className="space-y-3 text-sm text-zinc-400">
-              <li><Link href="/blog/secure-file-sharing-best-practices"><span className="hover:text-primary cursor-pointer transition-colors">Secure File Sharing Best Practices</span></Link></li>
-              <li><Link href="/blog/encrypted-file-transfer-vs-cloud-storage"><span className="hover:text-primary cursor-pointer transition-colors">Encrypted Transfer vs Cloud Storage</span></Link></li>
-              <li><Link href="/blog/anonymous-file-sharing-without-login"><span className="hover:text-primary cursor-pointer transition-colors">Anonymous Sharing Without Login</span></Link></li>
-              <li><Link href="/blog/temporary-file-links-and-auto-destruct"><span className="hover:text-primary cursor-pointer transition-colors">Temporary Links & Auto-Destruct</span></Link></li>
+            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-6">Company</h3>
+            <ul className="space-y-4 text-sm text-zinc-500 font-medium">
+              <li><Link href="/blog"><span className="hover:text-primary cursor-pointer transition-colors">Journal</span></Link></li>
+              <li><Link href="/roadmap"><span className="hover:text-primary cursor-pointer transition-colors">Changelog</span></Link></li>
+              <li><Link href="/privacy"><span className="hover:text-primary cursor-pointer transition-colors">Privacy</span></Link></li>
+              <li><Link href="/terms"><span className="hover:text-primary cursor-pointer transition-colors">Compliance</span></Link></li>
             </ul>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto pt-8 border-t border-zinc-800/50 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-400">
-          <p>© 2026 VaultBridge by Ace-Groups. All rights reserved.</p>
-          <div className="mt-4 md:mt-0 flex gap-4">
-            <span>Anonymous File Sharing</span>
-            <span>•</span>
-            <span>End-to-End Encrypted Transfer</span>
+        <div className="max-w-7xl mx-auto pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-[11px] text-zinc-600 font-medium">
+            © 2026 VaultBridge Infrastructure. Distributed Encryption Engine by <span className="text-zinc-400">Ace-Groups</span>.
+          </p>
+          <div className="flex items-center gap-6 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+            <span className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> Encrypted</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" /> Accelerated</span>
+            <span className="flex items-center gap-1.5"><Globe className="w-3 h-3" /> Global</span>
           </div>
         </div>
       </footer>

@@ -6,45 +6,34 @@
  * 2. Delete orphaned chunks from object storage
  */
 
-import { storage } from "../storage";
+import { taskQueue } from "../lib/queue";
 import { log } from "../index";
 
-// Track known storage paths for orphan detection
-let lastCleanupRun = new Date();
+// Track known storage status for health checks
+let lastQueuePush = new Date();
 
 /**
- * Main cleanup job
+ * Main cleanup job - now just pushes to the resilient queue
  */
 export async function runCleanup(): Promise<void> {
-    const startTime = Date.now();
-    log("Starting cleanup job...", "cleanup");
-
-    try {
-        // Delegate cleanup to storage service (which now handles DB + Object Storage)
-        await storage.cleanupExpiredVaults();
-
-        const duration = Date.now() - startTime;
-        log(`Cleanup complete in ${duration}ms.`, "cleanup");
-
-        lastCleanupRun = new Date();
-    } catch (error) {
-        log(`Cleanup job failed: ${error}`, "cleanup");
-    }
+    log("Pushing cleanup job to task queue...", "cleanup");
+    await taskQueue.add("cleanup_orphans", {});
+    lastQueuePush = new Date();
 }
 
 /**
  * Start the cleanup worker
- * Runs every 10 minutes
+ * Runs every 5 minutes (reduced interval as it only pushes to queue)
  */
 export function startCleanupWorker(): void {
-    const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+    const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; 
 
-    log("Cleanup worker started. Interval: 10 minutes.", "cleanup");
+    log("Cleanup scheduler started (Queue-based).", "cleanup");
 
     // Run immediately on startup
     runCleanup();
 
-    // Schedule periodic runs
+    // Schedule periodic pushes
     setInterval(runCleanup, CLEANUP_INTERVAL_MS);
 }
 
@@ -52,8 +41,8 @@ export function startCleanupWorker(): void {
  * Get cleanup status for health checks
  */
 export function getCleanupStatus(): { lastRun: Date; isHealthy: boolean } {
-    const timeSinceLastRun = Date.now() - lastCleanupRun.getTime();
+    const timeSinceLastRun = Date.now() - lastQueuePush.getTime();
     const isHealthy = timeSinceLastRun < 15 * 60 * 1000; // Should run within 15 mins
 
-    return { lastRun: lastCleanupRun, isHealthy };
+    return { lastRun: lastQueuePush, isHealthy };
 }

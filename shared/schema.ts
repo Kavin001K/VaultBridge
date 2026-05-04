@@ -15,7 +15,9 @@ export const vaults = pgTable("vaults", {
   maxDownloads: integer("max_downloads").default(1).notNull(),
   downloadCount: integer("download_count").default(0).notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),
+  pinSalt: text("pin_salt"), // Stores base64(16 random bytes) — used for per-vault PBKDF2 salt
   encryptedClipboardText: text("encrypted_clipboard_text"), // Optional encrypted clipboard text
+  emailSentCount: integer("email_sent_count").default(0).notNull(),
 });
 
 export const files = pgTable("files", {
@@ -47,6 +49,16 @@ export const emailUsage = pgTable("email_usage", {
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
+export const globalStats = pgTable("global_stats", {
+  id: serial("id").primaryKey(),
+  totalVaultsCreated: integer("total_vaults_created").default(0).notNull(),
+  totalBytesUploaded: text("total_bytes_uploaded").default("0").notNull(), // Using text to avoid overflow, or bigint
+  totalDownloads: integer("total_downloads").default(0).notNull(),
+  activeVaultsCount: integer("active_vaults_count").default(0).notNull(),
+  lastBurnedAt: timestamp("last_burned_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // === SCHEMAS ===
 
 export const insertVaultSchema = createInsertSchema(vaults).omit({
@@ -67,6 +79,7 @@ export const insertFileSchema = createInsertSchema(files).omit({
 export type Vault = typeof vaults.$inferSelect;
 export type FileRecord = typeof files.$inferSelect;
 export type ChunkRecord = typeof chunks.$inferSelect;
+export type GlobalStats = typeof globalStats.$inferSelect;
 
 // Client-facing types for creation
 export const createVaultRequestSchema = z.object({
@@ -75,6 +88,7 @@ export const createVaultRequestSchema = z.object({
   encryptedMetadata: z.string(), // Encrypted JSON of filenames, etc.
   lookupId: z.string().length(3).optional(), // 3-digit numeric ID for split-code lookup
   wrappedKey: z.string().optional(), // File key encrypted by PIN (for split-code vaults)
+  pinSalt: z.string().optional(), // PBKDF2 salt for PIN
   files: z.array(z.object({
     fileId: z.string(),
     chunks: z.number(),

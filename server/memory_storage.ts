@@ -1,5 +1,5 @@
 import {
-    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest
+    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats
 } from "@shared/schema";
 import { randomUUID } from "node:crypto";
 import type { IStorage } from "./storage_interface";
@@ -19,6 +19,29 @@ export class MemoryStorage implements IStorage {
     private files: Map<string, FileRecord> = new Map();
     private chunks: Map<number, ChunkRecord> = new Map();
     private chunkIdCounter = 1;
+    private stats: GlobalStats = {
+        id: 1,
+        totalVaultsCreated: 0,
+        totalBytesUploaded: "0",
+        totalDownloads: 0,
+        activeVaultsCount: 0,
+        lastBurnedAt: null,
+        updatedAt: new Date()
+    };
+    private emailUsage: Map<string, any> = new Map();
+
+    private updateStats(deltas: { vaults?: number, bytes?: number, downloads?: number, active?: number, burned?: boolean }) {
+        this.stats.totalVaultsCreated = Math.max(0, this.stats.totalVaultsCreated + (deltas.vaults || 0));
+        this.stats.totalBytesUploaded = (BigInt(this.stats.totalBytesUploaded) + BigInt(deltas.bytes || 0)).toString();
+        this.stats.totalDownloads = Math.max(0, this.stats.totalDownloads + (deltas.downloads || 0));
+        this.stats.activeVaultsCount = Math.max(0, this.stats.activeVaultsCount + (deltas.active || 0));
+        if (deltas.burned) this.stats.lastBurnedAt = new Date();
+        this.stats.updatedAt = new Date();
+    }
+
+    async getGlobalStats(): Promise<GlobalStats> {
+        return { ...this.stats };
+    }
 
     async createVault(data: CreateVaultRequest): Promise<Vault> {
         let shortCode = "", isUnique = false;
@@ -50,7 +73,9 @@ export class MemoryStorage implements IStorage {
             expiresAt,
             maxDownloads: data.maxDownloads,
             downloadCount: 0,
-            isDeleted: false
+            isDeleted: false,
+            emailSentCount: 0,
+            pinSalt: data.pinSalt || null
         };
 
         this.vaults.set(vault.id, vault);
@@ -59,6 +84,10 @@ export class MemoryStorage implements IStorage {
             const fileMaxDownloads = (f as any).maxDownloads ?? data.maxDownloads;
             await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize, fileMaxDownloads);
         }
+
+        // Update Stats
+        const totalSize = data.files.reduce((sum, f) => sum + f.size, 0);
+        this.updateStats({ vaults: 1, active: 1, bytes: totalSize });
 
         return vault;
     }
@@ -73,6 +102,13 @@ export class MemoryStorage implements IStorage {
     async getVault(id: string): Promise<Vault | undefined> {
         const v = this.vaults.get(id);
         return v && !v.isDeleted ? v : undefined;
+    }
+
+    async updateVault(id: string, updates: Partial<Vault>): Promise<void> {
+        const vault = this.vaults.get(id);
+        if (vault) {
+            this.vaults.set(id, { ...vault, ...updates, updatedAt: new Date() });
+        }
     }
 
     async getVaultByShortCode(code: string): Promise<Vault | undefined> {
@@ -190,6 +226,7 @@ export class MemoryStorage implements IStorage {
         if (v) {
             v.downloadCount += 1;
             this.vaults.set(vaultId, v);
+            this.updateStats({ downloads: 1 });
             return v.downloadCount;
         }
         return 0;
@@ -228,6 +265,10 @@ export class MemoryStorage implements IStorage {
             }
         }
 
+        if (results.length > 0) {
+            this.updateStats({ downloads: results.length });
+        }
+
         return results;
     }
 
@@ -245,6 +286,15 @@ export class MemoryStorage implements IStorage {
             }
         }
         throw new Error("Vault not found");
+    }
+
+    async softDeleteVault(id: string): Promise<void> {
+        const v = this.vaults.get(id);
+        if (v) {
+            v.isDeleted = true;
+            this.vaults.set(id, v);
+            console.log(`[MemoryStorage] Soft deleted vault ${id}`);
+        }
     }
 
     async deleteVault(id: string): Promise<void> {
@@ -290,6 +340,7 @@ export class MemoryStorage implements IStorage {
         }
 
         this.vaults.delete(id);
+        this.updateStats({ active: -1, burned: true });
         console.log(`[MemoryStorage] Deleted vault ${id} and resources.`);
     }
 
@@ -306,5 +357,27 @@ export class MemoryStorage implements IStorage {
                 await this.deleteVault(id);
             }
         }
+    }
+    
+    async incrementVaultEmailCount(vaultId: string): Promise<number> {
+        const v = this.vaults.get(vaultId);
+        if (v) {
+            v.emailSentCount = (v.emailSentCount || 0) + 1;
+            this.vaults.set(vaultId, v);
+            return v.emailSentCount;
+        }
+        return 0;
+    }
+
+    async getEmailUsage(date: string): Promise<any> {
+        return this.emailUsage.get(date) || { date, resendCount: 0, brevoCount: 0, msg91Count: 0 };
+    }
+
+    async incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void> {
+        const usage = await this.getEmailUsage(date);
+        if (provider === "resend") usage.resendCount++;
+        if (provider === "brevo") usage.brevoCount++;
+        if (provider === "msg91") usage.msg91Count++;
+        this.emailUsage.set(date, usage);
     }
 }

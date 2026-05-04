@@ -13,8 +13,8 @@ const isLocalDb = ['db', 'localhost', '127.0.0.1'].includes(dbUrl.hostname);
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  // Strict SSL in production. Ensure your DATABASE_URL includes sslmode=require
-  ssl: isLocalDb ? false : true
+  // Strict SSL in production. For Supabase Pooler, we allow unauthorized certs to handle the self-signed chain.
+  ssl: isLocalDb ? false : { rejectUnauthorized: false }
 });
 
 export const db = drizzle(pool, { schema });

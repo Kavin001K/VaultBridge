@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Sparkles, AlertTriangle, Copy, Check, Key,
   Share2, Mail, Trash2, Smartphone, Monitor, Shield, ExternalLink, Loader2,
-  Clock, Download, HardDrive, Timer, Zap
+  Clock, Download, HardDrive, Timer, Zap, Activity, ChevronRight, Binary, Cpu
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -19,73 +19,9 @@ import {
 import { useGetVault } from "@/hooks/use-vaults";
 import { useToast } from "@/hooks/use-toast";
 import { useVaultHistory } from "@/hooks/useVaultHistory";
+import { getVaultIdentity } from "@/lib/cipherAvatar";
 
-// SVG Filter for Heat Distortion
-const BurnFilter = () => (
-  <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-    <defs>
-      <filter id="heat-wave">
-        <feTurbulence
-          type="fractalNoise"
-          baseFrequency="0.01"
-          numOctaves="3"
-          result="noise"
-        >
-          <animate
-            attributeName="baseFrequency"
-            dur="2s"
-            values="0.01;0.05;0.2"
-            repeatCount="1"
-          />
-        </feTurbulence>
-        <feDisplacementMap
-          in="SourceGraphic"
-          in2="noise"
-          scale="20"
-        />
-      </filter>
-    </defs>
-  </svg>
-);
-
-function CountdownTimer({ expiresAt }: { expiresAt: string }) {
-  const [timeLeft, setTimeLeft] = useState<{ h: number, m: number, s: number } | null>(null);
-
-  useEffect(() => {
-    const update = () => {
-      const now = new Date().getTime();
-      const end = new Date(expiresAt).getTime();
-      const diff = end - now;
-
-      if (diff <= 0) {
-        setTimeLeft(null);
-        return;
-      }
-      setTimeLeft({
-        h: Math.floor(diff / (1000 * 60 * 60)),
-        m: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-        s: Math.floor((diff % (1000 * 60)) / 1000)
-      });
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [expiresAt]);
-
-  if (!timeLeft) return <span className="text-zinc-500 font-mono">Expired</span>;
-
-  return (
-    <div className="flex items-center gap-2 font-mono text-sm md:text-base font-bold text-primary">
-      <span className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded min-w-[2.5ch] text-center">{timeLeft.h.toString().padStart(2, '0')}</span>
-      <span className="text-zinc-500">:</span>
-      <span className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded min-w-[2.5ch] text-center">{timeLeft.m.toString().padStart(2, '0')}</span>
-      <span className="text-zinc-500">:</span>
-      <span className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded min-w-[2.5ch] text-center">{timeLeft.s.toString().padStart(2, '0')}</span>
-    </div>
-  );
-}
-
-export default function Success() {
+export default function SuccessPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/success/:id");
   const [splitCode, setSplitCode] = useState("");
@@ -102,71 +38,28 @@ export default function Success() {
   const { addRecord, updateRecord } = useVaultHistory();
   const historySavedRef = useRef(false);
 
-  const handleBurn = async () => {
-    if (!params?.id) return;
-
-    setIsDeleting(true);
-    try {
-      const res = await fetch(`/api/vaults/${params.id}`, { method: 'DELETE' });
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.message || "Failed to delete");
-
-      toast({
-        title: "Initiating Self-Destruct",
-        description: "Protocol activated. Vaporizing data...",
-        className: "bg-rose-950/50 border-rose-500 text-rose-400 font-mono",
-      });
-
-      // Mark as burned in vault history
-      if (splitCode) {
-        updateRecord(splitCode, "sent", { status: "burned" });
-      }
-
-      // Trigger Animation
-      setIsBurned(true);
-
-      // Redirect after animation
-      setTimeout(() => setLocation("/"), 2500);
-
-    } catch (error) {
-      toast({
-        title: "Deletion Failed",
-        description: "Could not destroy the vault. It may have already been deleted.",
-        variant: "destructive"
-      });
-      setIsDeleting(false);
-    }
-  };
-
   const vaultId = params?.id || "";
   const { data: vault } = useGetVault(vaultId);
+  const identity = vault ? getVaultIdentity(vault.shortCode) : null;
 
   useEffect(() => {
     const hash = window.location.hash;
-    const codeMatch = hash.match(/#code=(\d{6})/);
-    if (codeMatch) {
-      setSplitCode(codeMatch[1]);
-    }
+    const hashParams = new URLSearchParams(hash.replace("#", ""));
+    const code = hashParams.get("code");
+    if (code) setSplitCode(code);
 
-    // Parse Stats
-    const params = new URLSearchParams(hash.replace("#", "?")); // Hacky but works for hash params styled as queries
-    const time = params.get("time");
-    const speed = params.get("speed");
-
-    if (time && speed) {
+    const speed = hashParams.get("speed");
+    if (speed) {
       setUploadStats({
-        time: parseInt(time),
+        time: 0,
         speed: parseInt(speed)
       });
     }
   }, []);
 
-  // Save vault to browser history when vault data is loaded
   useEffect(() => {
     if (vault && splitCode && !historySavedRef.current) {
       historySavedRef.current = true;
-
       const fileNames = vault.files?.map((f: any) => f.originalName || f.fileName || `File ${f.fileId?.slice(0, 6)}`) || [];
       const totalSize = vault.files?.reduce((acc: number, f: any) => acc + (f.totalSize || f.size || 0), 0) || 0;
 
@@ -187,11 +80,6 @@ export default function Success() {
     }
   }, [vault, splitCode, addRecord]);
 
-  // Share Link logic
-  // User Requested: "give only the link to pave for entering the pin"
-  // So we just link to /access with the code in the hash fragment.
-  // The hash fragment is never sent to the server, preserving zero-knowledge.
-  // This allows auto-fill and auto-submit without manual entry.
   const shareLink = `${window.location.origin}/access#code=${splitCode}`;
 
   const handleCopy = async (text: string, type: 'link' | 'code') => {
@@ -203,501 +91,263 @@ export default function Success() {
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     }
-    toast({
-      title: "Copied to clipboard",
-      description: type === 'link' ? "Access link ready to share." : "Access code ready to share.",
-    });
+    toast({ title: "COPIED_TO_CLIPBOARD", description: type === 'link' ? "SECURE_LINK_READY" : "ACCESS_CODE_READY" });
   };
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Secure Vault',
-          text: 'Here is the comprehensive secure link to access the files.',
-          url: shareLink
-        });
-      } catch (err) {
-        console.error("Share failed", err);
-      }
-    } else {
-      handleCopy(shareLink, 'link');
+  const handleBurn = async () => {
+    if (!params?.id) return;
+    setIsDeleting(true);
+    try {
+      await fetch(`/api/vaults/${params.id}`, { method: 'DELETE' });
+      setIsBurned(true);
+      toast({ title: "SELF_DESTRUCT_INITIATED", description: "Vaporizing data from all nodes..." });
+      setTimeout(() => setLocation("/"), 2500);
+    } catch (error) {
+      setIsDeleting(false);
     }
   };
 
   const handleSendEmail = async () => {
-    if (!email) {
-      toast({ variant: "destructive", title: "Email Required", description: "Please enter a recipient email address." });
-      return;
-    }
-
-    // Normalize email to lowercase for case-insensitive handling (handles ALL CAPS, MixedCase, etc.)
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(normalizedEmail)) {
-      toast({ variant: "destructive", title: "Invalid Email", description: "Please enter a valid email address." });
-      return;
-    }
-
+    if (!email) return;
     setIsSending(true);
     try {
       const response = await fetch(`/api/vaults/${vaultId}/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: normalizedEmail, fullCode: splitCode }),
+        body: JSON.stringify({ to: email.trim().toLowerCase(), fullCode: splitCode }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to send email");
-      }
-
-      // Show Dialog Box
-      setShowSpamAlert(true);
-
-      toast({ title: "✅ Email Sent", description: "Recipient notified securely.", className: "bg-emerald-900/90 border-emerald-500" });
-
-      // Track email in vault history
-      if (splitCode) {
-        updateRecord(splitCode, "sent", { lastEmailedTo: normalizedEmail, lastEmailedAt: Date.now() });
-      }
-
-      setEmail("");
-    } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Failed to send",
-        description: e.message || "Could not send email. Please try again."
-      });
+      if (response.ok) setShowSpamAlert(true);
     } finally {
       setIsSending(false);
     }
   };
 
   return (
-    <div className={`min-h-screen relative overflow-hidden flex flex-col transition-colors duration-1000 ${isBurned ? 'bg-black' : 'bg-background'} text-foreground selection:bg-primary/30`}>
-      <BurnFilter />
-
-      {/* Background Ambience */}
-      <div className={`fixed inset-0 grid-bg opacity-30 pointer-events-none transition-opacity duration-1000 ${isBurned ? 'opacity-0' : ''}`} />
-      <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
+      {/* Background Effects */}
+      <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
+      <div className={`fixed inset-0 bg-primary/5 blur-[150px] transition-opacity duration-1000 ${isBurned ? 'opacity-0' : 'opacity-100'}`} />
+      <div className="scanline pointer-events-none opacity-10" />
 
       {/* Header */}
-      <header className="relative z-10 px-6 py-6 flex justify-between items-center max-w-6xl mx-auto w-full">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
-            <Shield className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-bold font-mono tracking-tight text-lg leading-none">SECURE<span className="text-primary">VAULT</span></h1>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Encrypted Transfer</p>
-          </div>
+      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <Link href="/">
+            <div className="flex items-center gap-3 cursor-pointer group">
+              <div className="w-8 h-8 bg-zinc-950 rounded-xl flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-all duration-500">
+                <Shield className="w-5 h-5 text-primary" />
+              </div>
+              <h1 className="text-base font-black font-mono tracking-widest text-white">VAULT<span className="text-primary">BRIDGE</span></h1>
+            </div>
+          </Link>
+          <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="rounded-full text-zinc-400 hover:text-white hover:bg-white/5 px-4 text-[10px] font-black tracking-widest gap-2">
+            <ArrowLeft className="w-4 h-4" /> NEW_SESSION
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.location.href = '/'}
-          className="gap-2 border-zinc-800 hover:bg-zinc-900"
-        >
-          <ArrowLeft className="w-4 h-4" /> New Transfer
-        </Button>
       </header>
 
-      {/* Main Content */}
-      <main
-        className="relative z-10 flex-1 w-full max-w-5xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-8 transition-all duration-1000 origin-center"
-        style={{
-          filter: isBurned ? 'url(#heat-wave) grayscale(100%) contrast(150%)' : 'none',
-          transform: isBurned ? 'scale(0.95)' : 'none',
-          opacity: isBurned ? 0 : 1
-        }}
-      >
+      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 pt-28 pb-20">
+        
+        {/* Status Badge */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black tracking-[0.3em] uppercase mb-6">
+            <CheckCircle2 className="w-3.5 h-3.5" /> VAULT_ESTABLISHED_SUCCESSFULLY
+          </div>
+          <h2 className="text-4xl sm:text-5xl font-black mb-4 tracking-tighter text-white uppercase italic">
+            Transmission <span className="text-primary">Complete</span>
+          </h2>
+          <p className="text-zinc-500 text-sm font-medium">Your data is now fragmented across the secure cloud. Protocol: Zero-Knowledge.</p>
+        </motion.div>
 
-        {/* Hero Section: PIN & Insights Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-
-          {/* PIN Display */}
-          {splitCode && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="glass-card p-6 md:p-8 flex flex-col items-center justify-center text-center border-l-4 border-l-primary relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-primary/5 animate-pulse rounded-3xl pointer-events-none" />
-
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-primary/10 rounded-full">
-                  <Key className="w-4 h-4 text-primary" />
-                </div>
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">Access PIN</span>
-              </div>
-
-              <div className="flex items-center gap-4 mb-4 scale-110">
-                <div className="font-mono text-5xl md:text-6xl font-black tracking-widest text-white drop-shadow-[0_0_25px_rgba(16,185,129,0.3)] select-all">
-                  {splitCode.slice(0, 3)}-{splitCode.slice(3, 6)}
-                </div>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2 text-zinc-500 hover:text-white hover:bg-white/5"
-                onClick={() => handleCopy(splitCode, 'code')}
-              >
-                {copiedCode ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                {copiedCode ? "Copied" : "Copy Code"}
-              </Button>
-            </motion.div>
-          )}
-
-          {/* Dashboard / Usefull Insights */}
-          {vault && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="glass-card p-6 flex flex-col justify-between gap-6"
-            >
-              {/* Timer */}
-              <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <div className="p-2 bg-zinc-900 rounded-lg">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider">Expiration</p>
-                    <p className="text-[10px] text-zinc-500">Auto-deletion timer</p>
-                  </div>
-                </div>
-                <CountdownTimer expiresAt={vault.expiresAt} />
-              </div>
-
-              {/* Download Limit */}
-              <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <div className="p-2 bg-zinc-900 rounded-lg">
-                    <Download className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider">Downloads</p>
-                    <p className="text-[10px] text-zinc-500">Remaining limit</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono text-xl font-bold text-white">
-                    {vault.maxDownloads - vault.downloadCount}
-                  </span>
-                  <span className="text-zinc-600 text-sm font-mono mx-1">/</span>
-                  <span className="text-zinc-600 text-sm font-mono">{vault.maxDownloads}</span>
-                </div>
-              </div>
-
-              {/* File Size */}
-              <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <div className="p-2 bg-zinc-900 rounded-lg">
-                    <HardDrive className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider">Total Size</p>
-                    <p className="text-[10px] text-zinc-500">{vault.files.length} Files</p>
-                  </div>
-                </div>
-                <span className="font-mono text-base font-bold text-zinc-300">
-                  {(vault.files.reduce((acc: any, f: any) => acc + f.totalSize, 0) / (1024 * 1024)).toFixed(2)} MB
-                </span>
-              </div>
-
-              {/* Upload Stats (If Available) */}
-              {uploadStats && (
-                <>
-                  <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                    <div className="flex items-center gap-3 text-zinc-400">
-                      <div className="p-2 bg-zinc-900 rounded-lg">
-                        <Timer className="w-4 h-4 text-amber-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider">Transfer Time</p>
-                        <p className="text-[10px] text-zinc-500">Encryption & Upload</p>
-                      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Left: Security Identity & QR */}
+          <div className="lg:col-span-4 space-y-6">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="glass-card p-8 text-center relative overflow-hidden group">
+               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Binary className="w-12 h-12 text-primary" />
+               </div>
+               
+               {identity && (
+                 <div className="mb-8 flex flex-col items-center">
+                    <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${identity.color} flex items-center justify-center text-4xl shadow-2xl mb-4 border border-white/10 group-hover:scale-105 transition-transform duration-500`}>
+                      {identity.icon}
                     </div>
-                    <span className="font-mono text-base font-bold text-zinc-300">
-                      {uploadStats.time < 1000 ? `${uploadStats.time}ms` : `${(uploadStats.time / 1000).toFixed(1)}s`}
-                    </span>
-                  </div>
+                    <h3 className="text-xl font-black tracking-tight text-white uppercase italic">Vault {identity.name}</h3>
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mt-1">SECURE_NODE_ID</span>
+                 </div>
+               )}
 
-                  <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
-                    <div className="flex items-center gap-3 text-zinc-400">
-                      <div className="p-2 bg-zinc-900 rounded-lg">
-                        <Zap className="w-4 h-4 text-emerald-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider">Speed</p>
-                        <p className="text-[10px] text-zinc-500">Avg. Throughput</p>
-                      </div>
-                    </div>
-                    <span className="font-mono text-base font-bold text-zinc-300">
-                      {uploadStats.speed < 1024 * 1024
-                        ? `${(uploadStats.speed / 1024).toFixed(1)} KB/s`
-                        : `${(uploadStats.speed / (1024 * 1024)).toFixed(1)} MB/s`}
-                    </span>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          )}
-        </div>
-
-
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
-          {/* Left Column: QR (Dark Theme) */}
-          <div className="w-full lg:w-1/3 flex flex-col gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="glass-card p-1 rounded-3xl overflow-hidden shadow-2xl"
-            >
-              <div className="bg-zinc-950/80 p-8 rounded-[22px] flex flex-col items-center text-center relative overflow-hidden group">
-
-                {/* Scanline Effect */}
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent animate-scanline pointer-events-none" />
-
-                <div className="relative bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl shadow-2xl mb-6 group-hover:border-primary/50 transition-colors duration-500">
-                  {/* Clean Dark Themed QR */}
+               <div className="relative aspect-square w-full max-w-[200px] mx-auto bg-zinc-950 p-4 rounded-3xl border border-white/5 shadow-2xl group-hover:border-primary/30 transition-colors">
                   <QRCodeSVG
                     value={shareLink}
                     size={200}
                     level="H"
                     includeMargin={true}
-                    bgColor="#09090b"  // zinc-950 background
-                    fgColor="#10b981"  // emerald-500 (primary) modules
-                    className="w-full h-full rounded-lg"
+                    bgColor="transparent"
+                    fgColor="#10b981"
+                    className="w-full h-full"
                   />
-                  {/* Glowing Corners */}
-                  <div className="absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 border-primary rounded-tl-xl opacity-50" />
-                  <div className="absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 border-primary rounded-tr-xl opacity-50" />
-                  <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 border-primary rounded-bl-xl opacity-50" />
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 border-primary rounded-br-xl opacity-50" />
-                </div>
-
-                <div className="space-y-2">
-                  <h2 className="text-xl font-bold text-white tracking-tight flex items-center justify-center gap-2">
-                    <Smartphone className="w-5 h-5 text-primary" />
-                    Scan to Download
-                  </h2>
-                  <p className="text-xs text-zinc-500 mx-auto">
-                    Instant mobile access. No app required.
-                  </p>
-                </div>
-
-              </div>
+                  <div className="absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 border-primary/40 rounded-tl-xl" />
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 border-primary/40 rounded-br-xl" />
+               </div>
+               <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mt-6">Scan for instant mobile access</p>
             </motion.div>
+
+            <div className="grid grid-cols-2 gap-4">
+               <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-4 text-center">
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Fragments</span>
+                  <span className="text-lg font-mono font-black text-white">{vault?.files?.length || 0}</span>
+               </div>
+               <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-4 text-center">
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Efficiency</span>
+                  <span className="text-lg font-mono font-black text-primary">99.9%</span>
+               </div>
+            </div>
           </div>
 
-          {/* Right Column: Actions */}
-          <div className="w-full lg:w-2/3">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="glass-card h-full min-h-[450px] flex flex-col"
-            >
-              {/* Tabs */}
-              <div className="flex border-b border-white/5">
-                <button
-                  onClick={() => setActiveTab('link')}
-                  className={`flex-1 py-5 text-sm font-medium flex items-center justify-center gap-2 transition-all ${activeTab === 'link' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'}`}
-                >
-                  <Share2 className="w-4 h-4" /> Share Link
-                </button>
-                <button
-                  onClick={() => setActiveTab('email')}
-                  className={`flex-1 py-5 text-sm font-medium flex items-center justify-center gap-2 transition-all ${activeTab === 'email' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'}`}
-                >
-                  <Mail className="w-4 h-4" /> Email
-                </button>
-                <button
-                  onClick={() => setActiveTab('burn')}
-                  className={`flex-1 py-5 text-sm font-medium flex items-center justify-center gap-2 transition-all ${activeTab === 'burn' ? 'text-rose-500 border-b-2 border-rose-500 bg-rose-500/5' : 'text-zinc-500 hover:text-rose-400 hover:bg-rose-900/10'}`}
-                >
-                  <Trash2 className="w-4 h-4" /> Burn
-                </button>
-              </div>
-
-              <div className="p-8 md:p-10 flex-1 flex flex-col justify-center">
-                <AnimatePresence mode="wait">
-                  {activeTab === 'link' && (
-                    <motion.div
-                      key="link"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="flex-1 flex flex-col justify-center space-y-8"
+          {/* Right: Main Access Panel */}
+          <div className="lg:col-span-8 space-y-6">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="glass-card flex flex-col h-full overflow-hidden">
+               {/* Access Tabs */}
+               <div className="flex border-b border-white/5">
+                  {(['link', 'email', 'burn'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all ${
+                        activeTab === tab 
+                          ? (tab === 'burn' ? 'text-red-500 border-b-2 border-red-500 bg-red-500/5' : 'text-primary border-b-2 border-primary bg-primary/5')
+                          : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                      }`}
                     >
-                      <div className="text-center space-y-2">
-                        <h3 className="text-2xl font-bold tracking-tight">Ready to Share</h3>
-                        <p className="text-zinc-400">Copy the secure link below or use the share sheet.</p>
-                      </div>
+                      {tab === 'link' && <Share2 className="w-3.5 h-3.5" />}
+                      {tab === 'email' && <Mail className="w-3.5 h-3.5" />}
+                      {tab === 'burn' && <Trash2 className="w-3.5 h-3.5" />}
+                      {tab}
+                    </button>
+                  ))}
+               </div>
 
-                      <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 flex items-center gap-4 group hover:border-primary/30 transition-colors">
-                        <div className="p-3 bg-zinc-900 rounded-lg group-hover:bg-primary/20 transition-colors">
-                          <ExternalLink className="w-6 h-6 text-zinc-500 group-hover:text-primary" />
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <p className="text-xs text-zinc-500 uppercase font-bold mb-1">Encrypted Link</p>
-                          <p className="text-sm md:text-base font-mono text-zinc-300 truncate selection:bg-primary/30">{shareLink}</p>
-                        </div>
-                      </div>
+               <div className="p-8 sm:p-12 flex-1 flex flex-col justify-center">
+                  <AnimatePresence mode="wait">
+                    {activeTab === 'link' && (
+                      <motion.div key="link" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
+                         <div className="text-center">
+                            <h3 className="text-2xl font-black text-white uppercase italic tracking-tight mb-2">Access Key Terminal</h3>
+                            <p className="text-zinc-500 text-xs font-medium">Distribute the secure link to authorized recipients only.</p>
+                         </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Button size="lg" className="cyber-btn w-full h-14 text-base" onClick={() => handleCopy(shareLink, 'link')}>
-                          {copiedLink ? "COPIED!" : "COPY LINK"}
-                        </Button>
-                        <Button size="lg" variant="secondary" className="w-full h-14 text-base border-zinc-700 bg-zinc-800 hover:bg-zinc-700" onClick={handleShare}>
-                          OPEN SHARE SHEET
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
+                         <div className="space-y-6">
+                            <div className="bg-zinc-950 p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+                               <div className="absolute inset-0 bg-primary/5 animate-pulse" />
+                               <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4">EPHEMERAL_ACCESS_CODE</span>
+                               <div className="text-4xl sm:text-5xl font-mono font-black text-white tracking-[0.4em] drop-shadow-[0_0_20px_rgba(16,185,129,0.3)] mb-4">
+                                  {splitCode.slice(0,3)}<span className="text-primary/50 font-sans mx-2">·</span>{splitCode.slice(3)}
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => handleCopy(splitCode, 'code')} className="text-[10px] font-black text-primary hover:bg-primary/10 rounded-full h-8 px-6">
+                                   {copiedCode ? "CODE_COPIED" : "COPY_CODE"}
+                                </Button>
+                            </div>
 
-                  {activeTab === 'email' && (
-                    <motion.div
-                      key="email"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="flex-1 flex flex-col justify-center space-y-8"
-                    >
-                      <div className="text-center space-y-2">
-                        <h3 className="text-2xl font-bold tracking-tight">Secure Dispatch</h3>
-                        <p className="text-zinc-400">Send an automated email notification with access details.</p>
-                      </div>
+                            <div className="relative group">
+                               <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-emerald-500/20 blur opacity-30 group-hover:opacity-100 transition duration-1000" />
+                               <div className="relative bg-zinc-950 p-4 rounded-2xl border border-white/10 flex items-center gap-4">
+                                  <div className="p-3 bg-zinc-900 rounded-xl text-zinc-500 group-hover:text-primary transition-colors">
+                                     <ExternalLink className="w-5 h-5" />
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                     <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-0.5">Secure Transfer URI</span>
+                                     <p className="text-xs font-mono text-zinc-400 truncate">{shareLink}</p>
+                                  </div>
+                                  <Button onClick={() => handleCopy(shareLink, 'link')} className="rounded-xl h-10 px-6 text-[10px] font-black bg-primary text-primary-foreground uppercase tracking-widest">
+                                     {copiedLink ? "COPIED" : "COPY_URI"}
+                                  </Button>
+                               </div>
+                            </div>
+                         </div>
+                      </motion.div>
+                    )}
 
-                      <div className="space-y-6">
-                        <div className="space-y-2">
-                          <label className="text-xs uppercase font-bold text-zinc-500 ml-1">Recipient Email</label>
-                          <Input
-                            placeholder="recipient@example.com"
-                            className="h-14 text-lg bg-zinc-950 border-zinc-800 focus:ring-primary/20"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                          />
-                        </div>
-                        <Button size="lg" className="cyber-btn w-full h-14 text-base" onClick={handleSendEmail} disabled={isSending}>
-                          {isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : "SEND NOTIFICATION"}
-                        </Button>
-                      </div>
+                    {activeTab === 'email' && (
+                      <motion.div key="email" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+                         <div className="text-center">
+                            <h3 className="text-2xl font-black text-white uppercase italic tracking-tight mb-2">Secure Dispatch</h3>
+                            <p className="text-zinc-500 text-xs font-medium">Encrypt and notify recipient via automated SMTP relay.</p>
+                         </div>
+                         <div className="space-y-4">
+                            <div className="relative">
+                               <Input 
+                                 placeholder="recipient@secure.node" 
+                                 value={email}
+                                 onChange={e => setEmail(e.target.value)}
+                                 className="h-16 bg-zinc-950 border-white/5 rounded-2xl px-6 text-lg font-mono focus:border-primary/50 transition-all shadow-2xl"
+                               />
+                               <Mail className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700" />
+                            </div>
+                            <Button onClick={handleSendEmail} disabled={isSending} className="w-full h-16 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform">
+                               {isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : "TRANSMIT NOTIFICATION"}
+                            </Button>
+                         </div>
+                         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 flex items-start gap-4">
+                            <Shield className="w-5 h-5 text-primary shrink-0 mt-1" />
+                            <p className="text-[10px] font-bold text-primary/70 leading-relaxed uppercase tracking-widest">
+                               Metadata Protection: Actual file fragments are never transmitted via email. Only secure handshake tokens are provided.
+                            </p>
+                         </div>
+                      </motion.div>
+                    )}
 
-                      <div className="py-4 px-6 bg-primary/5 rounded-xl border border-primary/10 flex items-start gap-3">
-                        <Shield className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                        <p className="text-xs text-primary/80 leading-relaxed">
-                          Security Note: We only send the unique access link and code. Actual files are never attached to emails, ensuring zero-knowledge privacy.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {activeTab === 'burn' && (
-                    <motion.div
-                      key="burn"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="flex-1 flex flex-col justify-center space-y-8 text-center"
-                    >
-                      <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-2 border-2 border-rose-500/20 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
-                        <Trash2 className="w-10 h-10 text-rose-500" />
-                      </div>
-                      <div className="space-y-4">
-                        <h3 className="text-2xl font-bold text-rose-500">Initiate Self-Destruct</h3>
-                        <p className="text-zinc-400 max-w-md mx-auto">
-                          This will immediately purge all encryption keys, metadata, and file chunks from the server.
-                        </p>
-                      </div>
-
-                      <div className="p-4 bg-rose-950/30 border border-rose-900/50 rounded-xl">
-                        <p className="text-sm text-rose-300 font-bold">WARNING: THIS ACTION CANNOT BE UNDONE.</p>
-                      </div>
-
-                      <Button
-                        size="lg"
-                        variant="destructive"
-                        className="w-full h-14 text-base bg-rose-600 hover:bg-rose-700 font-bold tracking-wider"
-                        onClick={handleBurn}
-                        disabled={isDeleting}
-                      >
-                        {isDeleting ? (
-                          <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            DESTROYING...
-                          </>
-                        ) : "CONFIRM DESTRUCTION"}
-
-                      </Button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                    {activeTab === 'burn' && (
+                      <motion.div key="burn" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8 text-center">
+                         <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
+                            <Trash2 className="w-10 h-10 text-red-500" />
+                         </div>
+                         <div>
+                            <h3 className="text-2xl font-black text-red-500 uppercase italic tracking-tight mb-2">Protocol: Self-Destruct</h3>
+                            <p className="text-zinc-500 text-xs font-medium">Irreversible vaporization of all cryptographic fragments from the network.</p>
+                         </div>
+                         <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-4">
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Data will be unrecoverable across all nodes after activation.</p>
+                         </div>
+                         <Button onClick={handleBurn} disabled={isDeleting} variant="destructive" className="w-full h-16 rounded-2xl bg-red-600 hover:bg-red-700 font-black uppercase tracking-[0.2em] shadow-lg shadow-red-900/20">
+                            {isDeleting ? <Loader2 className="w-6 h-6 animate-spin" /> : "CONFIRM_SELF_DESTRUCT"}
+                         </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+               </div>
             </motion.div>
           </div>
-
         </div>
       </main>
 
-      {/* Redesigned Check Spam Folder Dialog */}
+      {/* Spam Alert Dialog */}
       <Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert}>
-        <DialogContent className="sm:max-w-md bg-zinc-950 border border-zinc-800/80 text-zinc-100 shadow-2xl p-0 overflow-hidden">
-
-          {/* Header Pattern */}
-          <div className="relative h-24 bg-zinc-900/50 flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 grid-bg opacity-20" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-950" />
-
-            <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-center justify-center relative z-10 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-              <Mail className="w-8 h-8 text-emerald-500" />
-              <div className="absolute -bottom-2 -right-2 bg-zinc-950 rounded-full p-1 border border-zinc-800">
-                <Check className="w-4 h-4 text-emerald-500" />
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 pb-6 pt-2 text-center">
-            <DialogHeader className="mb-6">
-              <DialogTitle className="text-xl font-bold text-white text-center">Notification Sent</DialogTitle>
-              <DialogDescription className="text-center text-zinc-400">
-                The secure access link has been successfully dispatched.
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* Spam Alert - Redesigned */}
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 mb-6 text-left">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+        <DialogContent className="bg-zinc-950 border border-white/5 text-zinc-100 p-0 overflow-hidden rounded-3xl max-w-sm">
+          <div className="h-2 bg-primary animate-pulse" />
+          <div className="p-8 text-center space-y-6">
+             <div className="w-16 h-16 bg-primary/10 rounded-2xl border border-primary/20 flex items-center justify-center mx-auto">
+                <Send className="w-8 h-8 text-primary" />
+             </div>
+             <div>
+                <h3 className="text-xl font-black uppercase italic tracking-tight text-white mb-2">Dispatch Logged</h3>
+                <p className="text-zinc-500 text-xs font-medium">Notification has been transmitted through our secure SMTP relay.</p>
+             </div>
+             <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 text-left">
+                <div className="flex gap-3">
+                   <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+                   <p className="text-[10px] font-bold text-amber-500/70 uppercase tracking-widest leading-relaxed">
+                      Handshake verification failure? Check "Junk" or "Spam" directories in the recipient's terminal.
+                   </p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-amber-500">Delivery Confirmation</p>
-                  <p className="text-xs text-amber-200/70 leading-relaxed">
-                    If the email is not visible in the inbox within 2 minutes, it is highly likely in the <strong className="text-amber-200">Spam</strong> or <strong className="text-amber-200">Junk</strong> folder.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-wide rounded-xl shadow-lg shadow-emerald-900/20 transition-all"
-              onClick={() => setShowSpamAlert(false)}
-            >
-              UNDERSTOOD
-            </Button>
+             </div>
+             <Button onClick={() => setShowSpamAlert(false)} className="w-full h-12 rounded-xl bg-zinc-900 border border-white/5 text-white font-black uppercase tracking-widest text-[10px]">
+                Acknowledge
+             </Button>
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

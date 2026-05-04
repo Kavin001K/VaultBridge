@@ -96,6 +96,7 @@ export const api = {
           wrappedKey: z.string(),
           encryptedMetadata: z.string(),
           encryptedClipboardText: z.string().nullish(), // Encrypted clipboard text (null from DB, undefined from client)
+          pinSalt: z.string().nullish(), // Per-vault PBKDF2 salt for PIN
           expiresAt: z.string(),
           maxDownloads: z.number(), // Vault-level default
           downloadCount: z.number(), // Vault-level total (legacy, sum of file downloads)
@@ -160,6 +161,18 @@ export const api = {
         404: errorSchemas.notFound,
         410: z.object({ message: z.string() }),
       },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/vaults/:id',
+      input: z.object({
+        expiresIn: z.number().optional(),
+        maxDownloads: z.number().optional(),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        404: errorSchemas.notFound,
+      }
     },
   },
   chunks: {

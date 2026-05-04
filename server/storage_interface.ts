@@ -3,11 +3,12 @@
  * Extracted into its own file to avoid circular dependencies
  * between storage.ts and memory_storage.ts.
  */
-import type { Vault, FileRecord, ChunkRecord, CreateVaultRequest } from "@shared/schema";
+import type { Vault, FileRecord, ChunkRecord, CreateVaultRequest, GlobalStats } from "@shared/schema";
 
 export interface IStorage {
     createVault(data: CreateVaultRequest): Promise<Vault>;
     getVault(id: string): Promise<Vault | undefined>;
+    updateVault(id: string, updates: Partial<Vault>): Promise<void>;
     getVaultByShortCode(code: string): Promise<Vault | undefined>;
     getVaultByLookupId(lookupId: string): Promise<Vault | undefined>;
     createFile(vaultId: string, fileId: string, chunkCount: number, totalSize: number, isCompressed?: boolean, originalSize?: number, maxDownloads?: number): Promise<FileRecord>;
@@ -27,5 +28,10 @@ export interface IStorage {
     areAllFilesExhausted(vaultId: string): Promise<boolean>;
     updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date>;
     deleteVault(id: string): Promise<void>;
+    softDeleteVault(id: string): Promise<void>;
     cleanupExpiredVaults(): Promise<void>;
+    getGlobalStats(): Promise<GlobalStats>;
+    incrementVaultEmailCount(vaultId: string): Promise<number>;
+    getEmailUsage(date: string): Promise<any>;
+    incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void>;
 }

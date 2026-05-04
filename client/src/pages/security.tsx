@@ -1,211 +1,205 @@
+import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowLeft, Shield, Lock, TimerReset, DatabaseZap, KeyRound } from "lucide-react";
+import { 
+    Shield, Lock, Key, Activity, Cpu, Network, Database, 
+    ArrowLeft, ShieldCheck, Zap, Globe, Gavel
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const principles = [
-  {
-    title: "Client-Side Encryption",
-    body: "Files are encrypted in the browser before transfer. Raw file payloads are never uploaded in plaintext.",
-    icon: Lock,
-  },
-  {
-    title: "Zero-Knowledge Architecture",
-    body: "VaultBridge cannot decrypt file contents because decryption keys are generated and retained client-side.",
-    icon: KeyRound,
-  },
-  {
-    title: "Temporary Storage",
-    body: "Vault payloads are short-lived by default and are removed after lifecycle conditions are met.",
-    icon: TimerReset,
-  },
-  {
-    title: "Minimal Data Collection",
-    body: "No account is required for core flows and no behavioral profiling is performed for product usage.",
-    icon: DatabaseZap,
-  },
-];
-
-const lifecycle = [
-  "User selects file in browser.",
-  "Client encrypts payload and metadata locally.",
-  "Encrypted blob is transferred over TLS.",
-  "VaultBridge stores encrypted payload with TTL metadata.",
-  "Recipient accesses vault with secure link and code.",
-  "Vault auto-destructs on expiration, burn-on-read, or manual destruction.",
-];
-
-const keyFlow = [
-  "Generate per-session entropy in browser runtime.",
-  "Derive encryption material from access factors (e.g., code + random salt).",
-  "Use symmetric encryption for payload chunks (AES-256 class model).",
-  "Store only encrypted payload and lifecycle metadata server-side.",
-  "Discard runtime key material once transfer/decryption flow ends.",
-];
-
-const securityTable = [
-  { label: "Encryption Standard", value: "AES-256 class symmetric encryption model" },
-  { label: "Transport Security", value: "TLS 1.3 for in-transit protection" },
-  { label: "Key Management", value: "Ephemeral, client-generated session keys" },
-  { label: "Access Model", value: "Link-based vault access + retrieval verification" },
-];
-
-const cannotDo = [
-  "Read file contents in plaintext",
-  "Decrypt encrypted payloads without user-held key material",
-  "Build user identity profiles from account systems",
-  "Retain files indefinitely outside configured lifecycle controls",
-];
-
 export default function SecurityPage() {
-  return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link href="/">
-            <div className="cursor-pointer font-mono text-lg font-bold tracking-tight">
-              VAULT<span className="text-primary">BRIDGE</span>
-            </div>
-          </Link>
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2 text-zinc-300">
-              <ArrowLeft className="h-4 w-4" />
-              Home
-            </Button>
-          </Link>
-        </div>
-      </header>
+    const principles = [
+        {
+            icon: Lock,
+            title: "Client-Side Encryption",
+            desc: "Encryption happens locally in your browser memory. Raw file payloads never leave your device in plaintext.",
+            tag: "AES-256-GCM"
+        },
+        {
+            icon: ShieldCheck,
+            title: "Zero-Knowledge",
+            desc: "We cannot decrypt your contents. We serve only as a blind courier, handling encrypted fragments we cannot read.",
+            tag: "Mathematical Trust"
+        },
+        {
+            icon: Zap,
+            title: "Ephemeral Life",
+            desc: "Vaults are transient by design. Data auto-destructs after retrieval or TTL expiration with zero residual traces.",
+            tag: "Non-Persistent"
+        },
+        {
+            icon: Database,
+            title: "Data Minimization",
+            desc: "No accounts, no profiling, no tracking. We store only the minimum metadata required for secure routing.",
+            tag: "0-Log Policy"
+        }
+    ];
 
-      <main className="mx-auto max-w-6xl space-y-14 px-4 py-12">
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 md:p-10">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-            <Shield className="h-3.5 w-3.5" />
-            Security Architecture
-          </div>
-          <h1 className="text-3xl font-bold md:text-5xl">Security Architecture</h1>
-          <p className="mt-4 max-w-3xl text-zinc-400">
-            VaultBridge is designed so files remain private, encrypted, and outside direct platform control.
-            Trust is enforced by system design, not just policy text.
-          </p>
-        </section>
+    const specs = [
+        { label: "Encryption Standard", value: "AES-256 Symmetric Chain" },
+        { label: "Transport Security", value: "TLS 1.3 End-to-End" },
+        { label: "Key Management", value: "Client-Side Volatile" },
+        { label: "Access Control", value: "Dual-Factor PIN Protocol" }
+    ];
 
-        <section>
-          <h2 className="mb-5 text-2xl font-semibold">Core Security Principles</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {principles.map((item) => (
-              <div key={item.title} className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
-                <div className="mb-3 inline-flex rounded-lg bg-primary/10 p-2 text-primary">
-                  <item.icon className="h-4 w-4" />
+    return (
+        <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
+            {/* Background Effects */}
+            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
+            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
+            <div className="scanline pointer-events-none opacity-10" />
+
+            {/* Header */}
+            <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-5 flex items-center justify-between">
+                    <Link href="/">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 cursor-pointer group">
+                            <div className="w-9 h-9 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-all duration-500 shadow-2xl overflow-hidden">
+                                <img src="/icon-192x192.png" alt="VaultBridge" className="w-full h-full object-cover p-1.5 group-hover:scale-110 transition-transform duration-500" />
+                            </div>
+                            <h1 className="text-lg font-black font-mono tracking-widest text-white leading-none uppercase">VAULT<span className="text-primary">BRIDGE</span></h1>
+                        </motion.div>
+                    </Link>
+
+                    <Link href="/">
+                        <Button variant="ghost" size="sm" className="rounded-full text-zinc-400 hover:text-white hover:bg-white/5 px-4 text-xs font-bold gap-2">
+                            <ArrowLeft className="w-4 h-4" />
+                            Return
+                        </Button>
+                    </Link>
                 </div>
-                <h3 className="text-lg font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm text-zinc-400">{item.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+            </header>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-            <h2 className="mb-3 text-xl font-semibold">Architecture Overview</h2>
-            <p className="mb-4 text-sm text-zinc-400">
-              Encryption occurs at the client boundary. Infrastructure only receives encrypted payloads and
-              lifecycle metadata.
-            </p>
-            <pre className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-xs leading-6 text-zinc-300">
-{`[Client Browser]
-   |  (Encrypt + key derivation)
-   v
-[TLS 1.3 Transport]
-   |
-   v
-[VaultBridge API]
-   |  stores encrypted chunks + TTL metadata
-   v
-[Ephemeral Storage Layer]
-   |
-   v
-[Recipient Browser Decrypts Locally]`}
-            </pre>
-          </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-            <h2 className="mb-3 text-xl font-semibold">Key Generation Process</h2>
-            <ol className="space-y-2 text-sm text-zinc-300">
-              {keyFlow.map((step, index) => (
-                <li key={step} className="rounded-md border border-zinc-800 bg-zinc-950/70 px-3 py-2">
-                  <span className="mr-2 font-mono text-primary">{String(index + 1).padStart(2, "0")}</span>
-                  {step}
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
+            <main className="relative z-10 flex-1 w-full max-w-4xl mx-auto px-4 pt-28 pb-20">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-primary text-[10px] font-mono font-black tracking-[0.2em] uppercase mb-4">
+                        <Shield className="w-3.5 h-3.5 animate-pulse" />
+                        SECURITY_PROTOCOL_OVERVIEW
+                    </div>
+                    <h2 className="text-4xl sm:text-6xl font-black mb-6 tracking-tight text-white uppercase italic leading-none">
+                        Secure <span className="text-primary">Architecture</span>
+                    </h2>
+                    <p className="text-zinc-500 text-sm sm:text-lg font-medium max-w-xl mx-auto uppercase italic">
+                        Trust is enforced by mathematical system design, not just policy.
+                    </p>
+                </motion.div>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-          <h2 className="mb-4 text-xl font-semibold">File Lifecycle</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            {lifecycle.map((step, index) => (
-              <div key={step} className="rounded-md border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-sm">
-                <span className="mr-2 font-mono text-primary">{index + 1}.</span>
-                {step}
-              </div>
-            ))}
-          </div>
-        </section>
+                {/* Principles */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                    {principles.map((p, idx) => (
+                        <motion.div 
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: idx * 0.1 }}
+                            className="glass-card p-8 group hover:border-primary/30 transition-all duration-500"
+                        >
+                            <div className="flex items-start justify-between mb-6">
+                                <div className="w-12 h-12 bg-zinc-900 border border-white/5 rounded-xl flex items-center justify-center group-hover:border-primary/40 group-hover:bg-primary/5 transition-all duration-500 shadow-2xl">
+                                    <p.icon className="w-6 h-6 text-zinc-500 group-hover:text-primary transition-colors" />
+                                </div>
+                                <span className="text-[10px] font-mono font-black text-primary/30 tracking-widest">{p.tag}</span>
+                            </div>
+                            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2 italic">{p.title}</h3>
+                            <p className="text-xs font-bold text-zinc-500 uppercase italic leading-relaxed group-hover:text-zinc-400 transition-colors">
+                                {p.desc}
+                            </p>
+                        </motion.div>
+                    ))}
+                </div>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-          <h2 className="mb-4 text-xl font-semibold">Encryption Model</h2>
-          <div className="space-y-2">
-            {securityTable.map((row) => (
-              <div key={row.label} className="grid gap-2 rounded-md border border-zinc-800 bg-zinc-950/70 px-3 py-2 md:grid-cols-[220px_1fr]">
-                <div className="text-sm font-semibold text-zinc-200">{row.label}</div>
-                <div className="text-sm text-zinc-400">{row.value}</div>
-              </div>
-            ))}
-          </div>
-        </section>
+                {/* Tech Specs Table */}
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    className="glass-card p-1 p-0 overflow-hidden mb-12"
+                >
+                    <div className="bg-zinc-900/40 border-b border-white/5 p-6">
+                        <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3 italic">
+                            <Cpu className="w-4 h-4 text-primary" /> Technical Specifications
+                        </h3>
+                    </div>
+                    <div className="p-0">
+                        {specs.map((spec, i) => (
+                            <div key={i} className={`flex flex-col sm:flex-row sm:items-center justify-between p-6 ${i !== specs.length - 1 ? 'border-b border-white/5' : ''} hover:bg-white/5 transition-colors`}>
+                                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 sm:mb-0">{spec.label}</span>
+                                <span className="text-xs font-black text-primary uppercase italic tracking-tight">{spec.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-            <h2 className="mb-3 text-xl font-semibold">Data Retention Policy</h2>
-            <p className="text-sm text-zinc-400">
-              VaultBridge does not permanently store files. Vault data is removed after expiration or destruction
-              events. The platform is optimized for temporary transfer, not long-term archives.
-            </p>
-            <h3 className="mt-5 text-lg font-semibold">Auto-Destruct Logic</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-300">
-              <li>Time-based expiration is enforced via TTL metadata.</li>
-              <li>Burn-on-read deletes vaults after configured successful retrievals.</li>
-              <li>Manual destruction invalidates active access immediately.</li>
-              <li>Cleanup workers remove expired artifacts from storage.</li>
-            </ul>
-          </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-            <h2 className="mb-3 text-xl font-semibold">What VaultBridge Cannot Do</h2>
-            <ul className="list-disc space-y-2 pl-5 text-sm text-zinc-300">
-              {cannotDo.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <p className="mt-5 text-sm text-zinc-400">
-              Transparency statement: privacy guarantees are architecture-driven. Operational policy follows the
-              constraints established by the system design.
-            </p>
-          </div>
-        </section>
+                {/* Diagram Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                    <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="glass-card p-8 bg-primary/5 border-primary/20">
+                        <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-primary" /> Key Flow Protocol
+                        </h3>
+                        <div className="space-y-4">
+                            {[
+                                "Client Entropy Generation",
+                                "Local Key Derivation",
+                                "Volatile Chunking Engine",
+                                "Encrypted Relay Handshake",
+                                "Recipient-Side Reassembly"
+                            ].map((step, i) => (
+                                <div key={i} className="flex items-center gap-4 text-[11px] font-bold text-zinc-400 uppercase italic">
+                                    <span className="w-6 h-6 rounded-lg bg-black border border-white/5 flex items-center justify-center text-primary text-[10px]">{i + 1}</span>
+                                    {step}
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                    
+                    <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="glass-card p-8 bg-zinc-900/40">
+                        <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                            <Gavel className="w-4 h-4 text-primary" /> What We Cannot Do
+                        </h3>
+                        <div className="space-y-4">
+                            {[
+                                "Read plaintext contents",
+                                "Bypass encryption layers",
+                                "Recover lost access PINs",
+                                "Identity data association",
+                                "Permanent file retention"
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-center gap-3 text-[11px] font-bold text-zinc-500 uppercase italic">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                                    {item}
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                </div>
 
-        <section className="rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
-          <h2 className="text-2xl font-semibold">Privacy by Architecture</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm text-zinc-300">
-            Explore the reasoning and product philosophy behind these technical choices.
-          </p>
-          <div className="mt-5">
-            <Link href="/privacy-manifesto">
-              <Button className="rounded-full bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90">
-                View Privacy Manifesto
-              </Button>
-            </Link>
-          </div>
-        </section>
-      </main>
-    </div>
-  );
+                {/* Final Verification */}
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    className="p-10 rounded-3xl bg-primary/5 border border-primary/10 text-center relative overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05)_0%,transparent_70%)]" />
+                    <ShieldCheck className="w-12 h-12 text-primary mx-auto mb-6 relative z-10" />
+                    <h3 className="text-xl font-black text-white uppercase tracking-widest mb-3 relative z-10 italic">Privacy by Physics</h3>
+                    <p className="text-xs font-bold text-zinc-500 uppercase italic leading-relaxed max-w-sm mx-auto relative z-10 mb-8">
+                        Our code is open-source. Our encryption is military-grade. Our retention is zero.
+                    </p>
+                    <Link href="/privacy-manifesto">
+                        <Button className="h-12 px-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[10px] uppercase tracking-widest relative z-10 shadow-xl shadow-primary/20">
+                            Manifesto Protocol
+                        </Button>
+                    </Link>
+                </motion.div>
+            </main>
+
+            <footer className="relative z-10 py-10 border-t border-white/5 bg-zinc-950/40 backdrop-blur-md text-center">
+                <div className="max-w-7xl mx-auto px-4">
+                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em]">
+                        VAULTBRIDGE SECURITY INFRASTRUCTURE • VERIFIED_V1.0
+                    </p>
+                </div>
+            </footer>
+        </div>
+    );
 }

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Lock, Copy, RefreshCw, Power,
     Globe, Shield, Eye, EyeOff, Wifi, QrCode,
-    Trash2, CheckCircle2, Terminal, Clock
+    Trash2, CheckCircle2, Terminal, Clock,
+    Activity, Binary, ShieldCheck, Zap, Smartphone,
+    Network, Layers, Cpu, ArrowLeft, ArrowRight
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { ArrowLeft } from "lucide-react";
 
 const formatExpiry = (hours: number) => {
     if (hours < 24) return `${hours}h`;
@@ -32,35 +33,18 @@ const formatExpiry = (hours: number) => {
     return rem === 0 ? `${days}d` : `${days}d ${rem}h`;
 };
 
-const PulseIndicator = ({ status }: { status: "idle" | "syncing" | "live" }) => {
-    const colors = { idle: "bg-zinc-600", syncing: "bg-amber-400", live: "bg-emerald-500" };
-    const labels = { idle: "Draft", syncing: "Syncing…", live: "Live" };
-    return (
-        <div className="flex items-center gap-2">
-            <div className="relative flex h-2 w-2">
-                {status !== "idle" && (
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${colors[status]}`} />
-                )}
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${colors[status]}`} />
-            </div>
-            <span className={`text-[11px] font-mono uppercase tracking-wider ${status === "live" ? "text-emerald-400" :
-                status === "syncing" ? "text-amber-400" : "text-zinc-500"
-                }`}>{labels[status]}</span>
-        </div>
-    );
-};
-
 export default function UniversalClipboard() {
     const { toast } = useToast();
     const { play } = useSounds();
     const { addRecord } = useVaultHistory();
+    const [, setLocation] = useLocation();
 
     const [mode, setMode] = useState<"draft" | "live">("draft");
     const [content, setContent] = useState("");
     const [showContent, setShowContent] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [justCopied, setJustCopied] = useState(false);
-    const [expiresIn, setExpiresIn] = useState([1]); // Default to 1 hour
+    const [expiresIn, setExpiresIn] = useState([1]);
     const [showSettings, setShowSettings] = useState(false);
 
     const [vaultData, setVaultData] = useState<{
@@ -72,10 +56,8 @@ export default function UniversalClipboard() {
     const [isSyncing, setIsSyncing] = useState(false);
 
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    // FIX: prevent remote data overwriting while user is actively typing
     const isTypingRef = useRef(false);
     const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
-    // Keep a ref of content for the sync effect to compare without being a dep
     const contentRef = useRef(content);
     contentRef.current = content;
 
@@ -86,17 +68,15 @@ export default function UniversalClipboard() {
         mode === "live" && !!vaultData?.lookupId
     );
 
-    // Incoming sync — guarded by isTypingRef to prevent overwriting mid-edit
     useEffect(() => {
         if (mode !== "live" || !remoteData?.encryptedClipboardText || !vaultData) return;
-        if (isTypingRef.current) return; // user is typing, skip
+        if (isTypingRef.current) return;
 
         const decrypt = async () => {
             try {
                 const decryptedText = await decryptClipboardText(
                     remoteData.encryptedClipboardText!, vaultData.key
                 );
-                // Use ref to compare without adding content to deps (avoids outgoing loop)
                 if (decryptedText !== contentRef.current) {
                     setContent(decryptedText);
                     setLastSynced(new Date());
@@ -107,10 +87,8 @@ export default function UniversalClipboard() {
             }
         };
         decrypt();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [remoteData, mode, vaultData]);
+    }, [remoteData, mode, vaultData, play]);
 
-    // Outgoing sync, debounced 600ms
     const handleContentChange = useCallback((newText: string) => {
         setContent(newText);
         isTypingRef.current = true;
@@ -139,52 +117,36 @@ export default function UniversalClipboard() {
     }, [mode, vaultData, updateVault]);
 
     const handleGoLive = async () => {
-        if (!content.trim()) {
-            toast({ variant: "destructive", title: "Empty content", description: "Add some text first." });
-            return;
-        }
+        if (!content.trim()) return;
         setIsCreating(true);
         play("click");
         try {
             const key = await generateKey();
             const splitCode = generateSplitCode();
-            const wrappedKey = await wrapFileKey(key, splitCode.pin);
+            const { wrappedKey, salt } = await wrapFileKey(key, splitCode.pin);
             const encryptedContent = await encryptClipboardText(content, key);
             const encryptedMetadata = await encryptMetadata([], key);
             await createVault.mutateAsync({
                 expiresIn: expiresIn[0], maxDownloads: 100,
                 encryptedMetadata, lookupId: splitCode.lookupId,
-                wrappedKey, files: [], encryptedClipboardText: encryptedContent,
+                wrappedKey, pinSalt: salt, files: [], encryptedClipboardText: encryptedContent,
             });
             setVaultData({ ...splitCode, key, wrappedKey });
             setMode("live");
             setLastSynced(new Date());
             play("success");
 
-            // Save clipboard session to browser history
             addRecord({
-                type: "clipboard",
-                action: "sent",
-                accessCode: splitCode.fullCode,
-                fileNames: [],
-                fileCount: 0,
-                totalSize: new TextEncoder().encode(content).byteLength,
-                hasClipboard: true,
-                clipboardPreview: content.trim().slice(0, 80),
-                createdAt: Date.now(),
-                expiresAt: Date.now() + expiresIn[0] * 3600000,
-                maxDownloads: 100,
-                downloadCount: 0,
+                type: "clipboard", action: "sent", accessCode: splitCode.fullCode,
+                fileNames: [], fileCount: 0, totalSize: new TextEncoder().encode(content).byteLength,
+                hasClipboard: true, clipboardPreview: content.trim().slice(0, 80),
+                createdAt: Date.now(), expiresAt: Date.now() + expiresIn[0] * 3600000,
+                maxDownloads: 100, downloadCount: 0,
             });
 
-            toast({
-                title: "Live link active",
-                description: `Share PIN ${splitCode.fullCode.slice(0, 3)}-${splitCode.fullCode.slice(3)}`,
-                className: "bg-emerald-950 border-emerald-500/50 text-emerald-200",
-            });
+            toast({ title: "LIVE_BUFFER_ESTABLISHED", description: `Access Key: ${splitCode.fullCode}` });
         } catch (error) {
-            console.error(error);
-            toast({ variant: "destructive", title: "Failed", description: "Could not establish secure link." });
+            toast({ variant: "destructive", title: "FAILURE", description: "Encryption protocol failed." });
         } finally {
             setIsCreating(false);
         }
@@ -194,319 +156,166 @@ export default function UniversalClipboard() {
         await navigator.clipboard.writeText(text);
         setJustCopied(true);
         setTimeout(() => setJustCopied(false), 2000);
-        toast({ title: "Copied!" });
+        toast({ title: "COPIED" });
     };
 
-    const terminateSession = () => {
-        setMode("draft");
-        setVaultData(null);
-        setContent("");
-        play("off");
-        toast({ title: "Session ended", description: "Keys purged locally." });
-    };
-
-    const syncStatus = mode === "draft" ? "idle" : isSyncing || isCreating ? "syncing" : "live";
-    const pinDisplay = vaultData
-        ? `${vaultData.fullCode.slice(0, 3)}-${vaultData.fullCode.slice(3)}`
-        : null;
+    const pinDisplay = vaultData ? `${vaultData.fullCode.slice(0, 3)}·${vaultData.fullCode.slice(3)}` : null;
 
     return (
-        <div className="min-h-screen bg-[#1C1C1E] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500/30">
-            {/* ambient glow */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-emerald-500/4 rounded-full blur-[130px]" />
-            </div>
+        <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
+            {/* Background effects */}
+            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
+            <div className="fixed inset-0 bg-primary/5 blur-[150px] pointer-events-none" />
+            <div className="scanline pointer-events-none opacity-10" />
 
-            {/* ── HEADER ── */}
-            <header className={`sticky top-0 z-30 transition-all duration-500 border-b ${mode === "live"
-                ? "bg-[#1C1C1E]/90 border-emerald-500/25 backdrop-blur-xl"
-                : "bg-[#1C1C1E]/80 border-white/5 backdrop-blur-xl"
-                }`}>
-                <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-
-                    {/* Back + brand */}
+            {/* Header */}
+            <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+                <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <Link href="/">
-                        <button className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
-                            <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-                            <div className="hidden sm:flex items-center gap-1.5">
-                                <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                                </div>
-                                <span className="text-sm font-bold tracking-tight font-mono">
-                                    VAULT<span className="text-emerald-400">BRIDGE</span>
-                                </span>
+                        <div className="flex items-center gap-3 cursor-pointer group">
+                            <div className="w-8 h-8 bg-zinc-950 rounded-xl flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-all">
+                                <Terminal className="w-5 h-5 text-primary" />
                             </div>
-                            <span className="sm:hidden text-sm font-semibold">Back</span>
-                        </button>
+                            <h1 className="text-base font-black font-mono tracking-widest text-white uppercase italic">VAULT<span className="text-primary">BRIDGE</span></h1>
+                        </div>
                     </Link>
-
-                    {/* Center status */}
-                    <div className="flex-1 flex justify-center">
-                        <PulseIndicator status={syncStatus} />
+                    <div className="flex items-center gap-4">
+                        {mode === "live" ? (
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black tracking-widest animate-pulse">
+                                <Activity className="w-3 h-3" /> LIVE_SYNC_ACTIVE
+                            </div>
+                        ) : (
+                           <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} className="text-[10px] font-black text-zinc-500 hover:text-white uppercase tracking-widest gap-2">
+                               <Clock className="w-3.5 h-3.5" /> {formatExpiry(expiresIn[0])}
+                           </Button>
+                        )}
+                        <Link href="/">
+                            <Button variant="ghost" size="sm" className="rounded-full text-zinc-400 hover:text-white px-4 text-[10px] font-black tracking-widest gap-2">
+                                <ArrowLeft className="w-4 h-4" /> RETURN
+                            </Button>
+                        </Link>
                     </div>
+                </div>
+            </header>
 
-                    {/* Right controls */}
+            <main className="relative z-10 flex-1 w-full max-w-3xl mx-auto px-4 pt-24 pb-20 flex flex-col">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+                   <div className="flex items-center justify-between mb-2">
+                       <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Universal <span className="text-primary">Clipboard</span></h2>
+                       <div className="flex items-center gap-3">
+                          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{content.length} BYTES</span>
+                          <div className={`w-2 h-2 rounded-full ${mode === 'live' ? 'bg-primary animate-pulse' : 'bg-zinc-800'}`} />
+                       </div>
+                   </div>
+                   <p className="text-zinc-500 text-xs font-medium">Zero-knowledge secure buffer. Real-time cryptographic synchronization.</p>
+                </motion.div>
+
+                <AnimatePresence>
+                    {showSettings && mode === "draft" && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 overflow-hidden">
+                            <div className="glass-card p-6 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Buffer Expiration</span>
+                                    <span className="text-xs font-mono font-black text-primary">{formatExpiry(expiresIn[0])}</span>
+                                </div>
+                                <Slider value={expiresIn} onValueChange={setExpiresIn} max={24} step={1} min={1} className="py-2" />
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <div className="flex-1 flex flex-col gap-4">
+                    <motion.div layout className={`flex-1 glass-card overflow-hidden flex flex-col border-2 transition-colors duration-500 ${mode === 'live' ? 'border-primary/20 bg-primary/5 shadow-[0_0_50px_rgba(16,185,129,0.05)]' : 'border-white/5'}`}>
+                        {/* Toolbar */}
+                        <div className="px-4 py-3 border-b border-white/5 bg-black/20 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-3.5 h-3.5 text-primary/50" />
+                                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">AES-256 E2EE Buffer</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => setShowContent(!showContent)} className="h-8 w-8 text-zinc-500 hover:text-white">
+                                    {showContent ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(content)} className="h-8 w-8 text-zinc-500 hover:text-white">
+                                    <Copy className="w-4 h-4" />
+                                </Button>
+                                {mode === "draft" && content && (
+                                    <Button variant="ghost" size="icon" onClick={() => setContent("")} className="h-8 w-8 text-zinc-500 hover:text-red-400">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Text Area */}
+                        <div className="flex-1 relative">
+                            <Textarea 
+                                value={content}
+                                onChange={e => handleContentChange(e.target.value)}
+                                placeholder={mode === 'draft' ? "Initialize buffer input..." : "Establishing real-time link..."}
+                                className={`absolute inset-0 w-full h-full bg-transparent border-0 resize-none p-8 text-lg font-mono leading-relaxed focus-visible:ring-0 placeholder:text-zinc-800 ${!showContent ? "text-security-disc" : "text-zinc-200"}`}
+                                style={!showContent ? { WebkitTextSecurity: "disc" } as any : undefined}
+                            />
+                            {!content && mode === "draft" && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-10">
+                                    <Cpu className="w-16 h-16 text-primary mb-4" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.4em]">Ready for Injection</span>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+
+                    {/* Bottom Action Section */}
                     <AnimatePresence mode="wait">
-                        {mode === "live" && vaultData ? (
-                            <motion.div
-                                key="live-controls"
-                                initial={{ opacity: 0, x: 10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 10 }}
-                                className="flex items-center gap-2"
-                            >
-                                {/* PIN copy button */}
-                                <button
-                                    onClick={() => copyToClipboard(vaultData.fullCode)}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-800/60 border border-zinc-700/50 hover:border-emerald-500/40 transition-all group"
-                                >
-                                    <span className="font-mono font-bold text-sm text-white tracking-widest">{pinDisplay}</span>
-                                    {justCopied
-                                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                                        : <Copy className="w-3.5 h-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
-                                    }
-                                </button>
-
-                                {/* QR */}
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button size="icon" variant="ghost" className="w-8 h-8 text-zinc-400 hover:text-white hover:bg-zinc-800">
-                                            <QrCode className="w-4 h-4" />
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-xs bg-[#1C1C1E] border-zinc-800 text-zinc-100 rounded-2xl p-6">
-                                        <DialogHeader>
-                                            <DialogTitle className="text-center">Scan to Connect</DialogTitle>
-                                            <DialogDescription className="text-center text-zinc-500 text-sm">
-                                                Scan with your phone camera to open this clipboard instantly.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="flex justify-center p-4 bg-white rounded-xl mt-2">
-                                            <QRCodeSVG value={`${window.location.origin}/access#code=${vaultData.fullCode}`} size={160} />
-                                        </div>
-                                        <p className="text-center text-sm font-mono font-bold text-emerald-400 tracking-widest mt-3">
-                                            {pinDisplay}
-                                        </p>
-                                    </DialogContent>
-                                </Dialog>
-
-                                {/* End session */}
-                                <Button
-                                    size="sm" variant="ghost"
-                                    onClick={terminateSession}
-                                    className="h-8 px-2.5 text-red-400/70 hover:text-red-300 hover:bg-red-950/30"
-                                    title="End session"
-                                >
-                                    <Power className="w-3.5 h-3.5" />
+                        {mode === "draft" ? (
+                            <motion.div key="draft-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                <Button onClick={handleGoLive} disabled={!content.trim() || isCreating} className="h-16 w-full rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform">
+                                    {isCreating ? <Loader2 className="w-6 h-6 animate-spin" /> : <>ESTABLISH SECURE LINK <Wifi className="w-4 h-4 ml-2" /></>}
                                 </Button>
                             </motion.div>
                         ) : (
-                            <motion.div key="settings-toggle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                <Button
-                                    size="sm" variant="ghost"
-                                    onClick={() => setShowSettings(s => !s)}
-                                    className={`h-8 px-3 text-xs font-medium transition-colors ${showSettings ? "text-emerald-400 bg-emerald-500/10" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                                        }`}
-                                >
-                                    <Clock className="w-3.5 h-3.5 mr-1.5" />
-                                    {formatExpiry(expiresIn[0])}
-                                </Button>
+                            <motion.div key="live-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+                                <div className="glass-card p-6 flex items-center justify-between gap-6 border-primary/30 relative overflow-hidden">
+                                   <div className="absolute inset-0 bg-primary/5 animate-pulse" />
+                                   <div className="relative">
+                                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Ephemeral Access Code</span>
+                                      <div className="text-4xl font-mono font-black text-white tracking-[0.3em] drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                                         {pinDisplay}
+                                      </div>
+                                   </div>
+                                   <div className="flex gap-2">
+                                       <Dialog>
+                                           <DialogTrigger asChild>
+                                               <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-white/10 bg-zinc-950 text-zinc-400 hover:text-primary">
+                                                  <QrCode className="w-5 h-5" />
+                                               </Button>
+                                           </DialogTrigger>
+                                           <DialogContent className="bg-zinc-950 border-white/5 text-white max-w-sm rounded-3xl p-8">
+                                               <DialogHeader className="mb-6">
+                                                   <DialogTitle className="text-center uppercase italic font-black">Secure Link</DialogTitle>
+                                               </DialogHeader>
+                                               <div className="bg-white p-6 rounded-3xl flex justify-center mb-6">
+                                                  <QRCodeSVG value={`${window.location.origin}/access#code=${vaultData?.fullCode}`} size={200} />
+                                               </div>
+                                               <p className="text-center font-mono font-black text-2xl text-primary tracking-[0.3em]">{pinDisplay}</p>
+                                           </DialogContent>
+                                       </Dialog>
+                                       <Button variant="outline" size="icon" onClick={() => copyToClipboard(vaultData!.fullCode)} className="h-12 w-12 rounded-xl border-white/10 bg-zinc-950 text-zinc-400 hover:text-primary">
+                                          <Copy className="w-5 h-5" />
+                                       </Button>
+                                       <Button variant="outline" size="icon" onClick={() => window.location.reload()} className="h-12 w-12 rounded-xl border-white/10 bg-zinc-950 text-red-500 hover:bg-red-500/10">
+                                          <Power className="w-5 h-5" />
+                                       </Button>
+                                   </div>
+                                </div>
+                                <div className="flex items-center justify-between px-2 text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                                   <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5" /> P2P SYNC ACTIVE</div>
+                                   <div className="flex items-center gap-2">UPDATING EVERY 600MS <RefreshCw className="w-3 h-3 animate-spin" /></div>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </div>
-            </header>
-
-            {/* ── BODY ── */}
-            <main className="flex-1 flex flex-col max-w-3xl w-full mx-auto px-4 pb-4 pt-3 gap-3">
-
-                {/* Title — draft mode only */}
-                <AnimatePresence>
-                    {mode === "draft" && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="flex items-center justify-between"
-                        >
-                            <div>
-                                <h1 className="text-xl font-bold text-zinc-100 tracking-tight">Encrypted Clipboard</h1>
-                                <p className="text-xs text-zinc-500 mt-0.5">Paste text → share PIN → syncs everywhere</p>
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-600">
-                                <Lock className="w-3 h-3" /> AES-256
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Settings drawer */}
-                <AnimatePresence>
-                    {showSettings && mode === "draft" && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-emerald-400" /> Auto-destruct
-                                    </span>
-                                    <span className="text-sm font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-lg">
-                                        {formatExpiry(expiresIn[0])}
-                                    </span>
-                                </div>
-                                <Slider value={expiresIn} onValueChange={setExpiresIn} max={24} step={1} min={1} className="py-1" />
-                                <div className="flex flex-wrap gap-2">
-                                    {[
-                                        { icon: Shield, label: "AES-256" },
-                                        { icon: Globe, label: "Zero-Knowledge" },
-                                        { icon: Eye, label: "E2E Encrypted" },
-                                    ].map(({ icon: Icon, label }) => (
-                                        <div key={label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-mono tracking-wider uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                            <Icon className="w-3 h-3" /> {label}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Notes card */}
-                <motion.div
-                    layout
-                    className={`flex-1 flex flex-col rounded-2xl border overflow-hidden transition-all duration-500 ${mode === "live"
-                        ? "border-emerald-500/30 bg-zinc-900/50 shadow-[0_0_40px_rgba(16,185,129,0.04)]"
-                        : "border-zinc-800/60 bg-zinc-900/50"
-                        }`}
-                    style={{ minHeight: "calc(100vh - 260px)" }}
-                >
-                    {/* Card toolbar */}
-                    <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.04] bg-black/10">
-                        <div>
-                            {mode === "live" && lastSynced && (
-                                <span className="text-[10px] font-mono text-zinc-600">{lastSynced.toLocaleTimeString()}</span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-0.5">
-                            {content.length > 0 && (
-                                <span className="text-[10px] font-mono text-zinc-600 mr-1.5">{content.length.toLocaleString()} ch</span>
-                            )}
-                            <Button
-                                size="sm" variant="ghost"
-                                className="h-7 w-7 p-0 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
-                                onClick={() => setShowContent(v => !v)}
-                            >
-                                {showContent ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                            </Button>
-                            <Button
-                                size="sm" variant="ghost"
-                                className="h-7 w-7 p-0 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
-                                onClick={() => copyToClipboard(content)}
-                                disabled={!content}
-                            >
-                                <Copy className="w-3.5 h-3.5" />
-                            </Button>
-                            {content && mode === "draft" && (
-                                <Button
-                                    size="sm" variant="ghost"
-                                    className="h-7 w-7 p-0 hover:bg-red-500/10 text-zinc-600 hover:text-red-400"
-                                    onClick={() => setContent("")}
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Text area */}
-                    <div className="relative flex-1">
-                        <Textarea
-                            className={`absolute inset-0 w-full h-full bg-transparent border-0 resize-none px-5 py-4 text-[15px] leading-relaxed focus-visible:ring-0 placeholder:text-zinc-700 custom-scrollbar ${!showContent ? "text-security-disc" : "text-zinc-200"
-                                }`}
-                            style={!showContent ? { WebkitTextSecurity: "disc" } as any : undefined}
-                            placeholder={mode === "draft"
-                                ? "Paste or type anything here…"
-                                : "Typing syncs to all connected devices in real-time…"
-                            }
-                            value={content}
-                            onChange={(e) => handleContentChange(e.target.value)}
-                            spellCheck={false}
-                            autoFocus
-                        />
-                        {!content && mode === "draft" && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
-                                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
-                                    <Terminal className="w-8 h-8 text-emerald-500/60" />
-                                </div>
-                                <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Ready for input</p>
-                            </div>
-                        )}
-                    </div>
-                </motion.div>
-
-                {/* Action area */}
-                <AnimatePresence mode="wait">
-                    {mode === "draft" ? (
-                        <motion.div key="go-live" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
-                            <Button
-                                onClick={handleGoLive}
-                                disabled={!content.trim() || isCreating}
-                                className="w-full text-base font-bold rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/20"
-                                style={{ height: "52px" }}
-                            >
-                                {isCreating ? (
-                                    <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Creating secure link…</>
-                                ) : (
-                                    <><Wifi className="w-4 h-4 mr-2" />Go Live &amp; Share</>
-                                )}
-                            </Button>
-                            <p className="text-center text-[11px] text-zinc-600 mt-2 font-mono">
-                                <Lock className="w-2.5 h-2.5 inline mr-1" />
-                                End-to-end encrypted · {formatExpiry(expiresIn[0])} expiry · No logs
-                            </p>
-                        </motion.div>
-                    ) : (
-                        <motion.div key="live-status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="space-y-3">
-                            <div className="bg-zinc-900/60 border border-emerald-500/20 rounded-2xl p-4">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs text-zinc-500 font-mono uppercase tracking-wider mb-1">Share this PIN to connect</p>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-3xl font-mono font-black text-white tracking-widest drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]">
-                                                {pinDisplay}
-                                            </span>
-                                            <button
-                                                onClick={() => copyToClipboard(vaultData!.fullCode)}
-                                                className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors"
-                                            >
-                                                {justCopied
-                                                    ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                                                    : <Copy className="w-4 h-4 text-zinc-400" />
-                                                }
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                        <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
-                                        </div>
-                                        {lastSynced && (
-                                            <p className="text-[10px] text-zinc-600 font-mono">{lastSynced.toLocaleTimeString()}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <p className="text-center text-[11px] text-zinc-600 font-mono">
-                                <Lock className="w-2.5 h-2.5 inline mr-1" />
-                                Syncing every 3s · Expires in {formatExpiry(expiresIn[0])} · Zero-knowledge
-                            </p>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </main>
         </div>
     );

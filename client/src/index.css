@@ -149,8 +149,13 @@
   --radius: 0.75rem;
 
   /* Typography */
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Executive Glass Tokens */
+  --glass-bg: rgba(9, 9, 11, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --emerald-glow: rgba(16, 185, 129, 0.15);
 }
 
 /* =============================================================================
@@ -170,9 +175,11 @@
   body {
     @apply bg-background text-foreground font-sans;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.08), transparent),
-      linear-gradient(180deg, hsl(240, 6%, 6%) 0%, hsl(240, 6%, 4%) 100%);
+      radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.12), transparent 70%),
+      radial-gradient(circle at 0% 100%, rgba(16, 185, 129, 0.05), transparent 50%),
+      linear-gradient(180deg, #09090b 0%, #020617 100%);
     min-height: 100vh;
+    overflow-x: hidden;
   }
 
   ::selection {
@@ -201,10 +208,12 @@
 
   /* Glass Card Effect */
   .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl;
+    @apply backdrop-blur-2xl border border-white/5 rounded-[2rem] shadow-2xl;
+    background: linear-gradient(135deg, rgba(24, 24, 27, 0.8) 0%, rgba(9, 9, 11, 0.9) 100%);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.03) inset,
-      0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      0 20px 40px -10px rgba(0, 0, 0, 0.7),
+      0 0 20px rgba(16, 185, 129, 0.05);
   }
 
   /* Glowing Border Effect */
@@ -404,12 +413,22 @@
   }
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.05); }
 }
 
-.animate-float {
-  animation: float 6s ease-in-out infinite;
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}
+
+@keyframes scanning {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(200%); }
+}
+
+.animate-scanning {
+  animation: scanning 4s ease-in-out infinite;
 }
 
 /* Typing Effect for Terminal Text */

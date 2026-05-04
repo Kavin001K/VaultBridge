@@ -1,9 +1,11 @@
 import {
-    vaults, files, chunks,
-    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest
+    vaults, files, chunks, globalStats, emailUsage,
+    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, lt } from "drizzle-orm";
+import { eq, sql, lt, and, or } from "drizzle-orm";
+import crypto from "crypto";
+
 
 // Smart Storage Router — manages R2 / Supabase / Local
 import {
@@ -32,6 +34,48 @@ export type { IStorage };
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class DatabaseStorage implements IStorage {
+    private async updateStats(deltas: { vaults?: number, bytes?: number, downloads?: number, active?: number, burned?: boolean }) {
+        try {
+            // Use an UPSERT-like pattern to ensure row 1 exists
+            const [stats] = await db.select().from(globalStats).where(eq(globalStats.id, 1));
+            if (!stats) {
+                await db.insert(globalStats).values({
+                    id: 1,
+                    totalVaultsCreated: Math.max(0, deltas.vaults || 0),
+                    totalBytesUploaded: Math.max(0, deltas.bytes || 0).toString(),
+                    totalDownloads: Math.max(0, deltas.downloads || 0),
+                    activeVaultsCount: Math.max(0, deltas.active || 0),
+                    lastBurnedAt: deltas.burned ? new Date() : null,
+                });
+                return;
+            }
+
+            const currentBytes = BigInt(stats.totalBytesUploaded || "0");
+            const newBytes = (currentBytes + BigInt(deltas.bytes || 0)).toString();
+            
+            await db.update(globalStats)
+                .set({
+                    totalVaultsCreated: sql`${globalStats.totalVaultsCreated} + ${deltas.vaults || 0}`,
+                    totalBytesUploaded: newBytes,
+                    totalDownloads: sql`${globalStats.totalDownloads} + ${deltas.downloads || 0}`,
+                    activeVaultsCount: sql`${globalStats.activeVaultsCount} + ${deltas.active || 0}`,
+                    lastBurnedAt: deltas.burned ? new Date() : stats.lastBurnedAt,
+                    updatedAt: new Date(),
+                })
+                .where(eq(globalStats.id, 1));
+        } catch (err) {
+            console.error("[Stats] Failed to update global stats:", err);
+        }
+    }
+
+    async getGlobalStats(): Promise<GlobalStats> {
+        const [stats] = await db.select().from(globalStats).where(eq(globalStats.id, 1));
+        if (!stats) {
+            const [newStats] = await db.insert(globalStats).values({ id: 1 }).returning();
+            return newStats;
+        }
+        return stats;
+    }
 
     async createVault(data: CreateVaultRequest): Promise<Vault> {
         let shortCode = "", isUnique = false;
@@ -42,6 +86,7 @@ export class DatabaseStorage implements IStorage {
         }
 
         const expiresAt = new Date(Date.now() + data.expiresIn * 60 * 60 * 1000);
+        const pinSalt = data.pinSalt || crypto.randomBytes(16).toString("base64");
 
         let vault: Vault;
         try {
@@ -54,7 +99,8 @@ export class DatabaseStorage implements IStorage {
                 expiresAt,
                 maxDownloads: data.maxDownloads,
                 downloadCount: 0,
-                isDeleted: false
+                isDeleted: false,
+                pinSalt
             }).returning();
         } catch (error: any) {
             const isLookupConflict =
@@ -80,21 +126,29 @@ export class DatabaseStorage implements IStorage {
             await this.createFile(vault.id, f.fileId, f.chunks, f.size, f.isCompressed, f.originalSize, fileMaxDownloads);
         }
 
+        // Update Global Stats
+        const totalSize = data.files.reduce((sum, f) => sum + f.size, 0);
+        await this.updateStats({ vaults: 1, active: 1, bytes: totalSize });
+
         return vault;
     }
 
     async getVault(id: string): Promise<Vault | undefined> {
-        const [vault] = await db.select().from(vaults).where(eq(vaults.id, id));
+        const [vault] = await db.select().from(vaults).where(and(eq(vaults.id, id), eq(vaults.isDeleted, false)));
         return vault;
+    }
+    
+    async updateVault(id: string, updates: Partial<Vault>): Promise<void> {
+        await db.update(vaults).set({ ...updates, updatedAt: new Date() }).where(eq(vaults.id, id));
     }
 
     async getVaultByShortCode(code: string): Promise<Vault | undefined> {
-        const [vault] = await db.select().from(vaults).where(eq(vaults.shortCode, code));
+        const [vault] = await db.select().from(vaults).where(and(eq(vaults.shortCode, code), eq(vaults.isDeleted, false))).limit(1);
         return vault;
     }
 
     async getVaultByLookupId(lookupId: string): Promise<Vault | undefined> {
-        const [vault] = await db.select().from(vaults).where(eq(vaults.lookupId, lookupId));
+        const [vault] = await db.select().from(vaults).where(and(eq(vaults.lookupId, lookupId), eq(vaults.isDeleted, false))).limit(1);
         return vault;
     }
 
@@ -173,6 +227,10 @@ export class DatabaseStorage implements IStorage {
             .set({ downloadCount: sql`${vaults.downloadCount} + 1` })
             .where(eq(vaults.id, vaultId))
             .returning();
+        
+        if (updated) {
+            await this.updateStats({ downloads: 1 });
+        }
         return updated?.downloadCount || 0;
     }
 
@@ -201,6 +259,10 @@ export class DatabaseStorage implements IStorage {
                     isExhausted: remaining <= 0
                 });
             }
+        }
+
+        if (results.length > 0) {
+            await this.updateStats({ downloads: results.length });
         }
 
         return results;
@@ -255,17 +317,26 @@ export class DatabaseStorage implements IStorage {
         }
 
         await db.delete(vaults).where(eq(vaults.id, id));
+        await this.updateStats({ active: -1, burned: true });
         console.log(`[Storage] Deleted vault ${id} and resources.`);
+    }
+
+    async softDeleteVault(id: string): Promise<void> {
+        await db.update(vaults).set({ isDeleted: true }).where(eq(vaults.id, id));
+        console.log(`[Storage] Vault ${id} marked for background deletion.`);
     }
 
     async cleanupExpiredVaults(): Promise<void> {
         const now = new Date();
         const expiredVaults = await db.select({ id: vaults.id })
             .from(vaults)
-            .where(lt(vaults.expiresAt, now));
+            .where(or(
+                lt(vaults.expiresAt, now),
+                eq(vaults.isDeleted, true)
+            ));
 
         if (expiredVaults.length > 0) {
-            console.log(`[Cleanup] Found ${expiredVaults.length} expired vaults. Purging...`);
+            console.log(`[Cleanup] Found ${expiredVaults.length} vaults to purge. Processing background queue...`);
             for (const vault of expiredVaults) {
                 await this.deleteVault(vault.id);
             }
@@ -332,6 +403,39 @@ export class DatabaseStorage implements IStorage {
             reconcileUsage(r2Total, supabaseTotal);
         } catch (err) {
             console.error("[Storage] Failed to reconcile usage from DB:", err);
+        }
+    }
+
+    async incrementVaultEmailCount(vaultId: string): Promise<number> {
+        const [vault] = await db.update(vaults)
+            .set({ emailSentCount: sql`${vaults.emailSentCount} + 1` })
+            .where(eq(vaults.id, vaultId))
+            .returning();
+        return vault?.emailSentCount || 0;
+    }
+
+    async getEmailUsage(date: string): Promise<any> {
+        const [usage] = await db.select().from(emailUsage).where(eq(emailUsage.date, date));
+        return usage || { date, resendCount: 0, brevoCount: 0, msg91Count: 0 };
+    }
+
+    async incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void> {
+        const [usage] = await db.select().from(emailUsage).where(eq(emailUsage.date, date));
+        
+        if (!usage) {
+            await db.insert(emailUsage).values({
+                date,
+                resendCount: provider === "resend" ? 1 : 0,
+                brevoCount: provider === "brevo" ? 1 : 0,
+                msg91Count: provider === "msg91" ? 1 : 0,
+            });
+        } else {
+            const update: any = { lastUpdated: new Date() };
+            if (provider === "resend") update.resendCount = usage.resendCount + 1;
+            if (provider === "brevo") update.brevoCount = usage.brevoCount + 1;
+            if (provider === "msg91") update.msg91Count = usage.msg91Count + 1;
+            
+            await db.update(emailUsage).set(update).where(eq(emailUsage.date, date));
         }
     }
 }
@@ -401,6 +505,10 @@ class FallbackStorage implements IStorage {
     async getVault(id: string): Promise<Vault | undefined> {
         return this.execute(s => s.getVault(id));
     }
+    
+    async updateVault(id: string, updates: Partial<Vault>): Promise<void> {
+        return this.execute(s => s.updateVault(id, updates));
+    }
     async getVaultByShortCode(code: string): Promise<Vault | undefined> {
         return this.execute(s => s.getVaultByShortCode(code));
     }
@@ -443,11 +551,26 @@ class FallbackStorage implements IStorage {
     async updateClipboard(lookupId: string, encryptedClipboardText: string): Promise<Date> {
         return this.execute(s => s.updateClipboard(lookupId, encryptedClipboardText));
     }
+    async softDeleteVault(id: string): Promise<void> {
+        return this.execute(s => s.softDeleteVault(id));
+    }
     async deleteVault(id: string): Promise<void> {
         return this.execute(s => s.deleteVault(id));
     }
     async cleanupExpiredVaults(): Promise<void> {
         return this.execute(s => s.cleanupExpiredVaults());
+    }
+    async getGlobalStats(): Promise<GlobalStats> {
+        return this.execute(s => s.getGlobalStats());
+    }
+    async incrementVaultEmailCount(vaultId: string): Promise<number> {
+        return this.execute(s => s.incrementVaultEmailCount(vaultId));
+    }
+    async getEmailUsage(date: string): Promise<any> {
+        return this.execute(s => s.getEmailUsage(date));
+    }
+    async incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void> {
+        return this.execute(s => s.incrementEmailUsage(date, provider));
     }
 
     // --- Extended methods (not part of IStorage — always use primary) ---

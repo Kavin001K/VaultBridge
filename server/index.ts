@@ -11,8 +11,12 @@ import { logStorageStatus } from "./services/storage_router";
 import { registerSeoRoutes } from "./seo-routes";
 
 const app = express();
-const httpServer = createServer(app);
 const isProduction = process.env.NODE_ENV === "production";
+if (isProduction) {
+  app.set("trust proxy", 1); // Enable trusting proxy for rate limiting (Render/Cloudflare)
+}
+const httpServer = createServer(app);
+log(`Server starting in ${process.env.NODE_ENV} mode (isProduction: ${isProduction})`);
 const apiBodyLimit = process.env.API_BODY_LIMIT || "100mb";
 const cspConnectSrc = [
   "'self'",
@@ -41,81 +45,107 @@ declare module "http" {
 }
 
 // =============================================================================
-// IMMEDIATE BOT REJECTION (HIGHEST PRIORITY)
+// RATE LIMIT DIAGNOSTICS
 // =============================================================================
-// Drop known bot requests before handling CORS, Security Headers, or Rate Limits
 app.use((req, res, next) => {
-  const botPaths = [
-    '.php',
-    '/wp-',
-    'wp-cron.php',
-    '/ads.txt',
-    '/.well-known/sg-hosted',
-    '/xmlrpc.php'
-  ];
-
-  if (botPaths.some(path => req.path.includes(path) || req.url.includes(path))) {
-    // 444 is a non-standard code used to tell the server to drop the connection
-    return res.status(444).end();
-  }
+  const originalStatus = res.status;
+  res.status = function(code) {
+    if (code === 429) {
+      console.trace(`[RATE LIMIT HIT] 429 on ${req.method} ${req.url} from ${req.ip}`);
+    }
+    return originalStatus.apply(res, [code]);
+  };
   next();
 });
+
+// Drop known bot requests before handling CORS, Security Headers, or Rate Limits
+if (isProduction) {
+  app.use((req, res, next) => {
+    const botPaths = [
+      '.php',
+      '/wp-',
+      'wp-cron.php',
+      '/ads.txt',
+      '/.well-known/sg-hosted',
+      '/xmlrpc.php'
+    ];
+
+    if (botPaths.some(path => req.path.includes(path) || req.url.includes(path))) {
+      // 444 is a non-standard code used to tell the server to drop the connection
+      return res.status(444).end();
+    }
+    next();
+  });
+}
 
 // =============================================================================
 // SECURITY MIDDLEWARE (Phase 2.4)
 // =============================================================================
 
-// Helmet for security headers
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://plausible.io", "https://static.cloudflareinsights.com"], // For Vite HMR in dev
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: cspConnectSrc, // API + storage + local dev tooling
+// Security Headers (Helmet) - Only enabled in production
+if (isProduction) {
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'", "https://plausible.io", "https://static.cloudflareinsights.com"], 
+          scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"], 
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          imgSrc: ["'self'", "data:", "blob:"],
+          connectSrc: cspConnectSrc,
+          workerSrc: ["'self'", "blob:"],
+          upgradeInsecureRequests: [],
+        },
       },
-    },
-    crossOriginEmbedderPolicy: false, // Required for some features
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-    },
-  })
-);
+      crossOriginEmbedderPolicy: false, // Required for some features
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+      },
+    })
+  );
+}
 
 
 
-// Global rate limiter: 50 requests per minute to protect all routes from bots
-const globalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 50,
-  message: { message: "Too many requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Global rate limiter: Disabled in dev to fix 429 issues
+const globalLimiter = process.env.NODE_ENV === "production" 
+  ? rateLimit({
+      windowMs: 60 * 1000,
+      max: 10000,
+      message: { message: "Too many requests. Please try again later." },
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  : (_req: any, _res: any, next: any) => next();
 
-app.use(globalLimiter);  // Applied globally instead of just /api
+if (process.env.NODE_ENV === "production") {
+  app.use("/api", globalLimiter);
+}
 
 // Stricter rate limit for code resolution (anti-brute-force)
-export const codeLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // Only 5 attempts per minute
-  message: { message: "Too many code attempts. Please wait before trying again." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+export const codeLimiter = process.env.NODE_ENV === "production"
+  ? rateLimit({
+      windowMs: 60 * 1000,
+      max: 5,
+      message: { message: "Too many code attempts. Please wait before trying again." },
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  : (_req: any, _res: any, next: any) => next();
 
 // Upload rate limiter
-export const uploadLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20, // 20 uploads per minute
-  message: { message: "Upload rate limit exceeded." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+export const uploadLimiter = process.env.NODE_ENV === "production"
+  ? rateLimit({
+      windowMs: 60 * 1000,
+      max: 10000,
+      message: { message: "Upload rate limit exceeded. Please wait a moment." },
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  : (_req: any, _res: any, next: any) => next();
 
 // =============================================================================
 // BODY PARSING
@@ -157,14 +187,13 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
+    let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    
+    if (path.startsWith("/api") && capturedJsonResponse) {
+      logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
     }
+
+    log(logLine);
   });
 
   next();
