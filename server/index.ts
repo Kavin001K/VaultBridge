@@ -110,10 +110,21 @@ if (isProduction) {
 
 
 
-// Rate limiters disabled in development to prevent 429 errors
-const globalLimiter = (_req: any, _res: any, next: any) => next();
-export const codeLimiter = (_req: any, _res: any, next: any) => next();
-export const uploadLimiter = (_req: any, _res: any, next: any) => next();
+// =============================================================================
+// RATE LIMITERS (Phase 2.5 - Executive Hardening)
+// =============================================================================
+
+const limiterConfig = {
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 20, // Limit each IP to 20 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please try again later." }
+};
+
+export const globalLimiter = rateLimit(limiterConfig);
+export const codeLimiter = rateLimit({ ...limiterConfig, max: 15 }); // Slightly tighter for brute-force protection
+export const uploadLimiter = rateLimit({ ...limiterConfig, max: 10, windowMs: 1 * 60 * 1000 }); // Strictest for upload initialization
 
 // =============================================================================
 // BODY PARSING
@@ -202,6 +213,7 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
     // Reconcile storage usage from DB (count existing bytes per provider)
     await storage.reconcileStorageUsage();
     logStorageStatus();
+    await storage.recalculateStats();
     await storage.createLog("info", "SYSTEM_STARTUP", "VaultBridge Executive Console initialized and secured.", {
         mode: process.env.NODE_ENV,
         version: "1.0.0-PROD"

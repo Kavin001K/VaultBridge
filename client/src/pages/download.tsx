@@ -310,7 +310,7 @@ export default function DownloadPage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 px-6 py-12">
+      <main className="relative z-10 flex-1 px-6 pt-12 sm:pt-16 pb-12">
         <div className="max-w-4xl mx-auto space-y-10">
           
           {/* Vault Header Identity */}

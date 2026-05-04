@@ -45,12 +45,14 @@ export function LiveClipboard({ lookupId, fileKey, wrappedKey, initialContent, s
             const decryptSync = async () => {
                 try {
                     const decrypted = await decryptClipboardText(syncData.encryptedClipboardText!, fileKey);
-                    // Compare via ref, not state dependency
+                    
+                    // Only update if content is different from local state
                     if (decrypted !== clipboardContentRef.current) {
                         setClipboardContent(decrypted);
                         if (syncData.updatedAt) {
                             setLastSaved(new Date(syncData.updatedAt));
                         }
+                        // Optional: trigger a "Remote update received" notification/pulse
                     }
                 } catch (e) {
                     console.error("Sync decryption failed", e);

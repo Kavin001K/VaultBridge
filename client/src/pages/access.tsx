@@ -265,7 +265,7 @@ export default function AccessPage() {
             <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
-            <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+            <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <Link href="/">
                         <div className="flex items-center gap-3 cursor-pointer group">
@@ -283,7 +283,7 @@ export default function AccessPage() {
                 </div>
             </header>
 
-            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 pt-28 pb-20 flex flex-col">
+            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 pt-12 sm:pt-16 pb-20 flex flex-col">
                 <AnimatePresence mode="wait">
                     {stage === "input" && (
                         <motion.div key="input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-10">
@@ -316,10 +316,10 @@ export default function AccessPage() {
                                 <Button 
                                     onClick={() => submitCode()} 
                                     disabled={accessCode.length < 8}
-                                    className="h-16 w-full rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform"
+                                    className="w-full h-20 rounded-[1.5rem] bg-gradient-to-br from-emerald-400 to-emerald-600 text-zinc-950 font-black uppercase tracking-[0.2em] text-xl shadow-[0_20px_60px_rgba(16,185,129,0.4)] hover:brightness-110 hover:-translate-y-1 active:scale-[0.98] transition-all flex items-center justify-center"
                                 >
                                     Establish Handshake
-                                    <ArrowRight className="w-4 h-4 ml-2" />
+                                    <ArrowRight className="w-6 h-6 ml-4" />
                                 </Button>
 
                                 <div className="pt-6 border-t border-white/5 flex items-center justify-between text-[10px] font-black text-zinc-600 uppercase tracking-widest">
@@ -384,16 +384,22 @@ export default function AccessPage() {
                                                     <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-tighter">{formatSize(file.size)} • {file.type.split('/')[1] || 'BINARY'}</p>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="sm" onClick={() => downloadFile(file)} className="text-[10px] font-black text-primary hover:bg-primary/10 rounded-full">
+                                            <Button 
+                                                onClick={() => downloadFile(file)} 
+                                                className="h-10 px-6 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md text-primary hover:bg-primary hover:text-white transition-all font-black uppercase tracking-[0.15em] text-[10px]"
+                                            >
                                                 <Download className="w-3.5 h-3.5 mr-2" /> EXTRACT
                                             </Button>
                                         </div>
                                     ))}
                                 </div>
                                 <div className="p-6 bg-zinc-900/50 flex flex-col gap-4">
-                                    <Button onClick={handleDownloadAll} className="h-14 w-full rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
+                                    <Button 
+                                        onClick={handleDownloadAll} 
+                                        className="w-full h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-zinc-950 font-black uppercase tracking-[0.2em] text-base shadow-[0_15px_40px_rgba(16,185,129,0.3)] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center"
+                                    >
                                         Extract Entire Payload
-                                        <Zap className="w-4 h-4 ml-2" />
+                                        <Zap className="w-6 h-6 ml-4 fill-current" />
                                     </Button>
                                 </div>
                             </div>
@@ -408,7 +414,10 @@ export default function AccessPage() {
                                     <div className="bg-zinc-950/80 p-5 rounded-2xl border border-white/5 font-mono text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed select-all">
                                         {clipboardPayload.plainText}
                                     </div>
-                                    <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(clipboardPayload.plainText)} className="w-full border-white/5 hover:bg-primary/10 hover:text-primary text-[10px] font-black uppercase tracking-widest">
+                                    <Button 
+                                        onClick={() => navigator.clipboard.writeText(clipboardPayload.plainText)} 
+                                        className="w-full h-12 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all font-black uppercase tracking-[0.15em] text-xs"
+                                    >
                                         Copy Buffer Content
                                     </Button>
                                 </div>

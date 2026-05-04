@@ -169,7 +169,7 @@ export default function UniversalClipboard() {
             <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
-            <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+            <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <Link href="/">
                         <div className="flex items-center gap-3 cursor-pointer group">
@@ -198,7 +198,7 @@ export default function UniversalClipboard() {
                 </div>
             </header>
 
-            <main className="relative z-10 flex-1 w-full max-w-3xl mx-auto px-4 pt-24 pb-20 flex flex-col">
+            <main className="relative z-10 flex-1 w-full max-w-3xl mx-auto px-4 pt-12 sm:pt-16 pb-20 flex flex-col">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
                    <div className="flex items-center justify-between mb-2">
                        <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Universal <span className="text-primary">Clipboard</span></h2>
@@ -213,12 +213,15 @@ export default function UniversalClipboard() {
                 <AnimatePresence>
                     {showSettings && mode === "draft" && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 overflow-hidden">
-                            <div className="glass-card p-6 space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Buffer Expiration</span>
-                                    <span className="text-xs font-mono font-black text-primary">{formatExpiry(expiresIn[0])}</span>
+                            <div className="glass-card bg-white/[0.02] border border-white/5 p-8 space-y-6 shadow-inner">
+                                <div className="flex justify-between items-center px-1">
+                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2"><Clock className="w-4 h-4 text-primary" /> Buffer Expiration</span>
+                                    <span className="text-sm font-mono font-black text-primary px-3 py-1 rounded-lg bg-primary/10 border border-primary/20">{formatExpiry(expiresIn[0])}</span>
                                 </div>
-                                <Slider value={expiresIn} onValueChange={setExpiresIn} max={24} step={1} min={1} className="py-2" />
+                                <div className="px-1 py-4 bg-black/20 rounded-2xl">
+                                    <Slider value={expiresIn} onValueChange={setExpiresIn} max={24} step={1} min={1} className="py-2" />
+                                </div>
+                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1 text-center">Protocol: Automatic fragmentation after timeout</p>
                             </div>
                         </motion.div>
                     )}
@@ -269,8 +272,12 @@ export default function UniversalClipboard() {
                     <AnimatePresence mode="wait">
                         {mode === "draft" ? (
                             <motion.div key="draft-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                                <Button onClick={handleGoLive} disabled={!content.trim() || isCreating} className="h-16 w-full rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform">
-                                    {isCreating ? <Loader2 className="w-6 h-6 animate-spin" /> : <>ESTABLISH SECURE LINK <Wifi className="w-4 h-4 ml-2" /></>}
+                                <Button 
+                                    onClick={handleGoLive} 
+                                    disabled={!content.trim() || isCreating} 
+                                    className="w-full h-20 rounded-[1.5rem] bg-gradient-to-br from-emerald-400 to-emerald-600 text-zinc-950 font-black uppercase tracking-[0.2em] text-xl shadow-[0_20px_60px_rgba(16,185,129,0.4)] hover:brightness-110 hover:-translate-y-1 active:scale-[0.98] transition-all flex items-center justify-center"
+                                >
+                                    {isCreating ? <RefreshCw className="w-8 h-8 animate-spin" /> : <>ESTABLISH SECURE LINK <Wifi className="w-6 h-6 ml-4" /></>}
                                 </Button>
                             </motion.div>
                         ) : (
@@ -286,9 +293,9 @@ export default function UniversalClipboard() {
                                    <div className="flex gap-2">
                                        <Dialog>
                                            <DialogTrigger asChild>
-                                               <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-white/10 bg-zinc-950 text-zinc-400 hover:text-primary">
-                                                  <QrCode className="w-5 h-5" />
-                                               </Button>
+                                                <Button className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all flex items-center justify-center">
+                                                   <QrCode className="w-5 h-5" />
+                                                </Button>
                                            </DialogTrigger>
                                            <DialogContent className="bg-zinc-950 border-white/5 text-white max-w-sm rounded-3xl p-8">
                                                <DialogHeader className="mb-6">
@@ -300,12 +307,12 @@ export default function UniversalClipboard() {
                                                <p className="text-center font-mono font-black text-2xl text-primary tracking-[0.3em]">{pinDisplay}</p>
                                            </DialogContent>
                                        </Dialog>
-                                       <Button variant="outline" size="icon" onClick={() => copyToClipboard(vaultData!.fullCode)} className="h-12 w-12 rounded-xl border-white/10 bg-zinc-950 text-zinc-400 hover:text-primary">
-                                          <Copy className="w-5 h-5" />
-                                       </Button>
-                                       <Button variant="outline" size="icon" onClick={() => window.location.reload()} className="h-12 w-12 rounded-xl border-white/10 bg-zinc-950 text-red-500 hover:bg-red-500/10">
-                                          <Power className="w-5 h-5" />
-                                       </Button>
+                                        <Button onClick={() => copyToClipboard(vaultData!.fullCode)} className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-zinc-300 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all flex items-center justify-center">
+                                           <Copy className="w-5 h-5" />
+                                        </Button>
+                                        <Button onClick={() => window.location.reload()} className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-red-500 hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-all flex items-center justify-center">
+                                           <Power className="w-5 h-5" />
+                                        </Button>
                                    </div>
                                 </div>
                                 <div className="flex items-center justify-between px-2 text-[10px] font-black text-zinc-600 uppercase tracking-widest">

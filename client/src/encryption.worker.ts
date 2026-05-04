@@ -72,7 +72,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 });
             }
 
-            const response: WorkerResponse = {
+            const response = {
                 type: 'decrypt_success',
                 id,
                 decryptedData: decrypted
@@ -95,3 +95,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         });
     }
 };
+
+export {};
+

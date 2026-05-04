@@ -162,6 +162,14 @@ function SplashScreen() {
   );
 }
 
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location]);
+  return null;
+}
+
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
@@ -211,6 +219,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <ScrollToTop />
         <Toaster />
         <ErrorBoundary>
           <AnimatePresence>
@@ -223,7 +232,7 @@ function App() {
               opacity: showSplash ? 0 : 1,
               pointerEvents: showSplash ? 'none' : 'auto',
               transition: 'opacity 0.6s ease-out',
-              position: showSplash ? 'fixed' : 'relative',
+              position: 'relative',
               width: '100%',
             }}
           >

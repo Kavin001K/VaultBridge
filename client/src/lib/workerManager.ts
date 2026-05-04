@@ -33,7 +33,7 @@ class EncryptionWorkerManager {
 
     private createWorker() {
         // Vite-compatible worker initialization
-        const worker = new Worker(new URL('../../encryption.worker.ts', import.meta.url), {
+        const worker = new Worker(new URL('../encryption.worker.ts', import.meta.url), {
             type: 'module'
         });
 
@@ -99,7 +99,7 @@ class PersistentWorkerPool {
         if (workerObj) return workerObj;
 
         if (this.workers.length < this.maxWorkers) {
-            const worker = new Worker(new URL('../../encryption.worker.ts', import.meta.url), {
+            const worker = new Worker(new URL('../encryption.worker.ts', import.meta.url), {
                 type: 'module'
             });
             const newWorkerObj = { worker, busy: false };

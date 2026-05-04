@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Sparkles, AlertTriangle, Copy, Check, Key,
   Share2, Mail, Trash2, Smartphone, Monitor, Shield, ExternalLink, Loader2,
-  Clock, Download, HardDrive, Timer, Zap, Activity, ChevronRight, Binary, Cpu
+  Clock, Download, HardDrive, Timer, Zap, Activity, ChevronRight, Binary, Cpu, CheckCircle2
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -130,7 +130,7 @@ export default function SuccessPage() {
       <div className="scanline pointer-events-none opacity-10" />
 
       {/* Header */}
-      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
+      <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <Link href="/">
             <div className="flex items-center gap-3 cursor-pointer group">
@@ -146,7 +146,7 @@ export default function SuccessPage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 pt-28 pb-20">
+      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 pt-12 sm:pt-16 pb-20">
         
         {/* Status Badge */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">

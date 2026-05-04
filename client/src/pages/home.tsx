@@ -267,7 +267,7 @@ export default function Home() {
       <div className="fixed bottom-8 right-8 w-32 h-32 border-r border-b border-primary/20 rounded-br-3xl pointer-events-none opacity-50" />
 
       {/* Header (Premium Navigation) */}
-      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
+      <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-5 flex items-center justify-between">
           <motion.div 
             initial={{ opacity: 0, x: -20 }} 
@@ -303,7 +303,7 @@ export default function Home() {
             </Button>
             <Button
               size="sm"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full px-4 sm:px-6 text-xs sm:text-sm"
+              className="h-10 px-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-zinc-950 font-black uppercase tracking-[0.2em] text-[10px] shadow-[0_10px_20px_rgba(16,185,129,0.3)] hover:brightness-110 transition-all"
               onClick={() => setLocation('/upload')}
             >
               Upload
@@ -341,7 +341,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1 relative z-10 pt-28 sm:pt-32">
+      <main className="flex-1 relative z-10 pt-12 sm:pt-16">
 
         {/* SECTION 1 — Hero (simplified, action-first) */}
         <section className="relative pt-24 sm:pt-32 pb-10 sm:pb-20 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center">
@@ -471,7 +471,7 @@ export default function Home() {
                     </div>
                     <Button
                       type="button"
-                      className="h-12 sm:h-14 rounded-2xl bg-primary px-6 sm:px-12 font-black text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_10px_30px_rgba(16,185,129,0.25)] border border-white/10"
+                      className="h-12 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-zinc-950 font-black uppercase tracking-[0.2em] text-xs px-10 shadow-[0_15px_30px_rgba(16,185,129,0.3)] hover:brightness-110 active:scale-95 transition-all"
                       onClick={() => openVault(vaultInput)}
                     >
                       Authenticate

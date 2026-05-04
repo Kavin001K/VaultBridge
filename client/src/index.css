@@ -206,14 +206,68 @@
 
 @layer components {
 
-  /* Glass Card Effect */
+  /* Glass Card Effect - Refined */
   .glass-card {
-    @apply backdrop-blur-2xl border border-white/5 rounded-[2rem] shadow-2xl;
-    background: linear-gradient(135deg, rgba(24, 24, 27, 0.8) 0%, rgba(9, 9, 11, 0.9) 100%);
+    @apply backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-2xl;
+    background: linear-gradient(135deg, rgba(24, 24, 27, 0.7) 0%, rgba(9, 9, 11, 0.85) 100%);
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.03) inset,
-      0 20px 40px -10px rgba(0, 0, 0, 0.7),
-      0 0 20px rgba(16, 185, 129, 0.05);
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+      0 25px 50px -12px rgba(0, 0, 0, 0.8),
+      0 0 30px rgba(16, 185, 129, 0.05);
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .glass-card:hover {
+    @apply border-white/15;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+      0 30px 60px -15px rgba(0, 0, 0, 0.9),
+      0 0 40px rgba(16, 185, 129, 0.1);
+  }
+
+  /* Executive Primary Button - High Contrast & Premium */
+  .btn-executive {
+    @apply relative overflow-hidden rounded-2xl font-black uppercase tracking-[0.2em] transition-all duration-500;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #061f14;
+    box-shadow: 
+      0 10px 40px -10px rgba(16, 185, 129, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+    border: 1px solid rgba(16, 185, 129, 0.5);
+  }
+
+  .btn-executive:hover:not(:disabled) {
+    @apply -translate-y-1 scale-[1.02];
+    box-shadow: 
+      0 20px 50px -15px rgba(16, 185, 129, 0.7),
+      0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+    filter: brightness(1.1);
+  }
+
+  .btn-executive:active:not(:disabled) {
+    @apply translate-y-0 scale-[0.98];
+  }
+
+  .btn-executive:disabled {
+    @apply opacity-40 cursor-not-allowed grayscale;
+  }
+
+  /* Glass Secondary Button - Executive Subtlety */
+  .btn-glass {
+    @apply relative overflow-hidden rounded-2xl font-black uppercase tracking-[0.15em] transition-all duration-500;
+    @apply bg-white/5 border border-white/10 backdrop-blur-md text-zinc-300;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  }
+
+  .btn-glass:hover:not(:disabled) {
+    @apply bg-white/10 border-white/20 text-white -translate-y-0.5;
+    box-shadow: 
+      0 10px 25px -5px rgba(0, 0, 0, 0.5),
+      0 0 15px rgba(255, 255, 255, 0.05);
+  }
+
+  .btn-glass:active:not(:disabled) {
+    @apply scale-[0.98] translate-y-0;
   }
 
   /* Glowing Border Effect */
@@ -532,14 +586,27 @@
   }
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.1) 50%,
-      transparent 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
-}
+  .animate-shimmer {
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  /* Executive Utilities */
+  .hover-elevate {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+  
+  .active-elevate-2 {
+    @apply active:translate-y-0 active:scale-[0.98];
+  }
+
+  .text-security-disc {
+    -webkit-text-security: disc;
+  }
 
 /* Bounce In Effect */
 @keyframes bounce-in {
