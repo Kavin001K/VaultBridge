@@ -117,23 +117,59 @@ function RecordCard({ record, onRemove, onCopy, onDeleteVault }: any) {
     };
 
     return (
-        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`glass-card p-5 group transition-all duration-300 ${record.status === 'active' ? 'border-white/5 hover:border-primary/20 bg-primary/[0.02]' : 'opacity-60 grayscale bg-zinc-950/20'}`}>
-            <div className="flex items-start justify-between gap-4 mb-4">
+        <motion.div 
+            layout 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className={`relative group p-6 rounded-[2rem] border transition-all duration-500 overflow-hidden ${
+                record.status === 'active' 
+                ? 'border-primary/20 bg-zinc-950/40 hover:bg-zinc-950/60 shadow-[0_0_50px_rgba(16,185,129,0.05)]' 
+                : 'border-white/5 opacity-50 grayscale bg-zinc-950/20'
+            }`}
+        >
+            {/* Background HUD elements for Active Bridges */}
+            {record.status === 'active' && (
+                <>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16 animate-pulse" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/5 blur-2xl -ml-12 -mb-12" />
+                    <div className="absolute top-4 right-4 flex gap-1">
+                        <div className="w-1 h-1 rounded-full bg-primary/40" />
+                        <div className="w-1 h-1 rounded-full bg-primary/20" />
+                        <div className="w-1 h-1 rounded-full bg-primary/10" />
+                    </div>
+                </>
+            )}
+
+            <div className="flex items-start justify-between gap-4 mb-5 relative z-10">
                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border border-white/10 shadow-xl relative overflow-hidden bg-gradient-to-br ${isClipboard ? 'from-violet-500/20 to-indigo-500/20' : identity.color}`}>
-                        {isClipboard ? <Clipboard className="w-5 h-5 text-violet-400" /> : <span className="text-xl drop-shadow-lg">{identity.icon}</span>}
+                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border border-white/10 shadow-2xl overflow-hidden transition-all duration-700 group-hover:scale-110 group-hover:rotate-3 ${isClipboard ? 'bg-gradient-to-br from-violet-500/20 to-indigo-500/20' : identity.color}`}>
+                        {record.status === 'active' && (
+                            <motion.div 
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="absolute inset-0 bg-primary/20"
+                            />
+                        )}
+                        {isClipboard ? <Clipboard className="w-6 h-6 text-violet-400" /> : <span className="text-2xl drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">{identity.icon}</span>}
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-sm font-black text-white uppercase italic tracking-tight truncate">
-                                {isClipboard ? "SECURE_BUFFER" : record.fileNames[0] || "BINARY_VAULT"}
+                            <h4 className="text-base font-black text-white uppercase italic tracking-tighter truncate group-hover:text-primary transition-colors">
+                                {isClipboard ? "SECURE_BUFFER_STREAM" : record.fileNames[0] || "BINARY_VAULT_NODE"}
                             </h4>
-                            {record.fileCount > 1 && <span className="text-[9px] font-black font-mono bg-zinc-900 border border-white/5 px-1.5 py-0.5 rounded text-zinc-500">+{record.fileCount - 1}</span>}
+                            {record.fileCount > 1 && (
+                                <span className="text-[8px] font-black font-mono bg-zinc-900 border border-primary/20 px-2 py-0.5 rounded-full text-primary">
+                                    +{record.fileCount - 1}_ASSETS
+                                </span>
+                            )}
                         </div>
-                        <div className="flex items-center gap-3 text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                            <span className={isSent ? 'text-primary/50' : 'text-cyan-500/50'}>{isSent ? "OUTBOUND" : "INBOUND"}</span>
+                        <div className="flex items-center gap-3 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
+                            <span className={`flex items-center gap-1.5 ${isSent ? 'text-primary/70' : 'text-cyan-400/70'}`}>
+                                {isSent ? <Upload className="w-3 h-3" /> : <Download className="w-3 h-3" />}
+                                {isSent ? "OUTBOUND_SECURE" : "INBOUND_BRIDGE"}
+                            </span>
                             <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                            <span>{formatRelativeTime(record.createdAt)}</span>
+                            <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatRelativeTime(record.createdAt)}</span>
                         </div>
                     </div>
                 </div>
@@ -229,13 +265,18 @@ export function RecentActivity() {
     const handleDeleteVault = async (record: any) => {
         try {
             const lookupId = record.accessCode.slice(0, 3);
-            const lookupRes = await fetch(`/api/vault/code/${lookupId}`);
+            // Re-map to correct production endpoint
+            const lookupRes = await fetch(`/api/vaults/code/${lookupId}`);
             if (!lookupRes.ok) { removeRecord(record.id); return; }
             const lookupData = await lookupRes.json();
             const deleteRes = await fetch(`/api/vaults/${lookupData.id}`, { method: "DELETE" });
             if (deleteRes.ok) {
+                setToastMessage("VAULT_PURGED_FROM_INFRASTRUCTURE");
                 updateRecord(record.accessCode, record.action, { status: "burned" });
-                setTimeout(() => removeRecord(record.id), 800);
+                setTimeout(() => {
+                    removeRecord(record.id);
+                    setToastMessage(null);
+                }, 1200);
             } else { removeRecord(record.id); }
         } catch (err) { removeRecord(record.id); }
     };

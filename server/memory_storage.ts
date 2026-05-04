@@ -1,5 +1,4 @@
-import {
-    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats
+    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats, type SystemLog
 } from "@shared/schema";
 import { randomUUID } from "node:crypto";
 import type { IStorage } from "./storage_interface";
@@ -29,6 +28,8 @@ export class MemoryStorage implements IStorage {
         updatedAt: new Date()
     };
     private emailUsage: Map<string, any> = new Map();
+    private logs: SystemLog[] = [];
+    private logIdCounter = 1;
 
     private updateStats(deltas: { vaults?: number, bytes?: number, downloads?: number, active?: number, burned?: boolean }) {
         this.stats.totalVaultsCreated = Math.max(0, this.stats.totalVaultsCreated + (deltas.vaults || 0));
@@ -41,6 +42,23 @@ export class MemoryStorage implements IStorage {
 
     async getGlobalStats(): Promise<GlobalStats> {
         return { ...this.stats };
+    }
+
+    async createLog(level: string, event: string, message: string, details?: any): Promise<void> {
+        const log: SystemLog = {
+            id: this.logIdCounter++,
+            level,
+            event,
+            message,
+            timestamp: new Date(),
+            details: details || {}
+        };
+        this.logs.unshift(log); // Add to beginning
+        if (this.logs.length > 500) this.logs.pop(); // Cap at 500 logs
+    }
+
+    async getSystemLogs(limit = 50): Promise<SystemLog[]> {
+        return this.logs.slice(0, limit);
     }
 
     async createVault(data: CreateVaultRequest): Promise<Vault> {
@@ -88,6 +106,12 @@ export class MemoryStorage implements IStorage {
         // Update Stats
         const totalSize = data.files.reduce((sum, f) => sum + f.size, 0);
         this.updateStats({ vaults: 1, active: 1, bytes: totalSize });
+
+        await this.createLog("info", "VAULT_CREATED", `New secure vault established: ${vault.id.substring(0,8)}`, { 
+            vaultId: vault.id, 
+            size: totalSize, 
+            files: data.files.length 
+        });
 
         return vault;
     }
@@ -227,6 +251,7 @@ export class MemoryStorage implements IStorage {
             v.downloadCount += 1;
             this.vaults.set(vaultId, v);
             this.updateStats({ downloads: 1 });
+            await this.createLog("info", "VAULT_ACCESS", `Secure vault accessed for download: ${vaultId.substring(0,8)}`, { vaultId });
             return v.downloadCount;
         }
         return 0;
@@ -267,6 +292,7 @@ export class MemoryStorage implements IStorage {
 
         if (results.length > 0) {
             this.updateStats({ downloads: results.length });
+            await this.createLog("info", "FILE_DOWNLOADED", `${results.length} secure fragments retrieved from storage`, { count: results.length });
         }
 
         return results;
@@ -342,6 +368,7 @@ export class MemoryStorage implements IStorage {
         this.vaults.delete(id);
         this.updateStats({ active: -1, burned: true });
         console.log(`[MemoryStorage] Deleted vault ${id} and resources.`);
+        await this.createLog("info", "VAULT_BURNED", `Secure vault and all associated fragments purged: ${id.substring(0,8)}`, { vaultId: id });
     }
 
     async cleanupExpiredVaults(): Promise<void> {

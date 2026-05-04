@@ -245,6 +245,26 @@ export default function Home() {
       <div className="fixed inset-0 grid-bg opacity-40 mix-blend-screen pointer-events-none" />
       <div className="scanline pointer-events-none opacity-20" />
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
+      
+      {/* Moving Security Pulse Rings */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <motion.div 
+            animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.2, 0.1] }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-primary/20 rounded-full"
+        />
+        <motion.div 
+            animate={{ scale: [1.2, 1.8, 1.2], opacity: [0.05, 0.15, 0.05] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-primary/10 rounded-full"
+        />
+      </div>
+      
+      {/* Decorative Technical HUD Corners */}
+      <div className="fixed top-24 left-8 w-32 h-32 border-l border-t border-primary/20 rounded-tl-3xl pointer-events-none opacity-50" />
+      <div className="fixed top-24 right-8 w-32 h-32 border-r border-t border-primary/20 rounded-tr-3xl pointer-events-none opacity-50" />
+      <div className="fixed bottom-8 left-8 w-32 h-32 border-l border-b border-primary/20 rounded-bl-3xl pointer-events-none opacity-50" />
+      <div className="fixed bottom-8 right-8 w-32 h-32 border-r border-b border-primary/20 rounded-br-3xl pointer-events-none opacity-50" />
 
       {/* Header (Premium Navigation) */}
       <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
@@ -353,25 +373,26 @@ export default function Home() {
             {/* ── 3 Big Action Cards (Premium Glassmorphism) ── */}
             <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
               {/* Upload Card */}
-              <Link href="/upload" className="h-full">
+              <Link href="/upload">
                 <motion.div
-                  whileHover={{ y: -5, scale: 1.02 }}
+                  whileHover={{ y: -8, scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => playSound('click')}
-                  className="group relative flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-primary/40 transition-all p-6 py-8 sm:p-8 sm:py-10 cursor-pointer overflow-hidden h-full shadow-xl"
+                  onClick={() => { playSound('click'); setLocation('/upload'); }}
+                  className="group relative flex flex-col items-center justify-center rounded-[2.5rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-primary/40 transition-all p-8 py-10 sm:p-10 sm:py-12 cursor-pointer overflow-hidden h-full shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
                 >
-                  {/* Glass highlight */}
-                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  {/* Glass highlight & corner accents */}
+                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                  <div className="absolute top-4 right-4 w-8 h-8 border-t border-r border-primary/20 rounded-tr-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   
-                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-[1.5rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-primary/50 transition-all duration-500 shadow-inner">
-                    <div className="absolute inset-0 bg-primary/5 blur-xl group-hover:bg-primary/20 transition-colors" />
-                    <Upload className="w-7 h-7 sm:w-9 sm:h-9 text-primary drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-[2rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:border-primary/50 transition-all duration-700 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]">
+                    <div className="absolute inset-0 bg-primary/10 blur-2xl group-hover:bg-primary/20 transition-colors" />
+                    <Upload className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary drop-shadow-[0_0_12px_rgba(16,185,129,0.6)]" />
                   </div>
                   
                   <div className="text-center relative">
-                    <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-primary transition-colors tracking-tight">Upload</h3>
-                    <p className="text-xs sm:text-sm text-zinc-500 mt-1.5 font-medium leading-tight">Encrypt & Share Files</p>
+                    <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-primary transition-colors tracking-tight uppercase">Upload</h3>
+                    <p className="text-[10px] sm:text-xs text-zinc-500 mt-2 font-black uppercase tracking-[0.2em] leading-tight opacity-80">Secure_File_Fragmenting</p>
                   </div>
                 </motion.div>
               </Link>
@@ -379,43 +400,45 @@ export default function Home() {
               {/* Access Card */}
               <motion.div
                 ref={vaultAccessPanelRef}
-                whileHover={{ y: -5, scale: 1.02 }}
+                whileHover={{ y: -8, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => { playSound('click'); focusVaultAccess(); }}
-                className="group relative flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-cyan-500/40 transition-all p-6 py-8 sm:p-8 sm:py-10 cursor-pointer overflow-hidden h-full shadow-xl"
+                className="group relative flex flex-col items-center justify-center rounded-[2.5rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-cyan-500/40 transition-all p-8 py-10 sm:p-10 sm:py-12 cursor-pointer overflow-hidden h-full shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
               >
-                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+                <div className="absolute top-4 right-4 w-8 h-8 border-t border-r border-cyan-500/20 rounded-tr-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 
-                <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-[1.5rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-cyan-400/50 transition-all duration-500 shadow-inner">
-                  <div className="absolute inset-0 bg-cyan-500/5 blur-xl group-hover:bg-cyan-500/20 transition-colors" />
-                  <KeyRound className="w-7 h-7 sm:w-9 sm:h-9 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-[2rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:border-cyan-400/50 transition-all duration-700 shadow-[inset_0_0_20px_rgba(34,211,238,0.05)]">
+                  <div className="absolute inset-0 bg-cyan-500/10 blur-2xl group-hover:bg-cyan-500/20 transition-colors" />
+                  <KeyRound className="relative w-8 h-8 sm:w-10 sm:h-10 text-cyan-400 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]" />
                 </div>
                 
                 <div className="text-center relative">
-                  <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-cyan-400 transition-colors tracking-tight">Access</h3>
-                  <p className="text-xs sm:text-sm text-zinc-500 mt-1.5 font-medium leading-tight">Unlock Secure Vault</p>
+                  <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-cyan-400 transition-colors tracking-tight uppercase">Access</h3>
+                  <p className="text-[10px] sm:text-xs text-zinc-500 mt-2 font-black uppercase tracking-[0.2em] leading-tight opacity-80">Zero_Knowledge_Unlock</p>
                 </div>
               </motion.div>
 
               {/* Clipboard Card */}
               <motion.div
-                whileHover={{ y: -5, scale: 1.02 }}
+                whileHover={{ y: -8, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => { playSound('click'); setLocation('/clipboard'); }}
-                className="group relative flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-emerald-500/40 transition-all p-6 py-8 sm:p-8 sm:py-10 cursor-pointer overflow-hidden h-full shadow-xl"
+                className="group relative flex flex-col items-center justify-center rounded-[2.5rem] border border-white/5 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-emerald-500/40 transition-all p-8 py-10 sm:p-10 sm:py-12 cursor-pointer overflow-hidden h-full shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
               >
-                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                <div className="absolute top-4 right-4 w-8 h-8 border-t border-r border-emerald-500/20 rounded-tr-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 
-                <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-[1.5rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-emerald-400/50 transition-all duration-500 shadow-inner">
-                  <div className="absolute inset-0 bg-emerald-500/5 blur-xl group-hover:bg-emerald-500/20 transition-colors" />
-                  <Clipboard className="w-7 h-7 sm:w-9 sm:h-9 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-[2rem] bg-zinc-950 border border-white/5 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:border-emerald-400/50 transition-all duration-700 shadow-[inset_0_0_20px_rgba(52,211,153,0.05)]">
+                  <div className="absolute inset-0 bg-emerald-500/10 blur-2xl group-hover:bg-emerald-500/20 transition-colors" />
+                  <Clipboard className="relative w-8 h-8 sm:w-10 sm:h-10 text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
                 </div>
                 
                 <div className="text-center relative">
-                  <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-emerald-400 transition-colors tracking-tight">Clipboard</h3>
-                  <p className="text-xs sm:text-sm text-zinc-500 mt-1.5 font-medium leading-tight">Zero-Knowledge Sync</p>
+                  <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-emerald-400 transition-colors tracking-tight uppercase">Clipboard</h3>
+                  <p className="text-[10px] sm:text-xs text-zinc-500 mt-2 font-black uppercase tracking-[0.2em] leading-tight opacity-80">Instant_Secure_Sync</p>
                 </div>
               </motion.div>
             </div>
@@ -426,8 +449,8 @@ export default function Home() {
               <div className="relative w-full rounded-[2rem] border border-white/10 bg-zinc-950/80 p-4 sm:p-6 text-left backdrop-blur-xl shadow-2xl">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                    <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-[0.2em]">Secure Entry Port</span>
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+                    <span className="text-[10px] font-mono font-black text-primary/80 uppercase tracking-[0.3em]">Secure_Access_Bridge_Node_v2.0</span>
                   </div>
                   
                   <div className="flex gap-2 sm:gap-3">
@@ -448,7 +471,7 @@ export default function Home() {
                     </div>
                     <Button
                       type="button"
-                      className="h-12 sm:h-14 rounded-2xl bg-primary px-6 sm:px-10 font-bold text-base text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                      className="h-12 sm:h-14 rounded-2xl bg-primary px-6 sm:px-12 font-black text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_10px_30px_rgba(16,185,129,0.25)] border border-white/10"
                       onClick={() => openVault(vaultInput)}
                     >
                       Authenticate
@@ -791,14 +814,46 @@ export default function Home() {
         </section>
 
         {/* SECTION 7 — Social Proof */}
-        <section className="py-20 px-4 border-y border-white/5 bg-primary/5 text-center">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="max-w-3xl mx-auto">
-            <Globe className="w-12 h-12 text-primary/50 mx-auto mb-6" />
+        <section className="py-20 px-4 border-y border-white/5 bg-primary/5 text-center relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #10b981 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="max-w-3xl mx-auto relative z-10">
+            <Globe className="w-12 h-12 text-primary/50 mx-auto mb-6 animate-pulse" />
             <p className="text-xl md:text-2xl font-medium text-zinc-300 leading-relaxed italic">
-              "Used by developers, students, and privacy-focused users worldwide to share sensitive data without leaving a trace."
+              "The gold standard for zero-knowledge file sharing. Encrypt anything, share anywhere, leave no trace."
             </p>
           </motion.div>
         </section>
+
+        {/* Live Security Ticker (Emerald Executive Detail) */}
+        <div className="w-full bg-zinc-950 border-y border-white/5 py-3 overflow-hidden whitespace-nowrap relative">
+            <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-zinc-950 to-transparent z-10" />
+            <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-zinc-950 to-transparent z-10" />
+            <motion.div 
+                animate={{ x: [0, -1000] }}
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                className="flex items-center gap-12 text-[10px] font-mono font-black text-zinc-500 uppercase tracking-[0.2em]"
+            >
+                {[...Array(10)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                        <span className="flex items-center gap-2">
+                            <Shield className="w-3 h-3 text-primary" /> SYSTEM_STATUS: <span className="text-emerald-400">OPTIMAL</span>
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                        <span className="flex items-center gap-2">
+                            <Lock className="w-3 h-3 text-primary" /> PROTOCOL: <span className="text-cyan-400">AES_256_GCM</span>
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                        <span className="flex items-center gap-2">
+                            <Zap className="w-3 h-3 text-primary" /> LATENCY: <span className="text-emerald-400">12MS</span>
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                        <span className="flex items-center gap-2">
+                            <Activity className="w-3 h-3 text-primary" /> NODES: <span className="text-cyan-400">GLOBAL_ACTIVE</span>
+                        </span>
+                    </div>
+                ))}
+            </motion.div>
+        </div>
 
         {/* SECTION 8 — Call to Action */}
         <section className="py-16 sm:py-32 px-3 sm:px-4 text-center relative overflow-hidden">
@@ -882,12 +937,17 @@ export default function Home() {
               VaultBridge is a high-performance, zero-knowledge platform engineered for military-grade file encryption and ultra-secure sharing. Built for privacy, scaled for performance.
             </p>
             
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <a href="https://github.com/Kavin001K/VaultBridge" aria-label="Github" className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 hover:border-white/10 transition-all">
                 <Github className="w-5 h-5" />
               </a>
-              <div className="px-4 h-10 rounded-xl bg-primary/5 border border-primary/10 flex items-center gap-2 text-primary font-mono text-[10px] font-bold uppercase tracking-widest">
-                <Activity className="w-3 h-3 animate-pulse" />
+              <Link href="/admin/stats?logs=true">
+                <button className="px-5 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2.5 text-emerald-400 font-mono text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all group">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  View System Logs
+                </button>
+              </Link>
+              <div className="px-4 h-10 rounded-xl bg-zinc-900/50 border border-white/5 flex items-center gap-2 text-zinc-500 font-mono text-[10px] font-bold uppercase tracking-widest">
                 Core: v2.4.0 Active
               </div>
             </div>

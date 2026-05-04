@@ -231,9 +231,12 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   registerSeoRoutes(app);
 
   // Reconcile storage usage from DB (count existing bytes per provider)
-  try {
     await storage.reconcileStorageUsage();
     logStorageStatus();
+    await storage.createLog("info", "SYSTEM_STARTUP", "VaultBridge Executive Console initialized and secured.", {
+        mode: process.env.NODE_ENV,
+        version: "1.0.0-PROD"
+    });
   } catch (err) {
     console.error("[Storage] Non-fatal: Failed to reconcile storage usage:", err);
   }

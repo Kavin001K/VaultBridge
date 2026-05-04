@@ -342,3 +342,17 @@ export function useStorageStatus() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
+
+// Get System Logs
+export function useSystemLogs(limit = 50) {
+  return useQuery({
+    queryKey: ["/api/admin/logs", limit],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/logs?limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch system logs");
+      return await res.json();
+    },
+    refetchInterval: 5000, // Refresh every 5s
+    retry: 2
+  });
+}

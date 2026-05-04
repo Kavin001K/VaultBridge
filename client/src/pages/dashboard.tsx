@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     Activity, Shield, HardDrive, Download, Zap, Flame, Clock,
     ArrowUpRight, BarChart3, Database, ShieldAlert, CheckCircle2,
-    RefreshCcw, AlertCircle
+    RefreshCcw, AlertCircle, X, Terminal, Search, Filter
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useGlobalStats, useStorageStatus } from "@/hooks/use-vaults";
+import { useGlobalStats, useStorageStatus, useSystemLogs } from "@/hooks/use-vaults";
 import { formatDistanceToNow } from "date-fns";
 
 const StatCard = ({ title, value, subValue, icon: Icon, color, delay }: any) => (
@@ -80,18 +80,158 @@ const StorageBar = ({ name, used, total, provider }: any) => {
     );
 };
 
+const LogViewer = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+    const { data: logs, isLoading } = useSystemLogs(100);
+    const [filter, setFilter] = useState("");
+
+    const filteredLogs = logs?.filter((log: any) => 
+        log.event.toLowerCase().includes(filter.toLowerCase()) ||
+        log.message.toLowerCase().includes(filter.toLowerCase())
+    );
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 lg:p-12">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                    />
+                    
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                        className="relative w-full max-w-5xl h-[80vh] bg-zinc-950 border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col"
+                    >
+                        {/* Terminal Header */}
+                        <div className="px-8 py-6 border-b border-white/5 bg-zinc-900/50 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="flex gap-1.5">
+                                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
+                                    <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50" />
+                                    <div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/50" />
+                                </div>
+                                <div className="h-4 w-px bg-white/10 mx-2" />
+                                <div className="flex items-center gap-2 text-zinc-400 font-mono text-xs font-bold tracking-widest uppercase">
+                                    <Terminal className="w-4 h-4" />
+                                    System_Audit_Log v1.0
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <div className="relative group">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="SEARCH_EVENTS..." 
+                                        value={filter}
+                                        onChange={(e) => setFilter(e.target.value)}
+                                        className="bg-zinc-950/50 border border-white/5 rounded-full pl-9 pr-4 py-2 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-primary/50 transition-all w-48 group-hover:w-64"
+                                    />
+                                </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={onClose}
+                                    className="rounded-full hover:bg-white/5 text-zinc-500 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Logs Content */}
+                        <div className="flex-1 overflow-y-auto p-8 font-mono text-[11px] leading-relaxed custom-scrollbar">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center h-full gap-3 text-zinc-500 italic">
+                                    <RefreshCcw className="w-4 h-4 animate-spin" />
+                                    Initializing secure connection to audit node...
+                                </div>
+                            ) : filteredLogs?.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-zinc-600 italic gap-2">
+                                    <ShieldAlert className="w-8 h-8 opacity-20" />
+                                    No events match current filter.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredLogs?.map((log: any) => (
+                                        <div key={log.id} className="flex gap-4 group hover:bg-white/[0.02] -mx-4 px-4 py-1.5 rounded-lg transition-colors">
+                                            <span className="text-zinc-600 shrink-0 select-none">
+                                                [{new Date(log.timestamp).toLocaleTimeString()}]
+                                            </span>
+                                            <span className={`shrink-0 font-black tracking-widest px-1.5 py-0.5 rounded text-[9px] border ${
+                                                log.level === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                log.level === 'warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                log.level === 'security' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                            }`}>
+                                                {log.event}
+                                            </span>
+                                            <span className="text-zinc-400 italic font-bold">
+                                                {log.message}
+                                            </span>
+                                            {log.details && Object.keys(log.details).length > 0 && (
+                                                <span className="text-zinc-600 italic opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    // {JSON.stringify(log.details)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <div className="pt-8 text-zinc-700 italic border-t border-white/5 animate-pulse">
+                                        &gt; LISTENING_FOR_NEW_EVENTS...
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-8 py-4 border-t border-white/5 bg-zinc-950 flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Connection: Encrypted_TLS_1.3</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Source: {location.hostname}</span>
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">
+                                {filteredLogs?.length || 0} Events Logged
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
+};
+
 export default function DashboardPage() {
     const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useGlobalStats();
     const { data: storageStatus, isLoading: storageLoading, refetch: refetchStorage } = useStorageStatus();
+    const [location] = useLocation();
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isLogsOpen, setIsLogsOpen] = useState(false);
+
+    // Auto-open logs if requested via URL param (Deep-linking)
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.get('logs') === 'true') {
+            setIsLogsOpen(true);
+        }
+    }, []);
 
     const handleManualRefresh = async () => {
         setIsRefreshing(true);
         try {
-            // Trigger server-side deep reconciliation
+            // Trigger server-side deep reconciliation of both storage and global metrics
             await fetch("/api/storage/reconcile", { method: "POST" });
             
-            // Refetch both data sets
+            // Refetch both data sets to update UI
             await Promise.all([
                 refetchStats(),
                 refetchStorage()
@@ -99,7 +239,8 @@ export default function DashboardPage() {
         } catch (err) {
             console.error("Manual refresh failed", err);
         } finally {
-            setTimeout(() => setIsRefreshing(false), 800);
+            // Keep the refreshing state for a moment for that 'technical' feel
+            setTimeout(() => setIsRefreshing(false), 1200);
         }
     };
 
@@ -318,7 +459,11 @@ export default function DashboardPage() {
                                 </div>
 
                                 <div className="mt-8 pt-8 border-t border-white/5">
-                                    <Button variant="outline" className="w-full bg-zinc-900/50 border-zinc-800 text-xs font-bold uppercase tracking-widest py-6">
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setIsLogsOpen(true)}
+                                        className="w-full bg-zinc-900/50 border-zinc-800 text-xs font-bold uppercase tracking-widest py-6 hover:bg-primary hover:text-black hover:border-primary transition-all duration-300"
+                                    >
                                         View System Logs
                                     </Button>
                                 </div>
@@ -330,6 +475,8 @@ export default function DashboardPage() {
 
             {/* Bottom Gradient Blur */}
             <div className="fixed bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent pointer-events-none z-0" />
+
+            <LogViewer isOpen={isLogsOpen} onClose={() => setIsLogsOpen(false)} />
         </div>
     );
 }

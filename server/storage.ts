@@ -1,6 +1,6 @@
 import {
-    vaults, files, chunks, globalStats, emailUsage,
-    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats
+    vaults, files, chunks, globalStats, emailUsage, systemLogs,
+    type Vault, type FileRecord, type ChunkRecord, type CreateVaultRequest, type GlobalStats, type SystemLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, lt, and, or } from "drizzle-orm";
@@ -39,12 +39,14 @@ export class DatabaseStorage implements IStorage {
             // Use an UPSERT-like pattern to ensure row 1 exists
             const [stats] = await db.select().from(globalStats).where(eq(globalStats.id, 1));
             if (!stats) {
+                // Initialize with counts if it doesn't exist
+                const [activeCount] = await db.select({ count: sql`count(*)` }).from(vaults).where(eq(vaults.isDeleted, false));
                 await db.insert(globalStats).values({
                     id: 1,
                     totalVaultsCreated: Math.max(0, deltas.vaults || 0),
                     totalBytesUploaded: Math.max(0, deltas.bytes || 0).toString(),
                     totalDownloads: Math.max(0, deltas.downloads || 0),
-                    activeVaultsCount: Math.max(0, deltas.active || 0),
+                    activeVaultsCount: Number(activeCount?.count || 0),
                     lastBurnedAt: deltas.burned ? new Date() : null,
                 });
                 return;
@@ -58,14 +60,62 @@ export class DatabaseStorage implements IStorage {
                     totalVaultsCreated: sql`${globalStats.totalVaultsCreated} + ${deltas.vaults || 0}`,
                     totalBytesUploaded: newBytes,
                     totalDownloads: sql`${globalStats.totalDownloads} + ${deltas.downloads || 0}`,
-                    activeVaultsCount: sql`${globalStats.activeVaultsCount} + ${deltas.active || 0}`,
+                    activeVaultsCount: sql`GREATEST(0, ${globalStats.activeVaultsCount} + ${deltas.active || 0})`,
                     lastBurnedAt: deltas.burned ? new Date() : stats.lastBurnedAt,
                     updatedAt: new Date(),
                 })
                 .where(eq(globalStats.id, 1));
         } catch (err) {
             console.error("[Stats] Failed to update global stats:", err);
+            await this.createLog("error", "STATS_UPDATE_FAILED", "Global stats engine failed to update metrics", { error: err instanceof Error ? err.message : "Unknown" });
         }
+    }
+
+    /**
+     * Deep reconciliation of stats by performing a full table scan.
+     * Ensures "Executive" reliability as requested by the user.
+     */
+    async recalculateStats(): Promise<void> {
+        try {
+            const [activeCount] = await db.select({ count: sql`count(*)` }).from(vaults).where(eq(vaults.isDeleted, false));
+            const [totalCount] = await db.select({ count: sql`count(*)` }).from(vaults);
+            const [sumBytes] = await db.select({ total: sql`sum(${chunks.size})` }).from(chunks).where(eq(chunks.isUploaded, true));
+            const [sumDownloads] = await db.select({ total: sql`sum(${vaults.downloadCount})` }).from(vaults);
+
+            await db.update(globalStats)
+                .set({
+                    activeVaultsCount: Number(activeCount?.count || 0),
+                    totalVaultsCreated: Number(totalCount?.count || 0),
+                    totalBytesUploaded: (sumBytes?.total || "0").toString(),
+                    totalDownloads: Number(sumDownloads?.total || 0),
+                    updatedAt: new Date()
+                })
+                .where(eq(globalStats.id, 1));
+            
+            await this.createLog("info", "STATS_RECONCILE", "Deep metrics reconciliation completed successfully", { 
+                active: activeCount?.count,
+                total: totalCount?.count
+            });
+        } catch (err) {
+            console.error("[Stats] Recalculate failed:", err);
+        }
+    }
+
+    async createLog(level: string, event: string, message: string, details?: any): Promise<void> {
+        try {
+            await db.insert(systemLogs).values({
+                level,
+                event,
+                message,
+                details: details || {}
+            });
+        } catch (err) {
+            console.error("[Storage] Failed to create system log:", err);
+        }
+    }
+
+    async getSystemLogs(limit = 50): Promise<SystemLog[]> {
+        return db.select().from(systemLogs).orderBy(sql`${systemLogs.timestamp} DESC`).limit(limit);
     }
 
     async getGlobalStats(): Promise<GlobalStats> {
@@ -129,6 +179,12 @@ export class DatabaseStorage implements IStorage {
         // Update Global Stats
         const totalSize = data.files.reduce((sum, f) => sum + f.size, 0);
         await this.updateStats({ vaults: 1, active: 1, bytes: totalSize });
+
+        await this.createLog("info", "VAULT_CREATED", `New secure vault established: ${vault.id.substring(0,8)}`, { 
+            vaultId: vault.id, 
+            size: totalSize, 
+            files: data.files.length 
+        });
 
         return vault;
     }
@@ -230,6 +286,7 @@ export class DatabaseStorage implements IStorage {
         
         if (updated) {
             await this.updateStats({ downloads: 1 });
+            await this.createLog("info", "VAULT_ACCESS", `Secure vault accessed for download: ${vaultId.substring(0,8)}`, { vaultId });
         }
         return updated?.downloadCount || 0;
     }
@@ -263,6 +320,7 @@ export class DatabaseStorage implements IStorage {
 
         if (results.length > 0) {
             await this.updateStats({ downloads: results.length });
+            await this.createLog("info", "FILE_DOWNLOADED", `${results.length} secure fragments retrieved from storage`, { count: results.length });
         }
 
         return results;
@@ -319,6 +377,7 @@ export class DatabaseStorage implements IStorage {
         await db.delete(vaults).where(eq(vaults.id, id));
         await this.updateStats({ active: -1, burned: true });
         console.log(`[Storage] Deleted vault ${id} and resources.`);
+        await this.createLog("info", "VAULT_BURNED", `Secure vault and all associated fragments purged: ${id.substring(0,8)}`, { vaultId: id });
     }
 
     async softDeleteVault(id: string): Promise<void> {
@@ -401,8 +460,10 @@ export class DatabaseStorage implements IStorage {
             }
 
             reconcileUsage(r2Total, supabaseTotal);
+            await this.createLog("info", "STORAGE_RECONCILE", `Storage usage reconciled from database source of truth`, { r2Total, supabaseTotal });
         } catch (err) {
             console.error("[Storage] Failed to reconcile usage from DB:", err);
+            await this.createLog("error", "STORAGE_RECONCILE_FAILED", "Failed to reconcile storage usage from database");
         }
     }
 
@@ -571,6 +632,15 @@ class FallbackStorage implements IStorage {
     }
     async incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void> {
         return this.execute(s => s.incrementEmailUsage(date, provider));
+    }
+    async createLog(level: string, event: string, message: string, details?: any): Promise<void> {
+        return this.execute(s => s.createLog(level, event, message, details));
+    }
+    async getSystemLogs(limit?: number): Promise<SystemLog[]> {
+        return this.execute(s => s.getSystemLogs(limit));
+    }
+    async recalculateStats(): Promise<void> {
+        return this.execute(s => s.recalculateStats());
     }
 
     // --- Extended methods (not part of IStorage — always use primary) ---

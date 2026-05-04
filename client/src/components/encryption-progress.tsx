@@ -65,13 +65,17 @@ export function EncryptionProgress({ stage, step, progress, statusText, speed, e
                 </div>
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Worker Threads</span>
-                    <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div className="flex gap-1.5">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                             <motion.div 
                                 key={i}
-                                animate={{ opacity: stage === 'uploading' ? [0.3, 1, 0.3] : 0.3 }}
-                                transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
-                                className="w-1.5 h-3 bg-primary/40 rounded-sm" 
+                                animate={{ 
+                                    opacity: stage === 'uploading' ? [0.2, 1, 0.2] : 0.2,
+                                    height: stage === 'uploading' ? [12, 20, 12] : 12,
+                                    backgroundColor: stage === 'uploading' ? ['#10b981', '#34d399', '#10b981'] : '#27272a'
+                                }}
+                                transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1 }}
+                                className="w-1.5 h-3 rounded-full" 
                             />
                         ))}
                     </div>
@@ -206,12 +210,30 @@ export function EncryptionProgress({ stage, step, progress, statusText, speed, e
                             <motion.div 
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="bg-primary/5 border border-primary/20 rounded-2xl p-5 text-center relative overflow-hidden group"
+                                className="bg-primary/5 border border-primary/30 rounded-[2.5rem] p-8 text-center relative overflow-hidden group shadow-[0_0_50px_rgba(16,185,129,0.15)]"
                             >
+                                {/* Technical scanline for access code */}
+                                <motion.div 
+                                    animate={{ top: ['-10%', '110%'] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                    className="absolute left-0 right-0 h-1 bg-primary/20 blur-sm pointer-events-none"
+                                />
+                                
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent group-hover:translate-x-full transition-transform duration-1000" />
-                                <span className="text-[9px] font-black text-primary uppercase tracking-[0.3em] mb-2 block">Ephemeral Access Key</span>
-                                <div className="text-4xl font-mono font-black text-white tracking-[0.3em] drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                                    {accessCode.slice(0, 3)}<span className="text-primary/50 font-sans mx-1">·</span>{accessCode.slice(3)}
+                                <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-4 block opacity-70">Ephemeral_Access_Key</span>
+                                <div className="relative">
+                                    <div className="text-4xl sm:text-5xl font-mono font-black text-white tracking-[0.3em] drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]">
+                                        {accessCode.slice(0, 3)}<span className="text-primary/40 font-sans mx-2">·</span>{accessCode.slice(3)}
+                                    </div>
+                                    
+                                    {/* Subtle glitch elements */}
+                                    <motion.div 
+                                        animate={{ opacity: [0, 0.5, 0], x: [-2, 2, -2] }}
+                                        transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
+                                        className="absolute inset-0 text-primary/30 font-mono font-black tracking-[0.3em] blur-[1px] translate-x-1"
+                                    >
+                                        {accessCode.slice(0, 3)}·{accessCode.slice(3)}
+                                    </motion.div>
                                 </div>
                             </motion.div>
                         )}

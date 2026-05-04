@@ -646,11 +646,15 @@ export async function registerRoutes(
 
   app.post("/api/storage/reconcile", async (_req, res) => {
     try {
+      // Reconcile physical storage usage and global platform stats
       await storage.reconcileStorageUsage();
+      await storage.recalculateStats();
+      
       const status = storage.getStorageStatus();
       res.json({ success: true, status });
     } catch (err) {
-      res.status(500).json({ message: "Failed to reconcile storage usage" });
+      console.error("[Reconcile API Error]", err);
+      res.status(500).json({ message: "Failed to reconcile storage and stats" });
     }
   });
 
@@ -662,6 +666,18 @@ export async function registerRoutes(
     } catch (err) {
       console.error("[Stats API Error]", err);
       res.status(500).json({ message: "Failed to get global stats" });
+    }
+  });
+
+  // Admin Logs
+  app.get("/api/admin/logs", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await storage.getSystemLogs(limit);
+      res.json(logs);
+    } catch (err) {
+      console.error("[Logs API Error]", err);
+      res.status(500).json({ message: "Failed to get system logs" });
     }
   });
 

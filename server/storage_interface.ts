@@ -3,7 +3,7 @@
  * Extracted into its own file to avoid circular dependencies
  * between storage.ts and memory_storage.ts.
  */
-import type { Vault, FileRecord, ChunkRecord, CreateVaultRequest, GlobalStats } from "@shared/schema";
+import type { Vault, FileRecord, ChunkRecord, CreateVaultRequest, GlobalStats, SystemLog } from "@shared/schema";
 
 export interface IStorage {
     createVault(data: CreateVaultRequest): Promise<Vault>;
@@ -34,4 +34,6 @@ export interface IStorage {
     incrementVaultEmailCount(vaultId: string): Promise<number>;
     getEmailUsage(date: string): Promise<any>;
     incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void>;
+    createLog(level: string, event: string, message: string, details?: any): Promise<void>;
+    getSystemLogs(limit?: number): Promise<SystemLog[]>;
 }

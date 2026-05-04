@@ -59,6 +59,15 @@ export const globalStats = pgTable("global_stats", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const systemLogs = pgTable("system_logs", {
+  id: serial("id").primaryKey(),
+  level: text("level").notNull(), // info, warning, error, security
+  event: text("event").notNull(), // VAULT_CREATED, VAULT_BURNED, STORAGE_CHECK, etc.
+  message: text("message").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  details: jsonb("details"), // Optional extra data (e.g. vaultId, size)
+});
+
 // === SCHEMAS ===
 
 export const insertVaultSchema = createInsertSchema(vaults).omit({
@@ -80,6 +89,7 @@ export type Vault = typeof vaults.$inferSelect;
 export type FileRecord = typeof files.$inferSelect;
 export type ChunkRecord = typeof chunks.$inferSelect;
 export type GlobalStats = typeof globalStats.$inferSelect;
+export type SystemLog = typeof systemLogs.$inferSelect;
 
 // Client-facing types for creation
 export const createVaultRequestSchema = z.object({
