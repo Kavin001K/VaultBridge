@@ -258,7 +258,7 @@ export default function AccessPage() {
     };
 
     return (
-        <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
+        <div className="min-h-screen relative flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background effects */}
             <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed inset-0 bg-primary/5 blur-[150px] pointer-events-none" />

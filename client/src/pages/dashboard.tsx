@@ -5,7 +5,7 @@ import {
     ArrowUpRight, BarChart3, Database, ShieldAlert, CheckCircle2,
     RefreshCcw, AlertCircle, X, Terminal, Search, Filter
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useGlobalStats, useStorageStatus, useSystemLogs } from "@/hooks/use-vaults";
@@ -82,6 +82,7 @@ const StorageBar = ({ name, used, total, provider }: any) => {
 
 const LogViewer = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
     const { data: logs, isLoading } = useSystemLogs(100);
+    const [location] = useLocation();
     const [filter, setFilter] = useState("");
 
     const filteredLogs = logs?.filter((log: any) => 

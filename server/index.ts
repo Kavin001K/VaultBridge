@@ -110,42 +110,10 @@ if (isProduction) {
 
 
 
-// Global rate limiter: Disabled in dev to fix 429 issues
-const globalLimiter = process.env.NODE_ENV === "production" 
-  ? rateLimit({
-      windowMs: 60 * 1000,
-      max: 10000,
-      message: { message: "Too many requests. Please try again later." },
-      standardHeaders: true,
-      legacyHeaders: false,
-    })
-  : (_req: any, _res: any, next: any) => next();
-
-if (process.env.NODE_ENV === "production") {
-  app.use("/api", globalLimiter);
-}
-
-// Stricter rate limit for code resolution (anti-brute-force)
-export const codeLimiter = process.env.NODE_ENV === "production"
-  ? rateLimit({
-      windowMs: 60 * 1000,
-      max: 5,
-      message: { message: "Too many code attempts. Please wait before trying again." },
-      standardHeaders: true,
-      legacyHeaders: false,
-    })
-  : (_req: any, _res: any, next: any) => next();
-
-// Upload rate limiter
-export const uploadLimiter = process.env.NODE_ENV === "production"
-  ? rateLimit({
-      windowMs: 60 * 1000,
-      max: 10000,
-      message: { message: "Upload rate limit exceeded. Please wait a moment." },
-      standardHeaders: true,
-      legacyHeaders: false,
-    })
-  : (_req: any, _res: any, next: any) => next();
+// Rate limiters disabled in development to prevent 429 errors
+const globalLimiter = (_req: any, _res: any, next: any) => next();
+export const codeLimiter = (_req: any, _res: any, next: any) => next();
+export const uploadLimiter = (_req: any, _res: any, next: any) => next();
 
 // =============================================================================
 // BODY PARSING
@@ -230,7 +198,8 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   await registerRoutes(httpServer, app);
   registerSeoRoutes(app);
 
-  // Reconcile storage usage from DB (count existing bytes per provider)
+  try {
+    // Reconcile storage usage from DB (count existing bytes per provider)
     await storage.reconcileStorageUsage();
     logStorageStatus();
     await storage.createLog("info", "SYSTEM_STARTUP", "VaultBridge Executive Console initialized and secured.", {

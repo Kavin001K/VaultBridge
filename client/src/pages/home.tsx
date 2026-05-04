@@ -240,7 +240,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col bg-zinc-950 text-zinc-50">
+    <div className="min-h-screen relative flex flex-col bg-zinc-950 text-zinc-50">
       {/* Background Effects */}
       <div className="fixed inset-0 grid-bg opacity-40 mix-blend-screen pointer-events-none" />
       <div className="scanline pointer-events-none opacity-20" />
@@ -341,7 +341,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1 relative z-10 pt-20 sm:pt-24">
+      <main className="flex-1 relative z-10 pt-28 sm:pt-32">
 
         {/* SECTION 1 — Hero (simplified, action-first) */}
         <section className="relative pt-24 sm:pt-32 pb-10 sm:pb-20 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto flex flex-col items-center text-center">

@@ -5,7 +5,7 @@ import {
     Lock, Upload, ArrowLeft, Shield, Timer, Zap, AlertTriangle, X,
     Paperclip, FileText, Image as ImageIcon, FileVideo, FileAudio,
     File, ChevronRight, Check, Eye, ArrowRight, Flame, Clock, CheckCircle2,
-    Send, Trash2, HardDrive, UploadCloud, FolderArchive, Loader2, Activity
+    Send, Trash2, HardDrive, UploadCloud, FolderArchive, Loader2, Activity, Cpu, Network
 } from "lucide-react";
 import { FileDropzone } from "@/components/file-dropzone";
 import { EncryptionProgress } from "@/components/encryption-progress";
@@ -72,6 +72,7 @@ const formatExpiry = (hours: number) => {
     if (remainingHours === 0) return `${days}d`;
     return `${days}d ${remainingHours}h`;
 };
+
 
 export default function UploadPage() {
     const [step, setStep] = useState(1);
@@ -324,7 +325,7 @@ export default function UploadPage() {
     const sizePercentage = Math.min((totalSize / MAX_FILE_SIZE) * 100, 100);
 
     return (
-        <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
+        <div className="min-h-screen relative flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background Effects (Unified with Home) */}
             <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
@@ -352,7 +353,7 @@ export default function UploadPage() {
             </header>
 
             {/* Main Content */}
-            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 pt-28 pb-20">
+            <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 pt-32 pb-20">
                 
                 {/* Executive Title area */}
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">

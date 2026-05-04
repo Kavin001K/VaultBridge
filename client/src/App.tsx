@@ -218,16 +218,13 @@ function App() {
           </AnimatePresence>
 
           <div
-            className="min-h-screen bg-black text-white"
+            className={`min-h-screen bg-black text-white ${showSplash ? 'overflow-hidden max-h-screen' : 'overflow-visible'}`}
             style={{
               opacity: showSplash ? 0 : 1,
               pointerEvents: showSplash ? 'none' : 'auto',
               transition: 'opacity 0.6s ease-out',
-              // Keep it fixed behind splash so it doesn't mess with scroll while invisible but still mounts
               position: showSplash ? 'fixed' : 'relative',
               width: '100%',
-              height: showSplash ? '100vh' : 'auto',
-              overflow: showSplash ? 'hidden' : 'visible'
             }}
           >
             <Suspense fallback={<LoadingFallback />}>
