@@ -15,12 +15,23 @@ interface SignalingMessage {
 }
 
 export function setupWebsocketSignaling(server: Server) {
+    // Per-IP connection tracking for rate limiting
+    const ipConnections = new Map<string, number>();
+    const MAX_CONNECTIONS_PER_IP = 20;
+
     const wss = new WebSocketServer({
         server,
         path: "/ws-signal",
-        // Handle upgrade errors
+        maxPayload: 16384, // 16KB max frame size — prevents DoS via large frames
         verifyClient: (info, callback) => {
-            // Accept all connections (can add auth here if needed)
+            const ip = info.req.socket.remoteAddress || "unknown";
+            const count = ipConnections.get(ip) || 0;
+            if (count >= MAX_CONNECTIONS_PER_IP) {
+                console.warn(`[WS-Signal] Rate limit: ${ip} has ${count} connections`);
+                callback(false, 429, "Too many connections");
+                return;
+            }
+            ipConnections.set(ip, count + 1);
             callback(true);
         }
     });
@@ -95,6 +106,11 @@ export function setupWebsocketSignaling(server: Server) {
 
         ws.on("close", (code: number, reason: Buffer) => {
             console.log(`[WS-Signal] Client ${clientIds.get(ws)} disconnected: ${code}`);
+            // Clean up IP tracking
+            const ip = req.socket.remoteAddress || "unknown";
+            const count = ipConnections.get(ip) || 1;
+            if (count <= 1) ipConnections.delete(ip);
+            else ipConnections.set(ip, count - 1);
             handleLeave(ws);
         });
 

@@ -11,12 +11,11 @@ import { generateSEOPages } from "@shared/seo-generator";
 import { motion, AnimatePresence } from "framer-motion";
 import { useHaptics } from "@/hooks/useHaptics";
 
-import ClipboardPage from "@/pages/clipboard";
-
 const isProduction = import.meta.env.PROD;
 
 // Lazy Load Pages
 const Home = lazy(() => import("@/pages/home"));
+const ClipboardPage = lazy(() => import("@/pages/clipboard"));
 
 const UploadPage = lazy(() => import("@/pages/upload"));
 const AccessPage = lazy(() => import("@/pages/access"));

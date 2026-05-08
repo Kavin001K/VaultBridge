@@ -467,18 +467,23 @@ export async function registerRoutes(
       const { to } = req.body;
       let { subject, body } = req.body;
 
+      // Sanitize: strip CR/LF from all user-supplied email fields to prevent header injection
+      const sanitize = (val: string) => (val || "").replace(/[\r\n]/g, "").trim();
+
       if (!to) {
         return res.status(400).json({ message: "Missing required field: to (recipient email)." });
       }
 
       // Auto-generate default subject if not provided
-      const fileNames = files.map(f => f.originalname).join(', ');
-      if (!subject || (typeof subject === 'string' && subject.trim() === '')) {
+      const fileNames = files.map(f => sanitize(f.originalname)).join(', ');
+      if (!subject || sanitize(subject) === '') {
         subject = `Files shared via VaultBridge: ${fileNames.substring(0, 50)}${fileNames.length > 50 ? '...' : ''}`;
+      } else {
+        subject = sanitize(subject);
       }
 
       // Auto-generate default body/message if not provided
-      if (!body || (typeof body === 'string' && body.trim() === '')) {
+      if (!body || sanitize(body) === '') {
         const totalSize = files.reduce((acc, f) => acc + f.size, 0);
         const formatSize = (bytes: number) => {
           if (bytes < 1024) return `${bytes} B`;
@@ -486,6 +491,8 @@ export async function registerRoutes(
           return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
         };
         body = `You have received ${files.length} file(s) (${formatSize(totalSize)}) via VaultBridge secure transfer.\n\nFiles: ${fileNames}`;
+      } else {
+        body = sanitize(body);
       }
 
       // Parse multiple recipients (comma-separated) and NORMALIZE TO LOWERCASE

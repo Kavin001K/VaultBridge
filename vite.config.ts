@@ -9,6 +9,8 @@ const __dirname = dirname(__filename);
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export default defineConfig({
   plugins: [
     react(),
@@ -27,7 +29,20 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
     target: "safari14",
-    sourcemap: true,
+    sourcemap: !isProduction,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom")) return "vendor";
+            if (id.includes("@radix-ui")) return "radix";
+            if (id.includes("framer-motion")) return "framer";
+            if (id.includes("recharts")) return "charts";
+            return "vendor";
+          }
+        },
+      },
+    },
   },
   server: {
     host: "0.0.0.0",
