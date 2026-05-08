@@ -19,7 +19,7 @@ export default function BlogPostPage() {
     if (!post) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center p-4">
-                <div className="glass-card p-10 text-center max-w-md">
+                <div className="transfer-panel p-10 text-center max-w-md">
                     <h1 className="text-2xl font-black text-white uppercase italic mb-4">Intelligence Missing</h1>
                     <p className="text-sm font-bold text-zinc-500 uppercase italic mb-8">The requested briefing is not available in our current repository.</p>
                     <Link href="/blog">
@@ -35,9 +35,7 @@ export default function BlogPostPage() {
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background Effects */}
-            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
-            <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
             <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
@@ -60,7 +58,7 @@ export default function BlogPostPage() {
                 <motion.article 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="glass-card p-8 md:p-12 mb-12"
+                    className="transfer-panel p-8 md:p-12 mb-12"
                 >
                     <div className="flex flex-wrap items-center gap-6 mb-8 border-b border-white/5 pb-8">
                         <div className="flex items-center gap-2 text-[9px] font-black text-primary uppercase tracking-widest">
@@ -101,7 +99,7 @@ export default function BlogPostPage() {
                         initial={{ opacity: 0, x: -20 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
-                        className="glass-card p-8 bg-primary/5 border-primary/20"
+                        className="transfer-panel p-8 bg-primary/5 border-primary/20"
                     >
                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2 italic">
                             <LinkIcon className="w-4 h-4 text-primary" /> Intelligence Links
@@ -123,7 +121,7 @@ export default function BlogPostPage() {
                         initial={{ opacity: 0, x: 20 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
-                        className="glass-card p-8"
+                        className="transfer-panel p-8"
                     >
                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2 italic">
                             <BookOpen className="w-4 h-4 text-primary" /> Related Briefings

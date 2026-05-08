@@ -162,7 +162,7 @@ export function VaultCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`glass-card overflow-hidden ring-1 ring-white/10 ${className}`}
+      className={`transfer-panel overflow-hidden ring-1 ring-white/10 ${className}`}
     >
       {/* Header Stripe & Active Status */}
       <div className="relative h-1 w-full bg-zinc-900 pointer-events-none overflow-hidden">

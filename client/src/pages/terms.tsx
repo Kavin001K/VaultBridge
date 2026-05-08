@@ -7,9 +7,7 @@ export default function TermsPage() {
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background Effects */}
-            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
-            <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
             <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
@@ -49,7 +47,7 @@ export default function TermsPage() {
 
                 <div className="space-y-6">
                     {/* Summary Card */}
-                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-8 border-primary/20 bg-primary/5">
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="transfer-panel p-8 border-primary/20 bg-primary/5">
                         <div className="flex gap-4 items-start">
                             <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shrink-0">
                                 <ShieldAlert className="w-6 h-6 text-primary" />
@@ -93,7 +91,7 @@ export default function TermsPage() {
                                 initial={{ opacity: 0, y: 20 }} 
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.1 }}
-                                className="glass-card p-6 sm:p-8 hover:border-primary/30 transition-all duration-500 group"
+                                className="transfer-panel p-6 sm:p-8 hover:border-primary/30 transition-all duration-500 group"
                             >
                                 <div className="flex gap-4">
                                     <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-white/5 group-hover:border-primary/40 transition-all duration-500">

@@ -163,10 +163,10 @@ export default function UniversalClipboard() {
 
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
-            {/* Background effects */}
-            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
-            <div className="fixed inset-0 bg-primary/5 blur-[150px] pointer-events-none" />
-            <div className="scanline pointer-events-none opacity-10" />
+            {/* Background */}
+            <div className="fixed inset-0 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-transparent" />
+            </div>
 
             {/* Header */}
             <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
@@ -213,7 +213,7 @@ export default function UniversalClipboard() {
                 <AnimatePresence>
                     {showSettings && mode === "draft" && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 overflow-hidden">
-                            <div className="glass-card bg-white/[0.02] border border-white/5 p-8 space-y-6 shadow-inner">
+                            <div className="transfer-panel bg-white/[0.02] border border-white/5 p-8 space-y-6 shadow-inner">
                                 <div className="flex justify-between items-center px-1">
                                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2"><Clock className="w-4 h-4 text-primary" /> Buffer Expiration</span>
                                     <span className="text-sm font-mono font-black text-primary px-3 py-1 rounded-lg bg-primary/10 border border-primary/20">{formatExpiry(expiresIn[0])}</span>
@@ -228,7 +228,7 @@ export default function UniversalClipboard() {
                 </AnimatePresence>
 
                 <div className="flex-1 flex flex-col gap-4">
-                    <motion.div layout className={`flex-1 glass-card overflow-hidden flex flex-col border-2 transition-colors duration-500 ${mode === 'live' ? 'border-primary/20 bg-primary/5 shadow-[0_0_50px_rgba(16,185,129,0.05)]' : 'border-white/5'}`}>
+                    <motion.div layout className={`flex-1 transfer-panel overflow-hidden flex flex-col border-2 transition-colors duration-500 ${mode === 'live' ? 'border-primary/20 bg-primary/5 shadow-[0_0_50px_rgba(16,185,129,0.05)]' : 'border-white/5'}`}>
                         {/* Toolbar */}
                         <div className="px-4 py-3 border-b border-white/5 bg-black/20 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -282,7 +282,7 @@ export default function UniversalClipboard() {
                             </motion.div>
                         ) : (
                             <motion.div key="live-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
-                                <div className="glass-card p-6 flex items-center justify-between gap-6 border-primary/30 relative overflow-hidden">
+                                <div className="transfer-panel p-6 flex items-center justify-between gap-6 border-primary/30 relative overflow-hidden">
                                    <div className="absolute inset-0 bg-primary/5 animate-pulse" />
                                    <div className="relative">
                                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Ephemeral Access Code</span>

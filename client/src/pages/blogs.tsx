@@ -8,9 +8,7 @@ export default function BlogsPage() {
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background Effects */}
-            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
-            <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
             <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
@@ -55,7 +53,7 @@ export default function BlogsPage() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: idx * 0.1 }}
-                            className="glass-card group flex flex-col h-full"
+                            className="transfer-panel group flex flex-col h-full"
                         >
                             <div className="p-8 space-y-4 flex-1">
                                 <div className="flex items-center justify-between mb-2">

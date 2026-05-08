@@ -4,7 +4,6 @@ export default function NotFound() {
   return (
     <div className="bg-terminal relative overflow-hidden font-mono selection:bg-green-900 selection:text-green-100 min-h-screen">
       {/* Noise Layer (using existing SVG noise pattern) */}
-      <div className="fixed inset-0 bg-noise opacity-[0.03] pointer-events-none z-0" />
 
       {/* CRT Effects */}
       <div className="crt-overlay fixed inset-0 pointer-events-none z-10" />

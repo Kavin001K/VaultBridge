@@ -44,9 +44,7 @@ export default function SecurityPage() {
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background Effects */}
-            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
-            <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
             <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl safe-top">
@@ -92,7 +90,7 @@ export default function SecurityPage() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: idx * 0.1 }}
-                            className="glass-card p-8 group hover:border-primary/30 transition-all duration-500"
+                            className="transfer-panel p-8 group hover:border-primary/30 transition-all duration-500"
                         >
                             <div className="flex items-start justify-between mb-6">
                                 <div className="w-12 h-12 bg-zinc-900 border border-white/5 rounded-xl flex items-center justify-center group-hover:border-primary/40 group-hover:bg-primary/5 transition-all duration-500 shadow-2xl">
@@ -113,7 +111,7 @@ export default function SecurityPage() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
-                    className="glass-card p-1 p-0 overflow-hidden mb-12"
+                    className="transfer-panel p-1 p-0 overflow-hidden mb-12"
                 >
                     <div className="bg-zinc-900/40 border-b border-white/5 p-6">
                         <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3 italic">
@@ -132,7 +130,7 @@ export default function SecurityPage() {
 
                 {/* Diagram Section */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                    <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="glass-card p-8 bg-primary/5 border-primary/20">
+                    <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="transfer-panel p-8 bg-primary/5 border-primary/20">
                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
                             <Activity className="w-4 h-4 text-primary" /> Key Flow Protocol
                         </h3>
@@ -152,7 +150,7 @@ export default function SecurityPage() {
                         </div>
                     </motion.div>
                     
-                    <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="glass-card p-8 bg-zinc-900/40">
+                    <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="transfer-panel p-8 bg-zinc-900/40">
                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
                             <Gavel className="w-4 h-4 text-primary" /> What We Cannot Do
                         </h3>

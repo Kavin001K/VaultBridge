@@ -266,9 +266,7 @@ export default function AccessPage() {
     return (
         <div className="min-h-screen relative flex flex-col font-sans text-zinc-100 bg-black">
             {/* Background effects */}
-            <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
             <div className="fixed inset-0 bg-primary/5 blur-[150px] pointer-events-none" />
-            <div className="scanline pointer-events-none opacity-10" />
 
             {/* Header */}
             <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
@@ -303,7 +301,7 @@ export default function AccessPage() {
                                 <p className="text-zinc-500 text-sm font-medium">Authentication required to reconstruct cryptographic fragments.</p>
                             </div>
 
-                            <div className="glass-card p-10 space-y-8 relative overflow-hidden">
+                            <div className="transfer-panel p-10 space-y-8 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-6 opacity-10">
                                    <KeyRound className="w-16 h-16 text-primary" />
                                 </div>
@@ -353,7 +351,7 @@ export default function AccessPage() {
                     {stage === "ready" && (
                         <motion.div key="ready" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
                             {/* Vault Identity Card */}
-                            <div className="glass-card p-6 flex items-center justify-between gap-6 relative overflow-hidden">
+                            <div className="transfer-panel p-6 flex items-center justify-between gap-6 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-4 opacity-5"><Binary className="w-20 h-20" /></div>
                                 <div className="flex items-center gap-4">
                                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${identity?.color} flex items-center justify-center text-3xl border border-white/10 shadow-xl`}>
@@ -371,7 +369,7 @@ export default function AccessPage() {
                             </div>
 
                             {/* Files Manifest */}
-                            <div className="glass-card overflow-hidden">
+                            <div className="transfer-panel overflow-hidden">
                                 <div className="p-4 border-b border-white/5 bg-zinc-900/30 flex items-center justify-between">
                                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                         <Layers className="w-3.5 h-3.5" /> Binary Manifest
@@ -412,7 +410,7 @@ export default function AccessPage() {
 
                             {/* Clipboard Section */}
                             {clipboardPayload && (
-                                <div className="glass-card p-6 space-y-4">
+                                <div className="transfer-panel p-6 space-y-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Clipboard className="w-4 h-4 text-primary" />
                                         <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Decrypted Secure Buffer</span>

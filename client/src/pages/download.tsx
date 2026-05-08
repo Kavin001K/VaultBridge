@@ -18,6 +18,7 @@ import {
   ChunkInfo, 
   DownloadProgress 
 } from "@/lib/downloadStream";
+import { VaultDestruction } from "@/components/VaultDestruction";
 
 // Enhanced spring animation configs
 const springConfig = { type: "spring", stiffness: 400, damping: 25 };
@@ -47,7 +48,6 @@ export default function DownloadPage() {
 
   // Self-Destruct State
   const [isDestructing, setIsDestructing] = useState(false);
-  const [isDestroyed, setIsDestroyed] = useState(false);
 
   const { data: vault, isLoading, error: apiError } = useGetVault(vaultId || "");
   const getDownloadUrl = useGetChunkDownloadUrl();
@@ -204,8 +204,7 @@ export default function DownloadPage() {
       }
 
       if (res.vaultExhausted) {
-        setTimeout(() => setIsDestructing(true), 2000);
-        setTimeout(() => setIsDestroyed(true), 6000);
+        setTimeout(() => setIsDestructing(true), 1500);
       }
     } catch (err) {
       toast({ variant: "destructive", title: "SEQUENCE_ERROR", description: "Cryptographic failure or stream interruption." });
@@ -236,26 +235,9 @@ export default function DownloadPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
-  if (isDestroyed) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 overflow-hidden relative">
-        <div className="absolute inset-0 grid-bg opacity-20" />
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="glass-card max-w-md w-full p-8 text-center relative z-10 border-red-500/20 bg-red-500/5">
-            <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-6">
-                <Flame className="w-10 h-10 text-red-500" />
-            </div>
-            <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter mb-4">Vault <span className="text-red-500">Purged</span></h1>
-            <p className="text-zinc-500 text-sm font-black uppercase tracking-[0.2em] mb-8 leading-relaxed">Cryptographic keys destroyed. <br/> Binary data has been wiped from memory nodes.</p>
-            <Button onClick={() => window.location.href = '/'} className="w-full h-14 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black tracking-widest uppercase rounded-2xl">Return to Terminal</Button>
-        </motion.div>
-      </div>
-    );
-  }
-
   if (isLoading || isDecrypting) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20" />
         <div className="text-center relative z-10">
           <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="w-16 h-16 border-2 border-primary/20 border-t-primary rounded-full mx-auto mb-6 shadow-[0_0_20px_rgba(16,185,129,0.2)]" />
           <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] animate-pulse">Initializing Security Protocol...</p>
@@ -267,8 +249,7 @@ export default function DownloadPage() {
   if (apiError || error) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 relative overflow-hidden">
-         <div className="absolute inset-0 grid-bg opacity-20" />
-         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card max-w-md w-full p-8 text-center relative z-10 border-red-500/20">
+         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="transfer-panel max-w-md w-full p-8 text-center relative z-10 border-red-500/20">
             <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="w-10 h-10 text-red-500" />
             </div>
@@ -281,9 +262,7 @@ export default function DownloadPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-zinc-950 text-white selection:bg-primary/30 relative flex flex-col overflow-x-hidden ${isDestructing ? 'burn-container' : ''}`}>
-      <div className="fixed inset-0 grid-bg opacity-30 pointer-events-none" />
-      <div className="fixed inset-0 scanline opacity-10 pointer-events-none" />
+    <div className="min-h-screen bg-zinc-950 text-white selection:bg-primary/30 relative flex flex-col overflow-x-hidden">
       
       <header className="relative z-20 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl px-6 py-5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -315,7 +294,7 @@ export default function DownloadPage() {
           
           {/* Vault Header Identity */}
           {vault && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-8 relative overflow-hidden group">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="transfer-panel p-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[80px] -mr-32 -mt-32 group-hover:bg-primary/10 transition-colors" />
                 <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
                     <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-white/10 flex items-center justify-center relative overflow-hidden shadow-2xl shrink-0">
@@ -369,7 +348,7 @@ export default function DownloadPage() {
                     const isDownloading = activeDownload === file.fileId;
                     
                     return (
-                        <motion.div key={file.fileId} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} className={`glass-card p-5 group transition-all duration-500 ${isExhausted ? 'opacity-40 grayscale pointer-events-none' : 'hover:border-primary/30'}`}>
+                        <motion.div key={file.fileId} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} className={`transfer-panel p-5 group transition-all duration-500 ${isExhausted ? 'opacity-40 grayscale pointer-events-none' : 'hover:border-primary/30'}`}>
                             <div className="flex flex-col md:flex-row items-center gap-6">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border transition-colors ${isDownloading ? 'bg-primary/20 border-primary animate-pulse' : 'bg-zinc-950 border-white/5 group-hover:border-primary/20'}`}>
                                     {isDownloading ? <RefreshCw className="w-6 h-6 text-primary animate-spin" /> : <File className="w-6 h-6 text-zinc-600 group-hover:text-primary transition-colors" />}
@@ -441,6 +420,17 @@ export default function DownloadPage() {
               <p className="text-[11px] font-medium text-zinc-500 max-w-sm leading-relaxed">VaultBridge uses browser-native WebCrypto API. Decryption occurs purely on your hardware. We never see your data or keys.</p>
           </div>
       </footer>
+
+      {/* Vault Destruction Overlay */}
+      <VaultDestruction
+        isActive={isDestructing}
+        vaultCode={vault?.shortCode}
+        fileCount={files.length}
+        totalSize={files.reduce((a, f) => a + f.size, 0)}
+        onComplete={() => {
+          setTimeout(() => (window.location.href = "/"), 3000);
+        }}
+      />
     </div>
   );
 }

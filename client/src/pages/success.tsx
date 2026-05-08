@@ -125,9 +125,7 @@ export default function SuccessPage() {
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col font-sans text-zinc-100 bg-black">
       {/* Background Effects */}
-      <div className="fixed inset-0 grid-bg opacity-20 pointer-events-none" />
       <div className={`fixed inset-0 bg-primary/5 blur-[150px] transition-opacity duration-1000 ${isBurned ? 'opacity-0' : 'opacity-100'}`} />
-      <div className="scanline pointer-events-none opacity-10" />
 
       {/* Header */}
       <header className="relative w-full z-50 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl">
@@ -163,7 +161,7 @@ export default function SuccessPage() {
           
           {/* Left: Security Identity & QR */}
           <div className="lg:col-span-4 space-y-6">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="glass-card p-8 text-center relative overflow-hidden group">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="transfer-panel p-8 text-center relative overflow-hidden group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Binary className="w-12 h-12 text-primary" />
                </div>
@@ -208,7 +206,7 @@ export default function SuccessPage() {
 
           {/* Right: Main Access Panel */}
           <div className="lg:col-span-8 space-y-6">
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="glass-card flex flex-col h-full overflow-hidden">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="transfer-panel flex flex-col h-full overflow-hidden">
                {/* Access Tabs */}
                <div className="flex border-b border-white/5">
                   {(['link', 'email', 'burn'] as const).map(tab => (
