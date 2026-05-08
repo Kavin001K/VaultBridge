@@ -210,16 +210,20 @@ app.use("/api/v1/vault/:id/file", (_req, res, next) => {
   registerSeoRoutes(app);
 
   try {
-    // Reconcile storage usage from DB (count existing bytes per provider)
     await storage.reconcileStorageUsage();
     logStorageStatus();
     await storage.recalculateStats();
-    await storage.createLog("info", "SYSTEM_STARTUP", "VaultBridge Executive Console initialized and secured.", {
+    await storage.createLog("info", "SYSTEM_STARTUP", "VaultBridge initialized", {
         mode: process.env.NODE_ENV,
-        version: "1.0.0-PROD"
+        version: "2.4.0"
     });
-  } catch (err) {
-    console.error("[Storage] Non-fatal: Failed to reconcile storage usage:", err);
+  } catch (err: any) {
+    // Non-fatal — server works fine without DB reconciliation
+    if (err?.code === "28P01" || err?.message?.includes("password")) {
+      console.log("[startup] Database auth failed — running in memory mode (data will not persist)");
+    } else {
+      console.error("[startup] Non-fatal: storage reconciliation skipped:", err?.message || err);
+    }
   }
 
   // Start cleanup worker (Phase 1.2)

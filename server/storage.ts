@@ -109,8 +109,12 @@ export class DatabaseStorage implements IStorage {
                 message,
                 details: details || {}
             });
-        } catch (err) {
-            console.error("[Storage] Failed to create system log:", err);
+        } catch (err: any) {
+            // Silently skip — logs are non-critical.
+            // Only log at debug level for diagnostics.
+            if (process.env.NODE_ENV === "development") {
+                console.debug("[Storage] Failed to create system log (non-critical):", err.message);
+            }
         }
     }
 
