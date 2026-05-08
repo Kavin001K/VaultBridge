@@ -186,6 +186,7 @@ export const api = {
         200: z.object({
           uploadUrl: z.string(),
           storagePath: z.string(),
+          provider: z.enum(["r2", "supabase", "local"]),
         }),
         404: errorSchemas.notFound,
       },

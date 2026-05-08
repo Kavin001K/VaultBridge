@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Link } from "wouter";
 import { Shield, Lock, Eye, ArrowLeft, Activity, ShieldCheck, ChevronUp, Cpu, Network, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";

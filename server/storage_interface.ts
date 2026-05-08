@@ -36,4 +36,5 @@ export interface IStorage {
     incrementEmailUsage(date: string, provider: "resend" | "brevo" | "msg91"): Promise<void>;
     createLog(level: string, event: string, message: string, details?: any): Promise<void>;
     getSystemLogs(limit?: number): Promise<SystemLog[]>;
+    recalculateStats(): Promise<void>;
 }

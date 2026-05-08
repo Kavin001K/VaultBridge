@@ -45,6 +45,24 @@ export class MemoryStorage implements IStorage {
         return { ...this.stats };
     }
 
+    async recalculateStats(): Promise<void> {
+        const activeVaults = Array.from(this.vaults.values()).filter((vault) => !vault.isDeleted);
+        const uploadedBytes = Array.from(this.chunks.values())
+            .filter((chunk) => chunk.isUploaded)
+            .reduce((sum, chunk) => sum + chunk.size, 0);
+        const downloads = Array.from(this.files.values())
+            .reduce((sum, file) => sum + file.downloadCount, 0);
+
+        this.stats = {
+            ...this.stats,
+            totalVaultsCreated: this.vaults.size,
+            totalBytesUploaded: uploadedBytes.toString(),
+            totalDownloads: downloads,
+            activeVaultsCount: activeVaults.length,
+            updatedAt: new Date(),
+        };
+    }
+
     async createLog(level: string, event: string, message: string, details?: any): Promise<void> {
         const log: SystemLog = {
             id: this.logIdCounter++,
@@ -132,7 +150,7 @@ export class MemoryStorage implements IStorage {
     async updateVault(id: string, updates: Partial<Vault>): Promise<void> {
         const vault = this.vaults.get(id);
         if (vault) {
-            this.vaults.set(id, { ...vault, ...updates, updatedAt: new Date() });
+            this.vaults.set(id, { ...vault, ...updates });
         }
     }
 

@@ -218,11 +218,14 @@ export function useTrackFileDownload() {
 // Update Vault Settings
 export function useUpdateVault() {
   return useMutation({
-    mutationFn: async ({ id, expiresIn, maxDownloads }: { id: string, expiresIn?: number, maxDownloads?: number }) => {
+    mutationFn: async ({ id, expiresIn, maxDownloads, vaultKey }: { id: string, expiresIn?: number, maxDownloads?: number, vaultKey?: string }) => {
       const url = buildUrl(api.vaults.update.path, { id });
       const res = await fetch(url, {
         method: api.vaults.update.method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(vaultKey ? { "x-vault-key": vaultKey } : {}),
+        },
         body: JSON.stringify({ expiresIn, maxDownloads })
       });
 

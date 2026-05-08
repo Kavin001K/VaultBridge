@@ -7,9 +7,8 @@ type WorkerMessage =
     | { type: 'decrypt'; data: ArrayBuffer; iv: Uint8Array; key: CryptoKey; id: number; isCompressed?: boolean };
 
 type WorkerResponse =
-    | { type: 'encrypt_success'; id: number; iv: Uint8Array; encryptedData: ArrayBuffer; compressedSize?: number; originalSize?: number }
-    | { type: 'decrypt_success'; id: number; decryptedData: ArrayBuffer }
-    | { type: 'error'; id: number; error: string };
+    | { type: 'success'; id: number | string; iv?: Uint8Array; encryptedData?: ArrayBuffer; compressedSize?: number; originalSize?: number; decryptedData?: ArrayBuffer }
+    | { type: 'error'; id: number | string; error: string };
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     const { type, id } = e.data;
@@ -43,7 +42,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
             // Transfer buffers to avoid cloning overhead
             const response: WorkerResponse = {
-                type: 'encrypt_success',
+                type: 'success',
                 id,
                 iv,
                 encryptedData: encrypted,
@@ -73,7 +72,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
             }
 
             const response = {
-                type: 'decrypt_success',
+                type: 'success',
                 id,
                 decryptedData: decrypted
             };
@@ -97,4 +96,3 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 };
 
 export {};
-

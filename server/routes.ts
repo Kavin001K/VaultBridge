@@ -8,7 +8,8 @@ import { api, errorSchemas } from "@shared/routes";
 import { z } from "zod";
 import { supabaseStorage } from "./services/supabase_storage";
 import { localStorage } from "./services/local_storage";
-import { logStorageStatus } from "./services/storage_router";
+import { trackUpload } from "./services/storage_router";
+import { isValidChunkIndex, isValidChunkSize, validateChunkStoragePath } from "./services/chunk_validation";
 import multer from "multer";
 import fs from "fs";
 
@@ -287,7 +288,7 @@ export async function registerRoutes(
   });
 
   app.patch(api.vaults.update.path, async (req, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { expiresIn, maxDownloads } = req.body;
 
     const vault = await storage.getVault(id);
@@ -720,8 +721,15 @@ export async function registerRoutes(
   app.post(api.chunks.getUploadUrl.path, uploadLimiter, async (req, res) => {
     const id = req.params.id as string;
     const fileId = req.params.fileId as string;
-    const chunkIndex = req.params.chunkIndex as string;
+    const chunkIndexValue = Number.parseInt(req.params.chunkIndex as string, 10);
     const { size } = req.body;
+
+    if (!Number.isInteger(chunkIndexValue) || chunkIndexValue < 0) {
+      return res.status(400).json({ message: "Invalid chunk index" });
+    }
+    if (!isValidChunkSize(size)) {
+      return res.status(400).json({ message: "Invalid chunk size" });
+    }
 
     const vault = await storage.getVault(id);
     if (!vault) {
@@ -736,12 +744,20 @@ export async function registerRoutes(
       return res.status(410).json({ message: "Vault has been burned" });
     }
 
+    const file = await storage.getFileByFileId(fileId);
+    if (!file || file.vaultId !== id) {
+      return res.status(404).json({ message: "File not found in vault" });
+    }
+    if (!isValidChunkIndex(chunkIndexValue, file.chunkCount)) {
+      return res.status(400).json({ message: "Chunk index exceeds file plan" });
+    }
+
     // Ensure the chunk record exists (idempotent)
-    await storage.createChunk(fileId, parseInt(chunkIndex), size);
+    await storage.createChunk(fileId, chunkIndexValue, size);
 
     try {
       // Smart routing: R2 first, Supabase overflow
-      const result = await storage.getSmartUploadUrl(id, fileId, parseInt(chunkIndex), size);
+      const result = await storage.getSmartUploadUrl(id, fileId, chunkIndexValue, size);
       res.json({
         uploadUrl: result.uploadUrl,
         storagePath: result.storagePath,  // Prefixed path: "r2:..." or "sb:..."
@@ -760,8 +776,15 @@ export async function registerRoutes(
   app.put(api.chunks.markUploaded.path, async (req, res) => {
     const id = req.params.id as string;
     const fileId = req.params.fileId as string;
-    const chunkIndex = req.params.chunkIndex as string;
+    const chunkIndexValue = Number.parseInt(req.params.chunkIndex as string, 10);
     const { storagePath } = req.body;
+
+    if (!Number.isInteger(chunkIndexValue) || chunkIndexValue < 0) {
+      return res.status(400).json({ message: "Invalid chunk index" });
+    }
+    if (typeof storagePath !== "string" || storagePath.length === 0) {
+      return res.status(400).json({ message: "Invalid storage path" });
+    }
 
     const vault = await storage.getVault(id);
     if (!vault) {
@@ -772,7 +795,36 @@ export async function registerRoutes(
       return res.status(410).json({ message: "Vault no longer active" });
     }
 
-    await storage.updateChunkStatus(fileId, parseInt(chunkIndex), storagePath);
+    const file = await storage.getFileByFileId(fileId);
+    if (!file || file.vaultId !== id) {
+      return res.status(404).json({ message: "File not found in vault" });
+    }
+    if (!isValidChunkIndex(chunkIndexValue, file.chunkCount)) {
+      return res.status(400).json({ message: "Chunk index exceeds file plan" });
+    }
+
+    const storagePathValidation = validateChunkStoragePath({
+      storagePath,
+      vaultId: id,
+      fileId,
+      chunkIndex: chunkIndexValue,
+    });
+    if (!storagePathValidation.valid) {
+      return res.status(400).json({ message: storagePathValidation.reason });
+    }
+
+    const existingChunk = await storage.getChunk(fileId, chunkIndexValue);
+    if (!existingChunk) {
+      return res.status(404).json({ message: "Chunk not found" });
+    }
+    if (existingChunk.storagePath && existingChunk.storagePath !== storagePath) {
+      return res.status(409).json({ message: "Chunk already confirmed with a different storage path" });
+    }
+
+    await storage.updateChunkStatus(fileId, chunkIndexValue, storagePath);
+    if (!existingChunk.isUploaded) {
+      trackUpload(storagePathValidation.provider, existingChunk.size);
+    }
     res.json({ success: true });
   });
 

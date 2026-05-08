@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link, useRoute } from "wouter";
-import { ArrowLeft, Link as LinkIcon, BookOpen, Clock, Calendar, Activity, Zap, Share2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Link as LinkIcon, BookOpen, Calendar, Zap, Share2 } from "lucide-react";
 import { blogPostBySlug, blogPosts } from "@shared/blog";
 import { Button } from "@/components/ui/button";
 

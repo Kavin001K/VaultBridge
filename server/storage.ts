@@ -195,7 +195,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     async updateVault(id: string, updates: Partial<Vault>): Promise<void> {
-        await db.update(vaults).set({ ...updates, updatedAt: new Date() }).where(eq(vaults.id, id));
+        await db.update(vaults).set(updates).where(eq(vaults.id, id));
     }
 
     async getVaultByShortCode(code: string): Promise<Vault | undefined> {
@@ -418,7 +418,6 @@ export class DatabaseStorage implements IStorage {
         const uploadUrl = await routerGetUploadUrl(provider, rawPath);
         const storagePath = buildPrefixedPath(provider, rawPath);
 
-        trackUpload(provider, chunkSize);
         console.log(`[Storage Router] Upload → ${provider.toUpperCase()} | ${rawPath} | ${chunkSize} bytes`);
 
         return { uploadUrl, storagePath, provider };
@@ -532,6 +531,7 @@ class FallbackStorage implements IStorage {
         } catch (err: any) {
             // Detect fatal DB errors and switch to memory
             const isFatalDb = err.code === 'ECONNREFUSED'
+                || err.code === '28P01'
                 || err.code === '57P03'
                 || err.code === 'ENOTFOUND'
                 || err.message?.includes('connect')

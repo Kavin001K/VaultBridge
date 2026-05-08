@@ -11,9 +11,15 @@ export interface ChunkTask {
     end: number;
     fileId: string;
     displayName: string;
+    uploadId?: string;
 }
 
-export type UploadChunkFn = (task: ChunkTask) => Promise<void>;
+export interface UploadChunkResult {
+    uploadedBytes: number;
+    provider?: string;
+}
+
+export type UploadChunkFn = (task: ChunkTask) => Promise<UploadChunkResult | void>;
 
 export class ParallelUploadQueue {
     private queue: ChunkTask[] = [];
