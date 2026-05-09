@@ -89,7 +89,7 @@ if (isProduction) {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-hashes'", "https://plausible.io", "https://static.cloudflareinsights.com"], 
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'", "https://plausible.io", "https://static.cloudflareinsights.com"], 
           scriptSrcAttr: ["'unsafe-hashes'"], 
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -193,11 +193,9 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 
-// Clear site data on download routes (extra paranoid)
-app.use("/api/v1/vault/:id/file", (_req, res, next) => {
-  res.set({
-    "Clear-Site-Data": '"cache", "storage"',
-  });
+// Clear sensitive cached data on download routes without destroying IndexedDB
+app.use("/api/vaults/:id/files", (_req, res, next) => {
+  res.set({ "Clear-Site-Data": '"cache"' });
   next();
 });
 

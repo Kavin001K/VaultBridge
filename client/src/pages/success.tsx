@@ -89,6 +89,20 @@ export default function SuccessPage() {
     toast({ title: "Copied" });
   };
 
+  const handleSendEmail = async () => {
+    if (!email) return;
+    setIsSending(true);
+    try {
+      const response = await fetch(`/api/vaults/${vaultId}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: email.trim().toLowerCase(), fullCode: splitCode }),
+      });
+      if (response.ok) setShowSpamAlert(true);
+    } catch { toast({ variant: "destructive", title: "Failed to send email" }); }
+    finally { setIsSending(false); }
+  };
+
   const handleBurn = async () => {
     if (!params?.id) return;
     setIsDeleting(true);

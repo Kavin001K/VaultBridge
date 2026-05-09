@@ -125,8 +125,19 @@ async function initDB(): Promise<IDBDatabase> {
  */
 async function getStore(mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
     const db = await initDB();
-    const transaction = db.transaction(STORE_NAME, mode);
-    return transaction.objectStore(STORE_NAME);
+    // If the database connection was closed externally (e.g. Clear-Site-Data), reset and retry once
+    try {
+        const transaction = db.transaction(STORE_NAME, mode);
+        return transaction.objectStore(STORE_NAME);
+    } catch (err: any) {
+        if (err.name === 'InvalidStateError' || dbInstance === null) {
+            dbInstance = null; // Reset cached instance
+            const freshDb = await initDB();
+            const transaction = freshDb.transaction(STORE_NAME, mode);
+            return transaction.objectStore(STORE_NAME);
+        }
+        throw err;
+    }
 }
 
 // ============================================================================
