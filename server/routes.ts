@@ -240,11 +240,16 @@ export async function registerRoutes(
       // Check if ALL files in the vault are now exhausted
       const allVaultFilesExhausted = await storage.areAllFilesExhausted(vault.id);
 
-      // BURNING LOGIC: If all files exhausted, delete the vault via queue
+      // BURNING LOGIC: If all files exhausted, mark vault for destruction
       if (allVaultFilesExhausted) {
-        console.log(`[Vault ${vault.id}] All files exhausted. Queueing for burn...`);
+        console.log(`[Vault ${vault.id}] All files exhausted — vault will be purged.`);
+        // Soft-delete marks it as deleted but files remain for any in-flight downloads
         await storage.softDeleteVault(vault.id);
-        await taskQueue.add("burn_vault", { vaultId: vault.id });
+        // Queue physical file deletion (runs asynchronously)
+        taskQueue.add("burn_vault", { vaultId: vault.id }).catch(e => console.error("[Burn Queue Error]", e));
+
+        // Log the burn event
+        await storage.createLog("security", "VAULT_EXHAUSTED", `Vault ${vault.id.slice(0,8)} reached download limit — queued for destruction`).catch(() => {});
       }
 
       res.json({

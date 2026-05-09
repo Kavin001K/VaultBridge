@@ -247,6 +247,15 @@ export default function DownloadPage() {
   }
 
   if (apiError || error) {
+    // If vault is gone (expired/deleted/exhausted), show destruction
+    const isGone = error?.includes("expired") || error?.includes("deleted") || error?.includes("not found");
+    if (isGone) {
+      return (
+        <div className="min-h-screen bg-zinc-950 text-white relative flex flex-col overflow-x-hidden">
+          <VaultDestruction isActive={true} onComplete={() => window.location.href = "/"} />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 relative overflow-hidden">
          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="transfer-panel max-w-md w-full p-8 text-center relative z-10 border-red-500/20">
