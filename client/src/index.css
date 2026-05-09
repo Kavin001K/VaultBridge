@@ -225,6 +225,14 @@
   .safe-top { padding-top: env(safe-area-inset-top); }
 }
 
+/* Desktop-only grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(45, 212, 191, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
 @media screen and (max-width: 768px) {
   /* Prevent iOS zoom on focus */
   input, textarea, select { font-size: 16px !important; }
