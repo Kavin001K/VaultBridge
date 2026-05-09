@@ -23,40 +23,37 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("Uncaught error:", error, errorInfo);
+        // Log to console for debugging (stripped in production builds)
+        if (import.meta.env.DEV) {
+            console.error("Uncaught error:", error, errorInfo);
+        }
     }
 
     public render() {
         if (this.state.hasError) {
             if (this.props.fallback) return this.props.fallback;
 
+            const isDev = import.meta.env.DEV;
+            const message = isDev && this.state.error
+                ? this.state.error.message
+                : "Please refresh the page to continue.";
+
             return (
-                <div className="min-h-screen w-full flex items-center justify-center bg-zinc-950 p-4">
-                    <div className="max-w-md w-full bg-zinc-900 border border-red-900/50 rounded-2xl p-8 text-center shadow-2xl">
-                        <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <AlertCircle className="w-8 h-8 text-red-500" />
+                <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 safe-bottom">
+                    <div className="max-w-sm w-full surface-card p-6 sm:p-8 text-center">
+                        <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+                            <AlertCircle className="w-7 h-7 text-red-400" />
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
-                        <p className="text-zinc-400 mb-6 text-sm">
-                            We encountered an unexpected error. The application state has been captured.
-                        </p>
+                        <h2 className="text-lg font-semibold text-white mb-1">Something went wrong</h2>
+                        <p className="text-sm text-zinc-400 mb-5">{message}</p>
 
-                        <div className="p-4 bg-black/40 rounded-lg text-left mb-6 overflow-hidden">
-                            <code className="text-xs text-red-300 font-mono break-words line-clamp-3">
-                                {this.state.error?.message}
-                            </code>
-                        </div>
-
-                        <Button
-                            onClick={() => {
-                                this.setState({ hasError: false });
-                                window.location.href = "/";
-                            }}
-                            className="w-full bg-red-600 hover:bg-red-700 text-white"
+                        <button
+                            onClick={() => { window.location.href = "/"; }}
+                            className="btn-primary w-full py-2.5 text-sm rounded-xl"
                         >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Reload Application
-                        </Button>
+                            <RefreshCw className="w-4 h-4" />
+                            Reload
+                        </button>
                     </div>
                 </div>
             );

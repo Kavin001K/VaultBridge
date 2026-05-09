@@ -2,6 +2,23 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// ─── Global error suppression in production ───
+if (import.meta.env.PROD) {
+  // Suppress raw error messages from reaching the user console
+  const prevOnerror = window.onerror;
+  window.onerror = (msg, url, line, col, error) => {
+    if (prevOnerror) prevOnerror(msg, url, line, col, error);
+    // Prevent default browser error dialog
+    return true;
+  };
+
+  // Suppress unhandled promise rejections
+  window.addEventListener("unhandledrejection", (event) => {
+    event.preventDefault();
+    // Silently swallow in production — ErrorBoundary handles React errors
+  });
+}
+
 // Initialize MobileSDK (sets up --vh, battery, network listeners)
 import { MobileSDK } from "./lib/mobile-sdk";
 if (typeof window !== 'undefined') {
