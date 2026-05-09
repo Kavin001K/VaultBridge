@@ -210,14 +210,16 @@ export default function SuccessPage() {
         {/* Access code & link */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="surface-card p-5 sm:p-6 mb-4">
           <div className="text-center mb-4">
-            <p className="text-xs text-zinc-500 mb-3 uppercase tracking-wide">Access code</p>
-            <div className="text-3xl sm:text-4xl font-mono font-bold text-white tracking-[0.3em] mb-3">
+            <p className="text-xs text-zinc-500 mb-3 uppercase tracking-wide">Access code — tap to copy</p>
+            <button
+              onClick={() => handleCopy(splitCode, "code")}
+              className="text-3xl sm:text-4xl font-mono font-bold text-white tracking-[0.3em] hover:text-primary transition-colors active:scale-[0.98] cursor-pointer select-all mb-3"
+            >
               {splitCode.slice(0, 3)}<span className="text-primary/40 mx-1">-</span>{splitCode.slice(3)}
-            </div>
-            <button onClick={() => handleCopy(splitCode, "code")} className="btn-ghost px-3 py-1.5 text-[11px]">
-              {copiedCode ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
-              {copiedCode ? "Copied" : "Copy code"}
             </button>
+            <div className="text-[11px] text-zinc-500">
+              {copiedCode ? <span className="text-primary flex items-center justify-center gap-1"><Check className="w-3 h-3" />Copied to clipboard</span> : "Tap the code to copy"}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">

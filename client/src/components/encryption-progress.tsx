@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Activity, Binary, CheckCircle2, Clock, KeyRound, Network, ShieldCheck } from "lucide-react";
+import { Activity, Binary, CheckCircle2, Clock, KeyRound, Network, ShieldCheck, Copy, Check } from "lucide-react";
 
 type ProgressStep = "keys" | "metadata" | "transfer" | "done";
 type UploadStage = "idle" | "encrypting" | "uploading" | "success" | "resuming";
@@ -88,13 +89,7 @@ export function EncryptionProgress({
       </div>
 
       {accessCode && (
-        <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
-          <p className="mb-2 flex items-center gap-2 text-xs text-primary">
-            <KeyRound className="h-4 w-4" />
-            Access code
-          </p>
-          <p className="font-mono text-3xl font-semibold tracking-wide text-white">{formatDisplayCode(accessCode)}</p>
-        </div>
+        <CodeCopyBlock code={accessCode} />
       )}
 
       {masterKey && (
@@ -125,6 +120,32 @@ function MiniStat({ icon: Icon, label, value }: { icon: any; label: string; valu
         {label}
       </div>
       <p className="font-mono text-sm text-white">{value}</p>
+    </div>
+  );
+}
+
+function CodeCopyBlock({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const clean = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const display = clean.length > 3 ? `${clean.slice(0, 3)}-${clean.slice(3)}` : clean;
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(clean);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
+      <p className="mb-2 flex items-center gap-2 text-xs text-primary">
+        <KeyRound className="h-4 w-4" />
+        Access code
+      </p>
+      <button onClick={copy} className="w-full text-left font-mono text-3xl font-semibold tracking-wide text-white hover:text-primary transition-colors active:scale-[0.98] cursor-pointer select-all flex items-center justify-between gap-2 group">
+        <span>{display}</span>
+        {copied ? <Check className="w-5 h-5 text-primary shrink-0" /> : <Copy className="w-4 h-4 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
+      </button>
+      {copied && <p className="text-[10px] text-primary/70 mt-1.5">Copied to clipboard</p>}
     </div>
   );
 }

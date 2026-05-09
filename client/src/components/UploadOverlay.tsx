@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield, Zap, Clock, Activity, CheckCircle2, Lock,
   Binary, Network, Gauge, Cpu, Globe, Sparkles, Layers,
+  Copy, Check,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 
@@ -151,18 +152,7 @@ export function UploadOverlay({
 
             {/* Access Code (shown during transfer) */}
             {accessCode && (
-              <div className="mx-6 my-2 p-4 rounded-2xl bg-primary/[0.06] border border-primary/15">
-                <p className="text-[10px] font-medium text-primary/70 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <KeyRoundUI className="w-3 h-3" />
-                  Your access code
-                </p>
-                <p className="font-mono text-3xl font-bold text-white tracking-wider">
-                  {formatCode(accessCode)}
-                </p>
-                <p className="text-[10px] text-zinc-500 mt-1.5">
-                  Save this — it's the only way to access your files.
-                </p>
-              </div>
+              <CodeDisplay code={accessCode} />
             )}
 
             {/* Master key (collapsible) */}
@@ -234,12 +224,35 @@ function ByteLine({ label, value, total, color }: { label: string; value: number
   );
 }
 
-function KeyRoundUI({ className }: { className?: string }) {
+function CodeDisplay({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const formatted = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const display = formatted.length > 3 ? `${formatted.slice(0, 3)}-${formatted.slice(3)}` : formatted;
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(formatted);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="12" r="4" />
-      <path d="M12 12l8 0" />
-      <path d="M16 8l0 8" />
-    </svg>
+    <div className="mx-6 my-2 p-4 rounded-2xl bg-primary/[0.06] border border-primary/15">
+      <p className="text-[10px] font-medium text-primary/70 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="8" cy="12" r="4" /><path d="M12 12l8 0" /><path d="M16 8l0 8" />
+        </svg>
+        Your access code
+      </p>
+      <button
+        onClick={copy}
+        className="w-full text-left font-mono text-3xl font-bold text-white tracking-wider hover:text-primary transition-colors active:scale-[0.98] cursor-pointer select-all flex items-center justify-between gap-2 group"
+      >
+        <span>{display}</span>
+        {copied ? <Check className="w-5 h-5 text-primary shrink-0" /> : <Copy className="w-4 h-4 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
+      </button>
+      <p className="text-[10px] text-zinc-500 mt-1.5">
+        {copied ? "Copied to clipboard!" : "Tap to copy · Save this — it's the only way to access your files."}
+      </p>
+    </div>
   );
 }
