@@ -217,7 +217,7 @@
 }
 
 /* =============================================================================
-   MOBILE
+   MOBILE — Native app feel, no overflow, no overlap
    ============================================================================= */
 
 @supports (padding: env(safe-area-inset-bottom)) {
@@ -226,11 +226,47 @@
 }
 
 @media screen and (max-width: 768px) {
+  /* Prevent iOS zoom on focus */
   input, textarea, select { font-size: 16px !important; }
+
+  /* Touch targets: minimum 40px */
   button:not(.tap-sm), [role="button"]:not(.tap-sm) {
     min-height: 40px;
     touch-action: manipulation;
   }
+
+  /* Prevent horizontal overflow globally */
+  *, *::before, *::after { max-width: 100vw; }
+  body { overflow-x: hidden; }
+
+  /* Ensure cards don't overflow */
+  .surface-card, .transfer-panel, .bento-card {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Smaller base text */
+  html { font-size: 15px; }
+
+  /* Reduce blur for GPU perf */
+  .blur-\[100px\], .blur-\[120px\], .blur-\[150px\] {
+    filter: blur(40px) !important;
+  }
+
+  /* Reduce motion for battery */
+  .animate-pulse-slow, .animate-float-subtle, .animate-glow-enhanced {
+    animation: none !important;
+  }
+
+  /* Make inputs full-width friendly */
+  input[type="text"], input[type="email"], textarea {
+    min-width: 0;
+  }
+}
+
+@media screen and (max-width: 380px) {
+  html { font-size: 14px; }
+  .code-input { font-size: 1.25rem !important; letter-spacing: 0.2em !important; }
 }
 
 /* =============================================================================

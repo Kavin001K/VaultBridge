@@ -348,7 +348,7 @@ export default function DownloadPage() {
                     const isDownloading = activeDownload === file.fileId;
                     
                     return (
-                        <motion.div key={file.fileId} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} className={`transfer-panel p-5 group transition-all duration-500 ${isExhausted ? 'opacity-40 grayscale pointer-events-none' : 'hover:border-primary/30'}`}>
+                        <motion.div key={file.fileId} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} className={`transfer-panel p-5 group transition-all duration-500 ${isExhausted ? 'border-red-500/20 bg-red-500/[0.03]' : 'hover:border-primary/30'}`}>
                             <div className="flex flex-col md:flex-row items-center gap-6">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border transition-colors ${isDownloading ? 'bg-primary/20 border-primary animate-pulse' : 'bg-zinc-950 border-white/5 group-hover:border-primary/20'}`}>
                                     {isDownloading ? <RefreshCw className="w-6 h-6 text-primary animate-spin" /> : <File className="w-6 h-6 text-zinc-600 group-hover:text-primary transition-colors" />}

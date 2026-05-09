@@ -140,7 +140,19 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
-  const id = genId()
+  // If an id is provided, deduplicate: dismiss existing toast with same id first
+  const id = (props as any).id || genId()
+
+  // Check if a toast with this id already exists
+  const existing = memoryState.toasts.find((t) => t.id === id)
+  if (existing) {
+    // Update existing toast instead of stacking
+    dispatch({
+      type: "UPDATE_TOAST",
+      toast: { ...props, id, open: true },
+    })
+    return { id, dismiss: () => dispatch({ type: "DISMISS_TOAST", toastId: id }), update: () => {} }
+  }
 
   const update = (props: ToasterToast) =>
     dispatch({

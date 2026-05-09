@@ -195,9 +195,13 @@ export function useFolderUpload() {
                 statusMessage: `Compressing ${files.length} files...`
             }));
 
-            // Create ZIP using fflate
+            // Create ZIP using fflate — validate paths to prevent zip slip
             const zipData: { [path: string]: Uint8Array } = {};
             files.forEach(f => {
+                // Reject paths with traversal sequences
+                if (f.path.includes('..') || f.path.startsWith('/') || f.path.includes('\0')) {
+                    throw new Error(`Invalid file path: ${f.path}`);
+                }
                 zipData[f.path] = f.data;
             });
 

@@ -243,7 +243,7 @@ export function VaultCard({
                 />
 
                 <div className="bg-white p-2 rounded-lg relative z-0 w-full h-full flex items-center justify-center">
-                  <QRCodeSVG
+                  <QRCodeSVG level="H" includeMargin
                     value={fullLink}
                     size={200}
                     className="w-full h-full"
