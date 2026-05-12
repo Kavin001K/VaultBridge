@@ -36,13 +36,14 @@ const formatBytes = (b: number) => {
 };
 
 const formatSpeed = (bps: number) => {
-  if (!bps || bps <= 0) return "—";
+  if (!bps || bps <= 0) return "BOOTING";
+  if (bps < 1024) return `${bps.toFixed(0)} B/s`;
   if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(0)} KB/s`;
   return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
 };
 
 const formatEta = (s: number) => {
-  if (!s || s <= 0 || !Number.isFinite(s)) return "—";
+  if (!s || s <= 0 || !Number.isFinite(s)) return "CALC";
   if (s < 60) return `${Math.round(s)}s`;
   const m = Math.floor(s / 60);
   const sec = Math.round(s % 60);
@@ -125,10 +126,10 @@ export function UploadOverlay({
 
             {/* Stats Grid */}
             <div className="px-6 pb-2 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <Stat icon={Gauge} label="Speed" value={formatSpeed(speed)} />
-              <Stat icon={Clock} label="ETA" value={formatEta(eta)} />
-              <Stat icon={Layers} label="Chunks" value={chunkCount > 0 ? String(chunkCount) : "—"} />
-              <Stat icon={Shield} label="Size" value={formatBytes(totalSize)} />
+              <Stat icon={Gauge} label="Bandwidth" value={formatSpeed(speed)} />
+              <Stat icon={Clock} label="Protocol ETA" value={formatEta(eta)} />
+              <Stat icon={Layers} label="Fragments" value={chunkCount > 0 ? String(chunkCount) : "INIT"} />
+              <Stat icon={Shield} label="Payload" value={formatBytes(totalSize)} />
             </div>
 
             {/* Byte Progress */}

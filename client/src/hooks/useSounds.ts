@@ -12,6 +12,7 @@ export type SoundType =
     | 'tick'
     | 'pop'
     | 'chime'
+    | 'destruction'
     | 'off';
 
 // Web Audio API based synthesized sounds - no external files needed!
@@ -179,7 +180,59 @@ const soundConfigs: Record<SoundType, (ctx: AudioContext, volume: number) => voi
             osc.stop(ctx.currentTime + 0.5);
         });
     },
+    destruction: (ctx, volume) => {
+        // Complex destruction sound: Noise + Low frequency sweep + Random pops
+        const duration = 2.5;
+        
+        // 1. Low frequency "rumble"
+        const rumble = ctx.createOscillator();
+        const rumbleGain = ctx.createGain();
+        rumble.type = 'sawtooth';
+        rumble.frequency.setValueAtTime(100, ctx.currentTime);
+        rumble.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + duration);
+        rumbleGain.gain.setValueAtTime(volume * 0.3, ctx.currentTime);
+        rumbleGain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+        rumble.connect(rumbleGain);
+        rumbleGain.connect(ctx.destination);
+        rumble.start();
+        rumble.stop(ctx.currentTime + duration);
 
+        // 2. White noise "explosion"
+        const bufferSize = ctx.sampleRate * duration;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1);
+        }
+        const noise = ctx.createBufferSource();
+        const noiseGain = ctx.createGain();
+        const noiseFilter = ctx.createBiquadFilter();
+        noise.buffer = buffer;
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(2000, ctx.currentTime);
+        noiseFilter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + duration);
+        noiseGain.gain.setValueAtTime(volume * 0.2, ctx.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start();
+
+        // 3. High-pitched digital "glitches"
+        for (let i = 0; i < 15; i++) {
+            const time = ctx.currentTime + Math.random() * duration;
+            const popOsc = ctx.createOscillator();
+            const popGain = ctx.createGain();
+            popOsc.type = 'square';
+            popOsc.frequency.setValueAtTime(Math.random() * 2000 + 500, time);
+            popGain.gain.setValueAtTime(volume * 0.1, time);
+            popGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+            popOsc.connect(popGain);
+            popGain.connect(ctx.destination);
+            popOsc.start(time);
+            popOsc.stop(time + 0.05);
+        }
+    },
     off: (ctx, volume) => {
         // Power down sound
         const osc = ctx.createOscillator();

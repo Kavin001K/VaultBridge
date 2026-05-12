@@ -13,7 +13,8 @@ type Sample = {
   uploadedBytes: number;
 };
 
-const DEFAULT_WINDOW_MS = 8000;
+const DEFAULT_WINDOW_MS = 6000; // 6s window for more responsiveness
+const MIN_SAMPLES = 2;
 
 export class ByteProgressTracker {
   private totalBytes: number;
@@ -22,10 +23,12 @@ export class ByteProgressTracker {
   private confirmedBytes = 0;
   private samples: Sample[] = [];
   private readonly windowMs: number;
+  private startTime: number;
 
   constructor(totalBytes: number, windowMs = DEFAULT_WINDOW_MS) {
     this.totalBytes = Math.max(0, totalBytes);
     this.windowMs = windowMs;
+    this.startTime = Date.now();
     this.recordSample();
   }
 
@@ -47,12 +50,16 @@ export class ByteProgressTracker {
   }
 
   snapshot(): UploadProgressSnapshot {
+    const now = Date.now();
+    this.pruneSamples(now);
+
     const weightedDone =
       this.encryptedBytes * 0.2 +
       this.uploadedBytes * 0.6 +
       this.confirmedBytes * 0.2;
+    
     const progress = this.totalBytes > 0 ? (weightedDone / this.totalBytes) * 100 : 0;
-    const speed = this.calculateSpeed();
+    const speed = this.calculateSpeed(now);
     const remainingBytes = Math.max(0, this.totalBytes - this.uploadedBytes);
 
     return {
@@ -69,18 +76,45 @@ export class ByteProgressTracker {
   private recordSample() {
     const now = Date.now();
     this.samples.push({ at: now, uploadedBytes: this.uploadedBytes });
-    this.samples = this.samples.filter((sample) => now - sample.at <= this.windowMs);
-    if (this.samples.length === 1) {
-      this.samples.unshift({ at: now - 1, uploadedBytes: this.uploadedBytes });
+    this.pruneSamples(now);
+  }
+
+  private pruneSamples(now: number) {
+    const cutoff = now - this.windowMs;
+    this.samples = this.samples.filter((s) => s.at >= cutoff);
+    
+    // Always keep at least one baseline if possible
+    if (this.samples.length === 0) {
+      this.samples.push({ at: now - 100, uploadedBytes: this.uploadedBytes });
     }
   }
 
-  private calculateSpeed() {
-    if (this.samples.length < 2) return 0;
+  private calculateSpeed(now: number) {
+    if (this.samples.length < MIN_SAMPLES) {
+      // Not enough data yet, use average since start
+      const elapsed = (now - this.startTime) / 1000;
+      return elapsed > 0.5 ? this.uploadedBytes / elapsed : 0;
+    }
+
     const first = this.samples[0];
     const last = this.samples[this.samples.length - 1];
-    const elapsedSeconds = Math.max(0.001, (last.at - first.at) / 1000);
-    return Math.max(0, (last.uploadedBytes - first.uploadedBytes) / elapsedSeconds);
+    
+    const elapsedSeconds = (last.at - first.at) / 1000;
+    
+    // If the last sample is old, speed is dropping
+    const timeSinceLastSample = (now - last.at) / 1000;
+    
+    if (elapsedSeconds <= 0.01) return 0;
+    
+    let currentSpeed = (last.uploadedBytes - first.uploadedBytes) / elapsedSeconds;
+    
+    // Apply decay if we haven't seen data in a while
+    if (timeSinceLastSample > 1.5) {
+      const decay = Math.max(0, 1 - (timeSinceLastSample - 1.5) / 3);
+      currentSpeed *= decay;
+    }
+
+    return Math.max(0, currentSpeed);
   }
 
   private safeBytes(bytes: number) {

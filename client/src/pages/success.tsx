@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Copy, Check, Key, Share2, Mail, Trash2, Shield,
   Clock, Download, HardDrive, CheckCircle2, Send, AlertTriangle,
-  Flame, Layers, File, Timer, ExternalLink,
+  Flame, Layers, File, Timer, ExternalLink, Gauge, Activity,
+  ArrowRight, Smartphone, Loader2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useVaultHistory } from "@/hooks/useVaultHistory";
 import { getVaultIdentity } from "@/lib/cipherAvatar";
 import { VaultDestruction } from "@/components/VaultDestruction";
+import { cn } from "@/lib/utils";
+import { Sparkles, LayoutGrid, Cpu, Globe, Rocket, ShieldCheck } from "lucide-react";
 
 const formatBytes = (b: number) => {
   if (!b) return "0 B";
@@ -80,6 +83,13 @@ export default function SuccessPage() {
     }
   }, [vault, splitCode]);
 
+  useEffect(() => {
+    if (vault && vault.maxDownloads > 0 && vault.downloadCount >= vault.maxDownloads && !showDestruction) {
+      const timer = setTimeout(() => setShowDestruction(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [vault, showDestruction]);
+
   const shareLink = `${window.location.origin}/access#code=${splitCode}`;
 
   const handleCopy = async (text: string, type: "link" | "code") => {
@@ -123,21 +133,48 @@ export default function SuccessPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/[0.03] blur-[100px] rounded-full" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/[0.02] blur-[100px] rounded-full" />
+      {/* Background with dynamic orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden bg-[#020408]">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/[0.05] blur-[140px] rounded-full animate-pulse-slow" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-primary/[0.03] blur-[140px] rounded-full animate-pulse-slow" style={{ animationDelay: '3s' }} />
+        
+        {/* Modern grid background */}
+        <div className="absolute inset-0 opacity-[0.05]" 
+          style={{ 
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
+            backgroundSize: '40px 40px',
+            maskImage: 'radial-gradient(ellipse at center, black, transparent 80%)'
+          }} 
+        />
+        
+        {/* Floating particles (CSS only) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+            {[...Array(15)].map((_, i) => (
+                <div 
+                    key={i}
+                    className="absolute bg-primary rounded-full blur-[1px]"
+                    style={{
+                        width: Math.random() * 3 + 'px',
+                        height: Math.random() * 3 + 'px',
+                        top: Math.random() * 100 + '%',
+                        left: Math.random() * 100 + '%',
+                        animation: `float ${Math.random() * 10 + 10}s linear infinite`,
+                        animationDelay: `-${Math.random() * 10}s`
+                    }}
+                />
+            ))}
+        </div>
       </div>
 
       {/* Header */}
       <header className="relative z-50 border-b border-white/[0.05] bg-background/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-2.5 cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-3 cursor-pointer group">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:scale-105 group-hover:border-primary/40 transition-all">
+                <Shield className="w-4.5 h-4.5 text-primary" />
               </div>
-              <span className="text-sm font-bold text-white">VaultBridge</span>
+              <span className="text-sm font-black text-white tracking-tight uppercase italic">Vault<span className="text-primary">Bridge</span></span>
             </div>
           </Link>
           <button onClick={() => setLocation("/")} className="btn-ghost px-3 py-1.5 text-xs">
@@ -147,129 +184,220 @@ export default function SuccessPage() {
       </header>
 
       <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 pt-8 sm:pt-12 pb-16">
-        {/* Success badge */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/[0.06] border border-primary/15 text-primary text-[11px] font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Vault created
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-bold mt-3 mb-1">Files secured</h1>
-          <p className="text-sm text-zinc-500">Share the link below. Files auto-destruct after limits.</p>
-        </motion.div>
-
-        {/* Vault limits info */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="surface-card p-4 sm:p-5 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold">Vault limits</h3>
-            <span className="text-[11px] text-zinc-500 flex items-center gap-1">
-              <Timer className="w-3 h-3" />
-              {vault ? formatTimeLeft(vault.expiresAt) : "..."}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="h-full bg-primary rounded-full" style={{ width: `${vaultMax > 0 ? (vaultUsed / vaultMax) * 100 : 0}%` }} />
+        {/* Success Header & Identity */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12 relative">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2, type: "spring", damping: 15 }}
+            className="inline-flex flex-col items-center mb-8"
+          >
+            <div className={cn(
+              "w-24 h-24 rounded-[2.5rem] flex items-center justify-center text-5xl shadow-[0_0_50px_rgba(45,212,191,0.2)] mb-5 relative group transition-all duration-500 hover:rotate-6",
+              "bg-zinc-950/50 backdrop-blur-2xl border border-white/10 ring-4 ring-white/[0.02]"
+            )}>
+              <div className={cn("absolute inset-0 bg-gradient-to-br opacity-20 rounded-[2.5rem]", identity?.color)} />
+              <div className="relative z-10 filter drop-shadow-lg">{identity?.icon || "🔒"}</div>
+              
+              {/* Spinning ring */}
+              <div className="absolute -inset-1 border border-primary/20 rounded-[2.7rem] animate-spin-slow opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <span className="text-xs font-mono text-zinc-400 tabular-nums">{vaultRemaining}/{vaultMax} downloads left</span>
-          </div>
-        </motion.div>
-
-        {/* Per-file limits */}
-        {files.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="surface-card p-4 sm:p-5 mb-4">
-            <h3 className="text-sm font-semibold mb-3">Files ({files.length})</h3>
-            <div className="space-y-2">
-              {files.map((f: any, i: number) => {
-                const fileMax = f.maxDownloads || vaultMax;
-                const fileUsed = f.downloadCount || 0;
-                const fileRemaining = Math.max(0, fileMax - fileUsed);
-                const exhausted = fileRemaining <= 0;
-                return (
-                  <div key={f.fileId || i} className={`flex items-center gap-3 p-2.5 rounded-xl ${exhausted ? "bg-red-500/[0.04] border border-red-500/10" : "bg-white/[0.02] border border-white/[0.04]"}`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${exhausted ? "bg-red-500/10" : "bg-white/[0.04]"}`}>
-                      {exhausted ? <Flame className="w-4 h-4 text-red-400" /> : <File className="w-4 h-4 text-zinc-400" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-medium truncate ${exhausted ? "text-red-400" : "text-zinc-300"}`}>
-                        {f.fileId?.slice(0, 8) || `File ${i + 1}`}
-                      </p>
-                      <p className="text-[10px] text-zinc-500">{formatBytes(f.totalSize || f.size || 0)}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className={`text-xs font-mono font-medium ${exhausted ? "text-red-400" : "text-zinc-400"}`}>
-                        {fileRemaining}/{fileMax}
-                      </span>
-                      <p className="text-[9px] text-zinc-500">left</p>
-                    </div>
-                  </div>
-                );
-              })}
+            
+            <div className="flex flex-col items-center gap-1.5">
+                <span className="text-[10px] font-black text-primary tracking-[0.5em] uppercase px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
+                    {identity?.name || "Secured"} Node
+                </span>
+                <div className="h-0.5 w-8 bg-gradient-to-r from-transparent via-primary/40 to-transparent mt-2" />
             </div>
           </motion.div>
-        )}
 
-        {/* Access code & link */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="surface-card p-5 sm:p-6 mb-4">
-          <div className="text-center mb-4">
-            <p className="text-xs text-zinc-500 mb-3 uppercase tracking-wide">Access code — tap to copy</p>
-            <button
-              onClick={() => handleCopy(splitCode, "code")}
-              className="text-3xl sm:text-4xl font-mono font-bold text-white tracking-[0.3em] hover:text-primary transition-colors active:scale-[0.98] cursor-pointer select-all mb-3"
+          <h1 className="text-4xl sm:text-6xl font-black text-white uppercase italic tracking-tighter mb-4 leading-tight">
+            Vault <span className="text-primary glitch-text" data-text="Encrypted">Encrypted</span>
+          </h1>
+          <p className="text-sm text-zinc-500 font-medium max-w-md mx-auto leading-relaxed">
+            Your files have been split into encrypted fragments and distributed across our secure nodes.
+          </p>
+        </motion.div>
+
+        <div className="space-y-6">
+          {/* Main Dashboard Card */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="relative p-1 rounded-[2.5rem] bg-gradient-to-br from-white/10 to-transparent"
+          >
+            <div className="bg-[#0c111a]/95 backdrop-blur-3xl rounded-[2.4rem] p-6 sm:p-8 overflow-hidden relative group">
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-primary/[0.03] to-transparent pointer-events-none" />
+              
+              {/* Access Code Block */}
+              <div className="text-center relative z-10 mb-10">
+                <p className="text-[10px] font-black text-zinc-500 mb-8 uppercase tracking-[0.4em] flex items-center justify-center gap-2">
+                    <Sparkles className="w-3 h-3 text-primary animate-pulse" />
+                    Security Clearance Key
+                </p>
+                <div className="relative inline-block group/code">
+                    <button
+                      onClick={() => handleCopy(splitCode, "code")}
+                      className="text-5xl sm:text-7xl font-mono font-black text-white tracking-[0.2em] transition-all active:scale-[0.98] cursor-pointer select-all relative z-10 hover:text-primary"
+                    >
+                      {splitCode.slice(0, 3)}<span className="text-primary/30 mx-2">-</span>{splitCode.slice(3)}
+                    </button>
+                    <div className="absolute -inset-8 bg-primary/20 blur-[40px] opacity-0 group-hover/code:opacity-100 transition-opacity -z-10" />
+                </div>
+                
+                <div className="mt-8 flex items-center justify-center gap-2">
+                  {copiedCode ? (
+                    <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 border border-primary/30">
+                        <Check className="w-4 h-4 text-primary" />
+                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">Key Copied</span>
+                    </motion.div>
+                  ) : (
+                    <span className="text-[11px] font-black text-zinc-600 uppercase tracking-widest animate-pulse flex items-center gap-2">
+                        Tap code to duplicate <Copy className="w-3 h-3" />
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* URL & QR */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-3 p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-primary/30 transition-all group/link">
+                  <Globe className="w-4 h-4 text-zinc-600 group-hover/link:text-primary transition-colors shrink-0" />
+                  <p className="flex-1 text-[11px] text-zinc-500 font-mono truncate tracking-tight">{shareLink}</p>
+                  <button 
+                    onClick={() => handleCopy(shareLink, "link")} 
+                    className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] hover:shadow-[0_0_20px_rgba(45,212,191,0.4)] active:scale-95 transition-all"
+                  >
+                    {copiedLink ? "Synced" : "Copy_Link"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-center py-4">
+                  <div className="relative group/qr">
+                    <div className="absolute -inset-6 bg-primary/5 blur-2xl opacity-0 group-hover/qr:opacity-100 transition-all duration-700" />
+                    <div className="relative z-10 p-4 bg-white rounded-[2rem] shadow-2xl transition-transform hover:scale-105 duration-500">
+                        <QRCodeSVG level="H" value={shareLink} size={180} bgColor="#ffffff" fgColor="#000000" />
+                    </div>
+                    <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-max opacity-0 group-hover/qr:opacity-100 transition-opacity">
+                         <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Direct Handshake Protocol</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Telemetry Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="bg-zinc-950/50 backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 group hover:border-primary/20 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Gauge className="w-4 h-4 text-primary" />
+                        </div>
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Vault Health</h3>
+                    </div>
+                    <span className="text-[10px] font-black text-primary uppercase">Active</span>
+                </div>
+                <div className="space-y-4">
+                  <div className="h-1.5 rounded-full bg-zinc-900 border border-white/5 overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }} 
+                      animate={{ width: `${vaultMax > 0 ? (vaultUsed / vaultMax) * 100 : 0}%` }} 
+                      className="h-full bg-gradient-to-r from-primary to-emerald-400 rounded-full" 
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                    <span>Downloads used</span>
+                    <span className="text-zinc-300 font-mono">{vaultUsed} / {vaultMax}</span>
+                  </div>
+                </div>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="bg-zinc-950/50 backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 group hover:border-primary/20 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Clock className="w-4 h-4 text-amber-500" />
+                        </div>
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Expiraton</h3>
+                    </div>
+                </div>
+                <div className="flex items-end justify-between">
+                    <div>
+                        <p className="text-2xl font-mono font-black text-white tracking-tighter">
+                            {vault ? formatTimeLeft(vault.expiresAt) : "..."}
+                        </p>
+                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mt-1">Time remaining</p>
+                    </div>
+                    <div className="w-10 h-10 border-2 border-amber-500/10 border-t-amber-500 rounded-full animate-spin-slow" />
+                </div>
+            </motion.div>
+          </div>
+
+          {/* Fragments List */}
+          {files.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.6 }} 
+              className="bg-zinc-950/50 backdrop-blur-xl p-6 rounded-[2rem] border border-white/5"
             >
-              {splitCode.slice(0, 3)}<span className="text-primary/40 mx-1">-</span>{splitCode.slice(3)}
-            </button>
-            <div className="text-[11px] text-zinc-500">
-              {copiedCode ? <span className="text-primary flex items-center justify-center gap-1"><Check className="w-3 h-3" />Copied to clipboard</span> : "Tap the code to copy"}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <ExternalLink className="w-4 h-4 text-zinc-500 shrink-0" />
-            <p className="flex-1 text-[11px] text-zinc-400 font-mono truncate">{shareLink}</p>
-            <button onClick={() => handleCopy(shareLink, "link")} className="btn-primary px-3 py-1.5 text-[10px] rounded-lg shrink-0">
-              {copiedLink ? "Copied" : "Copy"}
-            </button>
-          </div>
-
-          {/* QR */}
-          <div className="flex justify-center mt-4">
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
-              <QRCodeSVG level="H" includeMargin value={shareLink} size={140} bgColor="transparent" fgColor="#2dd4bf" />
-            </div>
-          </div>
-          <p className="text-center text-[10px] text-zinc-600 mt-2">Scan for mobile access</p>
-        </motion.div>
-
-        {/* Email & Burn actions */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="space-y-3">
-          {/* Email */}
-          <div className="surface-card p-4">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Send via email</h3>
-            <div className="flex gap-2">
-              <input
-                placeholder="recipient@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 h-11 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary/30 transition-colors"
-              />
-              <button onClick={handleSendEmail} disabled={isSending || !email} className="btn-primary px-4 py-2 text-xs rounded-xl">
-                {isSending ? "..." : "Send"}
-              </button>
-            </div>
-          </div>
-
-          {/* Burn */}
-          <button onClick={handleBurn} disabled={isDeleting} className="w-full p-4 rounded-2xl border border-red-500/15 bg-red-500/[0.03] hover:bg-red-500/[0.06] transition-colors text-left group">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0 group-hover:bg-red-500/15 transition-colors">
-                <Flame className="w-5 h-5 text-red-400" />
+              <div className="flex items-center gap-3 mb-6">
+                 <LayoutGrid className="w-4 h-4 text-zinc-600" />
+                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Object Manifest ({files.length})</h3>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-red-400">Burn vault now</p>
-                <p className="text-[11px] text-zinc-500">Irreversibly destroy all files immediately</p>
+              <div className="grid gap-3">
+                {files.map((f: any, i: number) => {
+                  const exhausted = (f.maxDownloads || vaultMax) <= (f.downloadCount || 0);
+                  return (
+                    <div key={f.fileId || i} className="flex items-center gap-4 p-4 rounded-2xl bg-black/40 border border-white/[0.03] hover:border-white/10 transition-all group/file">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center group-hover/file:border-primary/30 transition-all">
+                        {exhausted ? <Flame className="w-5 h-5 text-red-500" /> : <Rocket className="w-5 h-5 text-zinc-600 group-hover/file:text-primary transition-colors" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-zinc-200 truncate uppercase tracking-tight">{f.fileId?.slice(0, 20) || `Object_${i + 1}`}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{formatBytes(f.totalSize || f.size || 0)}</span>
+                            <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                            <span className="text-[9px] font-black text-primary uppercase tracking-widest">Verified</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-mono font-black text-zinc-400">{Math.max(0, (f.maxDownloads || vaultMax) - (f.downloadCount || 0))}</p>
+                        <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Left</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          </button>
-        </motion.div>
+            </motion.div>
+          )}
+
+          {/* Destructive Actions */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="pt-6">
+            <button 
+              onClick={handleBurn} 
+              disabled={isDeleting} 
+              className="w-full group relative p-6 rounded-[2.5rem] border border-red-500/10 bg-red-500/[0.02] hover:bg-red-500/[0.08] hover:border-red-500/40 transition-all overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center group-hover:scale-110 transition-all">
+                    <Flame className="w-7 h-7 text-red-500" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-black text-red-500 uppercase italic tracking-tighter">Self-Destruct Sequence</h4>
+                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mt-1">Irreversible zero-trace elimination</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-6 h-6 text-red-500/30 group-hover:text-red-500 group-hover:translate-x-2 transition-all" />
+              </div>
+            </button>
+          </motion.div>
+        </div>
       </main>
 
       {/* Destruction overlay */}

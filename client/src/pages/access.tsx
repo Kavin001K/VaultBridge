@@ -17,6 +17,7 @@ import { initiateStreamDownload } from "@/lib/downloadStream";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useVaultHistory } from "@/hooks/useVaultHistory";
 import { getVaultIdentity } from "@/lib/cipherAvatar";
+import { VaultDestruction } from "@/components/VaultDestruction";
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
@@ -430,6 +431,13 @@ export default function AccessPage() {
                     )}
                 </AnimatePresence>
             </main>
+
+            <VaultDestruction 
+                isActive={isBurned}
+                vaultCode={vaultData?.shortCode}
+                fileCount={fileMetadata.length}
+                totalSize={fileMetadata.reduce((acc, f) => acc + (f.size || 0), 0)}
+            />
         </div>
     );
 }

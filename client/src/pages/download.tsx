@@ -250,11 +250,7 @@ export default function DownloadPage() {
     // If vault is gone (expired/deleted/exhausted), show destruction
     const isGone = error?.includes("expired") || error?.includes("deleted") || error?.includes("not found");
     if (isGone) {
-      return (
-        <div className="min-h-screen bg-zinc-950 text-white relative flex flex-col overflow-x-hidden">
-          <VaultDestruction isActive={true} onComplete={() => window.location.href = "/"} />
-        </div>
-      );
+      return <VaultDestruction isActive={true} />;
     }
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 relative overflow-hidden">
@@ -313,7 +309,15 @@ export default function DownloadPage() {
                     </div>
                     <div className="flex-1 text-center md:text-left">
                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 mb-3">
-                            <span className="text-[10px] font-black bg-zinc-900 border border-white/10 px-3 py-1 rounded-full text-zinc-400 tracking-widest">#{vault.shortCode}</span>
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(vault.shortCode);
+                                    toast({ title: "Short code copied", description: "Reference code saved to clipboard" });
+                                }}
+                                className="text-[10px] font-black bg-zinc-900 border border-white/10 px-3 py-1 rounded-full text-zinc-400 tracking-widest hover:text-primary hover:border-primary/30 transition-all active:scale-95"
+                            >
+                                #{vault.shortCode}
+                            </button>
                             <span className="text-[10px] font-black bg-primary/10 border border-primary/20 px-3 py-1 rounded-full text-primary tracking-widest uppercase">Secured_Vault</span>
                         </div>
                         <h2 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter mb-2">Binary <span className="text-primary">Package</span></h2>
@@ -436,9 +440,6 @@ export default function DownloadPage() {
         vaultCode={vault?.shortCode}
         fileCount={files.length}
         totalSize={files.reduce((a, f) => a + f.size, 0)}
-        onComplete={() => {
-          setTimeout(() => (window.location.href = "/"), 3000);
-        }}
       />
     </div>
   );

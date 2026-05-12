@@ -691,7 +691,16 @@ export default function UploadPage() {
                         <ShieldCheck className="h-4 w-4" />
                         Code reserved
                       </p>
-                      <p className="font-mono text-3xl font-semibold tracking-wide text-white">{formatCode(activeCode)}</p>
+                      <button 
+                        onClick={() => {
+                          const clean = activeCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+                          navigator.clipboard.writeText(clean);
+                          toast({ title: "Code copied", description: "Vault code saved to clipboard" });
+                        }}
+                        className="w-full text-left font-mono text-3xl font-semibold tracking-wide text-white hover:text-primary transition-colors cursor-pointer select-all active:scale-[0.98]"
+                      >
+                        {formatCode(activeCode)}
+                      </button>
                     </div>
                   )}
 
