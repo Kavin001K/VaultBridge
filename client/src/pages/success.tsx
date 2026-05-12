@@ -41,7 +41,7 @@ export default function SuccessPage() {
   const [, params] = useRoute("/success/:id");
   const [splitCode, setSplitCode] = useState("");
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"link" | "email" | "burn">("link");
+  const [activeTab, setActiveTab] = useState<"link" | "email">("link");
   const [email, setEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -96,11 +96,22 @@ export default function SuccessPage() {
     await navigator.clipboard.writeText(text);
     if (type === "link") { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }
     else { setCopiedCode(true); setTimeout(() => setCopiedCode(false), 2000); }
-    toast({ title: "Copied" });
+    toast({ title: "Copied to clipboard" });
   };
 
   const handleSendEmail = async () => {
-    if (!email) return;
+    if (!email) {
+      toast({ variant: "destructive", title: "Email required", description: "Please enter a recipient email address." });
+      return;
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({ variant: "destructive", title: "Invalid email", description: "Please enter a valid email address." });
+      return;
+    }
+
     setIsSending(true);
     try {
       const response = await fetch(`/api/vaults/${vaultId}/email`, {
@@ -108,8 +119,18 @@ export default function SuccessPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to: email.trim().toLowerCase(), fullCode: splitCode }),
       });
-      if (response.ok) setShowSpamAlert(true);
-    } catch { toast({ variant: "destructive", title: "Failed to send email" }); }
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setShowSpamAlert(true);
+        setEmail("");
+      } else {
+        toast({ variant: "destructive", title: "Failed to send", description: data.message || "Something went wrong." });
+      }
+    } catch { 
+      toast({ variant: "destructive", title: "Network error", description: "Could not connect to relay server." }); 
+    }
     finally { setIsSending(false); }
   };
 
@@ -117,6 +138,8 @@ export default function SuccessPage() {
     if (!params?.id) return;
     setIsDeleting(true);
     try {
+      // In a real app, we might need auth headers here, but the route is currently open for demo purposes 
+      // or requires wrapKey which we have in state.
       await fetch(`/api/vaults/${params.id}`, { method: "DELETE" });
       setShowDestruction(true);
     } catch { setIsDeleting(false); toast({ variant: "destructive", title: "Failed to burn vault" }); }
@@ -132,7 +155,7 @@ export default function SuccessPage() {
   const vaultRemaining = Math.max(0, vaultMax - vaultUsed);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background text-foreground overflow-x-hidden selection:bg-primary/30 selection:text-white">
       {/* Background with dynamic orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden bg-[#020408]">
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/[0.05] blur-[140px] rounded-full animate-pulse-slow" />
@@ -177,7 +200,7 @@ export default function SuccessPage() {
               <span className="text-sm font-black text-white tracking-tight uppercase italic">Vault<span className="text-primary">Bridge</span></span>
             </div>
           </Link>
-          <button onClick={() => setLocation("/")} className="btn-ghost px-3 py-1.5 text-xs">
+          <button onClick={() => setLocation("/")} className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" /> Home
           </button>
         </div>
@@ -225,65 +248,148 @@ export default function SuccessPage() {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
-            className="relative p-1 rounded-[2.5rem] bg-gradient-to-br from-white/10 to-transparent"
+            className="relative p-px rounded-[2.5rem] bg-gradient-to-br from-white/10 to-transparent shadow-2xl"
           >
-            <div className="bg-[#0c111a]/95 backdrop-blur-3xl rounded-[2.4rem] p-6 sm:p-8 overflow-hidden relative group">
+            <div className="bg-[#0c111a]/95 backdrop-blur-3xl rounded-[2.4rem] overflow-hidden relative">
               <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-primary/[0.03] to-transparent pointer-events-none" />
               
-              {/* Access Code Block */}
-              <div className="text-center relative z-10 mb-10">
-                <p className="text-[10px] font-black text-zinc-500 mb-8 uppercase tracking-[0.4em] flex items-center justify-center gap-2">
-                    <Sparkles className="w-3 h-3 text-primary animate-pulse" />
-                    Security Clearance Key
-                </p>
-                <div className="relative inline-block group/code">
-                    <button
-                      onClick={() => handleCopy(splitCode, "code")}
-                      className="text-5xl sm:text-7xl font-mono font-black text-white tracking-[0.2em] transition-all active:scale-[0.98] cursor-pointer select-all relative z-10 hover:text-primary"
-                    >
-                      {splitCode.slice(0, 3)}<span className="text-primary/30 mx-2">-</span>{splitCode.slice(3)}
-                    </button>
-                    <div className="absolute -inset-8 bg-primary/20 blur-[40px] opacity-0 group-hover/code:opacity-100 transition-opacity -z-10" />
-                </div>
-                
-                <div className="mt-8 flex items-center justify-center gap-2">
-                  {copiedCode ? (
-                    <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 border border-primary/30">
-                        <Check className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">Key Copied</span>
-                    </motion.div>
-                  ) : (
-                    <span className="text-[11px] font-black text-zinc-600 uppercase tracking-widest animate-pulse flex items-center gap-2">
-                        Tap code to duplicate <Copy className="w-3 h-3" />
-                    </span>
+              {/* Tabs Switcher */}
+              <div className="flex border-b border-white/[0.05]">
+                <button 
+                  onClick={() => setActiveTab("link")}
+                  className={cn(
+                    "flex-1 py-4 text-[10px] font-black uppercase tracking-[0.3em] transition-all relative",
+                    activeTab === "link" ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
                   )}
-                </div>
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <Share2 className="w-3.5 h-3.5" />
+                    Secure Link
+                  </span>
+                  {activeTab === "link" && (
+                    <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                </button>
+                <button 
+                  onClick={() => setActiveTab("email")}
+                  className={cn(
+                    "flex-1 py-4 text-[10px] font-black uppercase tracking-[0.3em] transition-all relative",
+                    activeTab === "email" ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <Mail className="w-3.5 h-3.5" />
+                    Relay via Email
+                  </span>
+                  {activeTab === "email" && (
+                    <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                </button>
               </div>
 
-              {/* URL & QR */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-primary/30 transition-all group/link">
-                  <Globe className="w-4 h-4 text-zinc-600 group-hover/link:text-primary transition-colors shrink-0" />
-                  <p className="flex-1 text-[11px] text-zinc-500 font-mono truncate tracking-tight">{shareLink}</p>
-                  <button 
-                    onClick={() => handleCopy(shareLink, "link")} 
-                    className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] hover:shadow-[0_0_20px_rgba(45,212,191,0.4)] active:scale-95 transition-all"
-                  >
-                    {copiedLink ? "Synced" : "Copy_Link"}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-center py-4">
-                  <div className="relative group/qr">
-                    <div className="absolute -inset-6 bg-primary/5 blur-2xl opacity-0 group-hover/qr:opacity-100 transition-all duration-700" />
-                    <div className="relative z-10 p-4 bg-white rounded-[2rem] shadow-2xl transition-transform hover:scale-105 duration-500">
-                        <QRCodeSVG level="H" value={shareLink} size={180} bgColor="#ffffff" fgColor="#000000" />
-                    </div>
-                    <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-max opacity-0 group-hover/qr:opacity-100 transition-opacity">
-                         <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Direct Handshake Protocol</span>
-                    </div>
+              <div className="p-6 sm:p-8">
+                {/* Access Code Block (Always visible) */}
+                <div className="text-center mb-10">
+                  <p className="text-[10px] font-black text-zinc-500 mb-6 uppercase tracking-[0.4em] flex items-center justify-center gap-2">
+                      <Sparkles className="w-3 h-3 text-primary animate-pulse" />
+                      Security Clearance Key
+                  </p>
+                  <div className="relative inline-block group/code">
+                      <button
+                        onClick={() => handleCopy(splitCode, "code")}
+                        className="text-5xl sm:text-7xl font-mono font-black text-white tracking-[0.2em] transition-all active:scale-[0.98] cursor-pointer select-all relative z-10 hover:text-primary"
+                      >
+                        {splitCode.slice(0, 3)}<span className="text-primary/30 mx-2">-</span>{splitCode.slice(3)}
+                      </button>
+                      <div className="absolute -inset-8 bg-primary/20 blur-[40px] opacity-0 group-hover/code:opacity-100 transition-opacity -z-10" />
+                  </div>
+                  
+                  <div className="mt-8 flex items-center justify-center gap-2">
+                    {copiedCode ? (
+                      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 border border-primary/30">
+                          <Check className="w-4 h-4 text-primary" />
+                          <span className="text-[10px] font-black text-primary uppercase tracking-widest">Key Copied</span>
+                      </motion.div>
+                    ) : (
+                      <span className="text-[11px] font-black text-zinc-600 uppercase tracking-widest animate-pulse flex items-center gap-2">
+                          Tap code to duplicate <Copy className="w-3 h-3" />
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                <AnimatePresence mode="wait">
+                  {activeTab === "link" ? (
+                    <motion.div 
+                      key="link-tab"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="space-y-6"
+                    >
+                      <div className="flex items-center gap-3 p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-primary/30 transition-all group/link">
+                        <Globe className="w-4 h-4 text-zinc-600 group-hover/link:text-primary transition-colors shrink-0" />
+                        <p className="flex-1 text-[11px] text-zinc-500 font-mono truncate tracking-tight">{shareLink}</p>
+                        <button 
+                          onClick={() => handleCopy(shareLink, "link")} 
+                          className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] hover:shadow-[0_0_20px_rgba(45,212,191,0.4)] active:scale-95 transition-all"
+                        >
+                          {copiedLink ? "Synced" : "Copy_Link"}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-center py-4">
+                        <div className="relative group/qr">
+                          <div className="absolute -inset-6 bg-primary/5 blur-2xl opacity-0 group-hover/qr:opacity-100 transition-all duration-700" />
+                          <div className="relative z-10 p-4 bg-white rounded-[2rem] shadow-2xl transition-transform hover:scale-105 duration-500">
+                              <QRCodeSVG level="H" value={shareLink} size={160} bgColor="#ffffff" fgColor="#000000" />
+                          </div>
+                          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-max opacity-0 group-hover/qr:opacity-100 transition-opacity">
+                               <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Direct Handshake Protocol</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      key="email-tab"
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="space-y-6"
+                    >
+                      <div className="relative">
+                        <div className="flex items-center gap-3 p-4 rounded-2xl bg-black/40 border border-white/5 focus-within:border-primary/50 transition-all group/email">
+                          <Mail className="w-4 h-4 text-zinc-600 group-focus-within/email:text-primary transition-colors shrink-0" />
+                          <input 
+                            type="email" 
+                            placeholder="RECIPIENT_EMAIL_ADDRESS"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="flex-1 bg-transparent border-none outline-none text-[11px] text-zinc-300 font-mono placeholder:text-zinc-700 uppercase tracking-widest"
+                          />
+                          <button 
+                            onClick={handleSendEmail} 
+                            disabled={isSending}
+                            className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-[10px] hover:shadow-[0_0_20px_rgba(45,212,191,0.4)] active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : "Dispatch"}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center gap-4 text-center py-6">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center">
+                          <Send className="w-6 h-6 text-primary/40" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Relay Protocol Activated</p>
+                          <p className="text-[9px] text-zinc-600 font-medium max-w-[200px] leading-relaxed">Recipient will receive a secure transmission containing the access link and clearance key.</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>
@@ -321,7 +427,7 @@ export default function SuccessPage() {
                         <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Clock className="w-4 h-4 text-amber-500" />
                         </div>
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Expiraton</h3>
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Expiration</h3>
                     </div>
                 </div>
                 <div className="flex items-end justify-between">
@@ -411,12 +517,24 @@ export default function SuccessPage() {
 
       {/* Spam dialog */}
       <Dialog open={showSpamAlert} onOpenChange={setShowSpamAlert}>
-        <DialogContent className="bg-background border border-white/[0.08] rounded-2xl max-w-sm p-6">
-          <DialogHeader>
-            <DialogTitle className="text-white text-base">Email sent</DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs">Check spam folder if not received.</DialogDescription>
-          </DialogHeader>
-          <button onClick={() => setShowSpamAlert(false)} className="btn-primary w-full py-2.5 text-sm rounded-xl mt-2">OK</button>
+        <DialogContent className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-[2rem] max-w-sm p-8 shadow-[0_0_50px_rgba(45,212,191,0.15)]">
+          <div className="flex flex-col items-center text-center gap-6">
+            <div className="w-20 h-20 rounded-[2rem] bg-primary/10 border border-primary/20 flex items-center justify-center shadow-inner">
+               <CheckCircle2 className="w-10 h-10 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <DialogTitle className="text-white text-xl font-black uppercase italic tracking-tighter">Relay Successful</DialogTitle>
+              <DialogDescription className="text-zinc-500 text-xs font-medium leading-relaxed">
+                The encrypted payload access details have been successfully dispatched. Check spam folder if not received within 60 seconds.
+              </DialogDescription>
+            </div>
+            <button 
+              onClick={() => setShowSpamAlert(false)} 
+              className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.3em] hover:shadow-[0_0_30px_rgba(45,212,191,0.3)] transition-all active:scale-95"
+            >
+              Understood
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
