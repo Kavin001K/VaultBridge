@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useVaultHistory } from "@/hooks/useVaultHistory";
 import { getVaultIdentity } from "@/lib/cipherAvatar";
 import { VaultDestruction } from "@/components/VaultDestruction";
+import { cn } from "@/lib/utils";
 
 type AccessStage = "input" | "fetching" | "decrypting" | "ready" | "downloading";
 
