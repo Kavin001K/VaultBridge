@@ -474,22 +474,38 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] text-foreground">
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl">
+    <div className="min-h-screen bg-[#020604] text-zinc-100 relative">
+      {/* Background effects */}
+      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] radial-backlight rounded-full opacity-50 pointer-events-none" />
+
+      <header className="sticky top-0 z-50 border-b border-white/[0.03] bg-[#020604]/80 backdrop-blur-2xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
-          <Link href="/" className="group flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
-              <Binary className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-normal text-white">VaultBridge</p>
-              <p className="text-[11px] text-muted-foreground">Transfer console</p>
+          <Link href="/">
+            <div className="flex items-center gap-3 cursor-pointer select-none">
+              <div className="relative w-9 h-9 flex items-center justify-center">
+                <svg className="w-full h-full text-[#10b981]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="50" r="44" stroke="#10b981" strokeOpacity="0.1" strokeWidth="1.5" strokeDasharray="8 6" />
+                  <circle cx="50" cy="50" r="38" stroke="#10b981" strokeOpacity="0.3" strokeWidth="2" />
+                  <path d="M50 18C66 18 73 23 73 23C73 45 62 66 50 80C38 66 27 45 27 23C27 23 34 18 50 18Z" fill="#10b981" fillOpacity="0.08" stroke="#10b981" strokeWidth="2.5" />
+                  <circle cx="50" cy="50" r="11" fill="#022c22" stroke="#10b981" strokeWidth="1.5" />
+                  <path d="M50 39V43" stroke="#10b981" strokeWidth="2" />
+                  <path d="M50 57V61" stroke="#10b981" strokeWidth="2" />
+                  <path d="M39 50H43" stroke="#10b981" strokeWidth="2" />
+                  <path d="M57 50H61" stroke="#10b981" strokeWidth="2" />
+                </svg>
+              </div>
+              <div>
+                <span className="text-base font-bold tracking-tight text-white font-['Geist',system-ui,sans-serif] block leading-none">
+                  Vault<span className="text-[#10b981]">Bridge</span>
+                </span>
+                <span className="text-[10px] text-zinc-500 font-bold tracking-wider mt-1 block">TRANSFER CONSOLE</span>
+              </div>
             </div>
           </Link>
           <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2 rounded-lg">
+            <Button variant="ghost" size="sm" className="rounded-full text-zinc-400 hover:text-white px-4 text-xs font-semibold gap-2 border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800 transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              Home
+              Return home
             </Button>
           </Link>
         </div>
